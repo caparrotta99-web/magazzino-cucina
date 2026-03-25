@@ -399,3 +399,16 @@ def is_contact_taken(identifier, exclude_user_id):
             (identifier, identifier, exclude_user_id)
         ).fetchone()
         return row is not None
+
+
+def get_feed(limit=40):
+    """Ultimi movimenti per il feed home."""
+    with get_conn() as conn:
+        rows = conn.execute("""
+            SELECT id, data, fornitore, prodotto, lotto, scadenza,
+                   carico, scarico, unita, operatore, reparto, movimento_id
+            FROM registro
+            ORDER BY id DESC
+            LIMIT ?
+        """, (limit,)).fetchall()
+        return [dict(r) for r in rows]

@@ -25,7 +25,7 @@ from database import (
     create_user, get_user_by_login, get_user_by_id,
     get_all_users, update_user_role, delete_user,
     create_reset_token, get_reset_token, use_reset_token, update_user_password,
-    update_user_profile, is_contact_taken,
+    update_user_profile, is_contact_taken, get_feed,
 )
 from sheets import load_listino, load_registro, append_registro
 
@@ -357,6 +357,12 @@ def api_giacenze():
 @login_required
 def api_alerts():
     return jsonify({'success': True, **get_alerts()})
+
+
+@app.route('/api/feed')
+@login_required
+def api_feed():
+    return jsonify({'success': True, 'movements': get_feed()})
 
 
 # ─── OPERAZIONI ──────────────────────────────────────────────────────────────

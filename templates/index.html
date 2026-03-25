@@ -1,0 +1,1480 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>HACCP — Magazzino</title>
+<link rel="manifest" href="/static/manifest.json">
+<meta name="theme-color" content="#c8a020">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="HACCP">
+<link rel="apple-touch-icon" href="/static/icon.svg">
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --accent:    #c8a020;
+  --acc-bg:    #faf3df;
+  --text:      #1a1815;
+  --muted:     #6e6355;
+  --dim:       #a89880;
+  --border:    #e6dfd4;
+  --surface:   #fafaf8;
+  --white:     #ffffff;
+  --red:       #c83030;
+  --red-bg:    rgba(200,48,48,.09);
+  --orange:    #c86010;
+  --ora-bg:    rgba(200,96,16,.09);
+  --green:     #2a7a2a;
+  --grn-bg:    rgba(42,122,42,.09);
+  --tab-btn-h: 62px;
+  --hdr-h:     58px;
+}
+
+/* ── RESET & BASE ── */
+*, *::before, *::after {
+  margin: 0; padding: 0; box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
+}
+html { height: -webkit-fill-available; }
+body {
+  background: var(--white);
+  color: var(--text);
+  font-family: 'Outfit', sans-serif;
+  font-size: 16px;
+  line-height: 1.5;
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
+  display: flex;
+  flex-direction: column;
+  overscroll-behavior: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── HEADER ── */
+header {
+  height: var(--hdr-h);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px 0 20px;
+  border-bottom: 1px solid var(--border);
+  background: var(--white);
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  flex-shrink: 0;
+  gap: 8px;
+}
+.logo {
+  font-weight: 700;
+  font-size: 17px;
+  letter-spacing: .3px;
+  color: var(--text);
+  flex-shrink: 0;
+}
+.logo span { color: var(--accent); }
+.hdr-user {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-left: 10px;
+}
+.hdr-nome {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hdr-reparto {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 100px;
+  background: var(--acc-bg);
+  color: var(--accent);
+  font-family: 'DM Mono', monospace;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+.hdr-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.btn-icon {
+  background: none;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  width: 40px; height: 40px;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  text-decoration: none;
+  transition: border-color .15s, color .15s;
+  flex-shrink: 0;
+}
+.btn-icon:hover  { border-color: var(--accent); color: var(--accent); }
+.btn-icon.spinning { animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.hdr-alert-dot {
+  width: 8px; height: 8px;
+  background: var(--red);
+  border-radius: 50%;
+  display: none;
+  animation: pulse 2s ease-in-out infinite;
+  flex-shrink: 0;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.3} }
+
+/* ── MAIN ── */
+main {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding-bottom: calc(var(--tab-btn-h) + env(safe-area-inset-bottom, 0px) + 20px);
+}
+.tab-panel {
+  display: none;
+  padding: 24px 18px 8px;
+  max-width: 560px;
+  margin: 0 auto;
+}
+.tab-panel.active { display: block; }
+
+/* ── HOME ── */
+.home-greeting {
+  margin-bottom: 28px;
+}
+.home-greeting h2 {
+  font-size: 22px;
+  font-weight: 700;
+  letter-spacing: -.2px;
+  margin-bottom: 4px;
+}
+.home-date {
+  font-size: 13px;
+  color: var(--muted);
+  font-family: 'DM Mono', monospace;
+}
+.home-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+.home-card {
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  padding: 28px 12px 22px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  text-align: center;
+  transition: background .12s, transform .1s;
+  position: relative;
+  border-top-width: 3px;
+  font-family: 'Outfit', sans-serif;
+  font-size: inherit;
+}
+.home-card:active { background: var(--surface); transform: scale(.97); }
+.home-card.carico  { border-top-color: var(--accent); }
+.home-card.scarico { border-top-color: #2a2520; }
+.home-card.giac    { border-top-color: var(--green); }
+.home-card.alert   { border-top-color: var(--red); }
+.home-icon {
+  font-size: 32px;
+  line-height: 1;
+  margin-bottom: 2px;
+}
+.home-label {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  letter-spacing: -.1px;
+}
+.home-sub {
+  font-size: 12px;
+  color: var(--muted);
+  line-height: 1.3;
+}
+.home-badge {
+  position: absolute;
+  top: 12px; right: 12px;
+  background: var(--red);
+  color: #fff;
+  border-radius: 100px;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 2px 7px;
+  font-family: 'DM Mono', monospace;
+  display: none;
+  line-height: 1.4;
+}
+
+/* ── TITOLI ── */
+.panel-title {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 24px;
+  letter-spacing: -.2px;
+}
+.panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+.panel-header .panel-title { margin-bottom: 0; }
+
+/* ── FORM ── */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 20px;
+}
+label {
+  font-size: 12px;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-family: 'DM Mono', monospace;
+  font-weight: 500;
+}
+input, select, textarea {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 15px 16px;
+  color: var(--text);
+  font-family: 'Outfit', sans-serif;
+  font-size: 16px;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+  width: 100%;
+  appearance: none;
+  -webkit-appearance: none;
+}
+input:focus, select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(200,160,32,.12);
+}
+input::placeholder { color: var(--dim); }
+select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' viewBox='0 0 14 9'%3E%3Cpath d='M1 1l6 6 6-6' stroke='%23a89880' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+  padding-right: 44px;
+  cursor: pointer;
+}
+input[type="date"] { color-scheme: light; }
+input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
+input.input-error { border-color: var(--red); }
+input.input-error:focus { box-shadow: 0 0 0 3px rgba(200,48,48,.12); }
+.field-error {
+  font-size: 13px;
+  color: var(--red);
+  font-family: 'DM Mono', monospace;
+  display: none;
+}
+.field-error.visible { display: block; }
+.field-display {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 15px 16px;
+  color: var(--dim);
+  font-size: 16px;
+  font-family: 'DM Mono', monospace;
+  min-height: 52px;
+  line-height: 1.4;
+}
+.field-display.has-value { color: var(--text); font-weight: 500; }
+
+/* ── SCAN BUTTON ── */
+.btn-scan {
+  width: 100%;
+  background: var(--surface);
+  border: 1.5px dashed var(--accent);
+  border-radius: 12px;
+  padding: 14px 16px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+  transition: background .15s, opacity .15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.btn-scan:active  { background: var(--acc-bg); }
+.btn-scan:disabled { opacity: .5; cursor: not-allowed; }
+
+/* ── PRIMARY BUTTON ── */
+.btn-primary {
+  width: 100%;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  padding: 18px 20px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 17px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: opacity .15s, transform .1s;
+  margin-top: 12px;
+  letter-spacing: .2px;
+}
+.btn-primary:active  { opacity: .8; transform: scale(.99); }
+.btn-primary:hover   { opacity: .9; }
+.btn-primary.btn-scarico { background: #2a2520; }
+.btn-primary:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+
+/* ── LOT INFO BOX ── */
+.lot-info-box {
+  background: var(--acc-bg);
+  border: 1.5px solid rgba(200,160,32,.3);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin-bottom: 20px;
+  display: none;
+}
+.lot-info-box.visible { display: block; }
+.lot-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 0;
+  font-size: 15px;
+}
+.lot-info-row + .lot-info-row { border-top: 1px solid rgba(200,160,32,.2); }
+.lot-info-row span {
+  color: var(--muted);
+  font-size: 11px;
+  font-family: 'DM Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: .6px;
+}
+.lot-info-row strong { font-weight: 600; }
+.lot-info-row strong.c-red    { color: var(--red); }
+.lot-info-row strong.c-orange { color: var(--orange); }
+.lot-info-row strong.c-green  { color: var(--green); }
+
+/* ── SEARCH ── */
+.search-input {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 16px;
+  color: var(--text);
+  font-family: 'Outfit', sans-serif;
+  font-size: 16px;
+  outline: none;
+  flex: 1;
+  transition: border-color .15s;
+  min-width: 0;
+}
+.search-input:focus { border-color: var(--accent); }
+
+/* ── PRODUCT CARDS ── */
+#giacenze-list { display: flex; flex-direction: column; gap: 12px; }
+.product-card {
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.product-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px 18px;
+  cursor: pointer;
+  user-select: none;
+  min-height: 64px;
+}
+.product-header:active { background: var(--surface); }
+.product-info { flex: 1; min-width: 0; }
+.product-name {
+  font-weight: 600;
+  font-size: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.product-sub { font-size: 13px; color: var(--muted); margin-top: 3px; }
+.cat-badge {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 20px;
+  background: rgba(200,160,32,.12);
+  color: #8a6800;
+  margin-top: 4px;
+}
+.cat-btn {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 5px 12px;
+  border-radius: 20px;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  transition: all .15s;
+}
+.cat-btn.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+.product-total {
+  font-family: 'DM Mono', monospace;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  padding: 6px 12px;
+  border-radius: 100px;
+  background: var(--grn-bg);
+  color: var(--green);
+  flex-shrink: 0;
+}
+.product-total.warn { background: var(--ora-bg); color: var(--orange); }
+.expand-arrow {
+  font-size: 13px;
+  color: var(--dim);
+  transition: transform .22s ease;
+  flex-shrink: 0;
+  margin-left: 2px;
+}
+.product-card.open .expand-arrow { transform: rotate(180deg); }
+.lot-list { display: none; border-top: 1px solid var(--border); }
+.product-card.open .lot-list { display: block; }
+.lot-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--border);
+  font-size: 14px;
+  min-height: 48px;
+}
+.lot-row:last-child { border-bottom: none; }
+.lot-code {
+  font-family: 'DM Mono', monospace;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  flex-shrink: 0;
+  min-width: 90px;
+}
+.lot-scad {
+  font-family: 'DM Mono', monospace;
+  font-size: 12px;
+  padding: 4px 9px;
+  border-radius: 100px;
+  white-space: nowrap;
+}
+.lot-scad.ok     { background: var(--grn-bg); color: var(--green); }
+.lot-scad.warn   { background: var(--ora-bg); color: var(--orange); }
+.lot-scad.danger { background: var(--red-bg); color: var(--red); }
+.lot-qty {
+  margin-left: auto;
+  font-family: 'DM Mono', monospace;
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ── ALERT CARDS ── */
+.alert-section-title {
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-family: 'DM Mono', monospace;
+  font-weight: 500;
+  margin: 0 0 12px;
+}
+.alerts-block + .alerts-block { margin-top: 28px; }
+.alert-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  padding: 16px 18px;
+  margin-bottom: 10px;
+  min-height: 64px;
+}
+.alert-card.red    { background: var(--red-bg); border-color: rgba(200,48,48,.2); }
+.alert-card.orange { background: var(--ora-bg); border-color: rgba(200,96,16,.2); }
+.alert-card.yellow { background: #fffbe6; border-color: rgba(200,160,32,.25); }
+.alert-left { flex: 1; min-width: 0; }
+.alert-prodotto {
+  font-weight: 600;
+  font-size: 15px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.alert-sub { font-size: 13px; color: var(--muted); margin-top: 3px; }
+.alert-right { text-align: right; flex-shrink: 0; }
+.alert-qty { font-family: 'DM Mono', monospace; font-size: 14px; font-weight: 600; }
+.alert-days { font-size: 12px; font-family: 'DM Mono', monospace; color: var(--muted); margin-top: 3px; }
+.alert-days.red    { color: var(--red); }
+.alert-days.orange { color: var(--orange); }
+
+/* ── EMPTY STATE ── */
+.empty-state {
+  text-align: center;
+  padding: 56px 24px;
+  color: var(--dim);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+}
+.empty-icon  { font-size: 40px; }
+.empty-label { font-size: 16px; }
+.empty-ok    { color: var(--green); font-size: 36px; }
+
+/* ── TAB BAR ── */
+.tab-bar {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  display: flex;
+  background: var(--white);
+  border-top: 1.5px solid var(--border);
+  z-index: 100;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.tab-btn {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--dim);
+  font-family: 'Outfit', sans-serif;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: .1px;
+  height: var(--tab-btn-h);
+  padding: 0 2px;
+  position: relative;
+  transition: color .15s;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.tab-btn:active { opacity: .7; }
+.tab-btn.active { color: var(--accent); }
+.tab-icon { font-size: 22px; line-height: 1; display: block; }
+.tab-label { line-height: 1; }
+.tab-badge {
+  position: absolute;
+  top: 8px;
+  right: calc(50% - 20px);
+  background: var(--red);
+  color: #fff;
+  border-radius: 100px;
+  font-size: 9px;
+  font-weight: 700;
+  padding: 2px 5px;
+  font-family: 'DM Mono', monospace;
+  min-width: 17px;
+  text-align: center;
+  display: none;
+  line-height: 1.4;
+}
+
+/* ── MODAL ── */
+.modal-backdrop {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,.5);
+  z-index: 200;
+  align-items: flex-end;
+  justify-content: center;
+}
+.modal-backdrop.open { display: flex; }
+.modal {
+  background: var(--white);
+  border-radius: 24px 24px 0 0;
+  width: 100%;
+  max-width: 560px;
+  padding: 28px 22px calc(28px + env(safe-area-inset-bottom, 0px));
+  animation: slideUp .25s cubic-bezier(.2,.8,.4,1);
+  max-height: 92dvh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+@media (min-height: 700px) {
+  .modal-backdrop { align-items: center; }
+  .modal { border-radius: 24px; max-width: 480px; margin: 20px; padding: 28px 24px; }
+}
+@keyframes slideUp {
+  from { transform: translateY(48px); opacity: 0; }
+  to   { transform: translateY(0);    opacity: 1; }
+}
+.modal-title {
+  font-size: 20px;
+  font-weight: 700;
+  margin-bottom: 22px;
+  color: var(--accent);
+  letter-spacing: -.2px;
+}
+.etichetta-card {
+  background: var(--surface);
+  border: 2px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  margin-bottom: 22px;
+}
+.eti-header {
+  text-align: center;
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+}
+.eti-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  gap: 14px;
+}
+.eti-row:last-child { border-bottom: none; }
+.eti-row span {
+  font-family: 'DM Mono', monospace;
+  font-size: 11px;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+  color: var(--muted);
+  flex-shrink: 0;
+}
+.eti-row strong { font-size: 15px; font-weight: 600; text-align: right; word-break: break-word; }
+.eti-id strong  { font-family: 'DM Mono', monospace; font-size: 14px; color: var(--accent); }
+.modal-actions  { display: flex; gap: 12px; }
+.modal-actions button {
+  flex: 1;
+  padding: 16px;
+  border-radius: 12px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity .15s;
+  border: none;
+}
+.btn-print       { background: var(--accent); color: #fff; }
+.btn-close-modal { background: var(--surface); color: var(--muted); border: 1.5px solid var(--border) !important; }
+.modal-actions button:active { opacity: .75; }
+
+/* ── TOAST ── */
+.toast {
+  position: fixed;
+  bottom: calc(var(--tab-btn-h) + env(safe-area-inset-bottom, 0px) + 14px);
+  left: 50%;
+  transform: translateX(-50%) translateY(10px);
+  background: var(--text);
+  color: #fff;
+  border-radius: 100px;
+  padding: 11px 22px;
+  font-size: 14px;
+  font-weight: 500;
+  z-index: 300;
+  opacity: 0;
+  pointer-events: none;
+  transition: all .22s cubic-bezier(.2,.8,.4,1);
+  white-space: nowrap;
+  max-width: 88vw;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  box-shadow: 0 4px 20px rgba(0,0,0,.18);
+}
+.toast.show    { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.success { background: var(--green); }
+.toast.error   { background: var(--red); }
+.toast.info    { background: var(--accent); }
+
+/* ── PRINT ── */
+@media print {
+  header, .tab-bar, .modal-actions, .toast { display: none !important; }
+  .modal-backdrop { display: flex !important; position: static !important; background: none !important; }
+  .modal { box-shadow: none !important; }
+}
+
+/* ── DESKTOP ── */
+@media (min-width: 640px) {
+  .tab-panel   { padding: 32px 28px 8px; }
+  .panel-title { font-size: 24px; }
+  .tab-icon    { font-size: 18px; }
+  .tab-btn     { font-size: 11px; height: 56px; }
+  .home-grid   { grid-template-columns: repeat(2, 1fr); max-width: 420px; }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo"><span>▲</span> HACCP</div>
+  <div class="hdr-user">
+    <span class="hdr-nome">{{ current_user.nome }}</span>
+    {% if current_user.reparto %}
+    <span class="hdr-reparto">{{ current_user.reparto }}</span>
+    {% endif %}
+  </div>
+  <div class="hdr-right">
+    <div class="hdr-alert-dot" id="hdr-alert-dot"></div>
+    <a href="/profile" class="btn-icon" title="Il mio profilo">👤</a>
+    {% if current_user.role == 'admin' %}
+    <a href="/admin" class="btn-icon" title="Gestione utenti">⚙</a>
+    {% endif %}
+    <button class="btn-icon" id="btn-sync" title="Sincronizza Sheets" onclick="syncAll()">⟳</button>
+    <a href="/logout" class="btn-icon" title="Esci">⎋</a>
+  </div>
+</header>
+
+<main>
+
+  <!-- ── HOME ── -->
+  <section class="tab-panel active" id="tab-home">
+    <div class="home-greeting">
+      <h2>Ciao, {{ current_user.nome.split()[0] }} 👋</h2>
+      <div class="home-date" id="home-date"></div>
+    </div>
+    <div class="home-grid">
+      <button class="home-card carico" onclick="switchTab('carico')">
+        <div class="home-icon">↑</div>
+        <div class="home-label">Carico</div>
+        <div class="home-sub">Registra entrata merce</div>
+      </button>
+      <button class="home-card scarico" onclick="switchTab('scarico')">
+        <div class="home-icon">↓</div>
+        <div class="home-label">Scarico</div>
+        <div class="home-sub">Registra uscita merce</div>
+      </button>
+      <button class="home-card giac" onclick="switchTab('giacenze')">
+        <div class="home-icon">▤</div>
+        <div class="home-label">Giacenze</div>
+        <div class="home-sub">Stock attuale per lotto</div>
+      </button>
+      <button class="home-card alert" onclick="switchTab('alert')">
+        <div class="home-icon">⚑</div>
+        <div class="home-label">Alert</div>
+        <div class="home-sub">Scadenze e scorte minime</div>
+        <span class="home-badge" id="home-alert-badge"></span>
+      </button>
+    </div>
+  </section>
+
+  <!-- ── CARICO ── -->
+  <section class="tab-panel" id="tab-carico">
+    <div class="panel-title">Carico Merce</div>
+
+    <div class="form-group">
+      <label>Prodotto *</label>
+      <select id="c-prodotto" onchange="onProdottoCarico()">
+        <option value="">— Seleziona prodotto —</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Fornitore</label>
+      <select id="c-fornitore">
+        <option value="">— seleziona prodotto prima —</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Unità di misura</label>
+      <div class="field-display" id="c-unita">—</div>
+    </div>
+
+    <div class="form-group">
+      <label>Categoria</label>
+      <div class="field-display" id="c-categoria">—</div>
+    </div>
+
+    <div class="form-group">
+      <label>Scansione automatica etichetta</label>
+      <button type="button" class="btn-scan" id="btn-scan" onclick="triggerCamera()">
+        📷 Scansiona etichetta
+      </button>
+      <input type="file" id="camera-input" accept="image/*" capture="environment"
+             style="display:none" onchange="onCameraCapture(this)">
+    </div>
+
+    <div class="form-group">
+      <label>Numero Lotto *</label>
+      <input type="text" id="c-lotto" placeholder="es. L2026001"
+             autocomplete="off" autocapitalize="characters">
+    </div>
+
+    <div class="form-group">
+      <label>Scadenza</label>
+      <input type="date" id="c-scadenza">
+    </div>
+
+    <div class="form-group">
+      <label>Quantità *</label>
+      <input type="number" id="c-qty" placeholder="0" min="0.01" step="0.01" inputmode="decimal">
+    </div>
+
+    <button class="btn-primary" onclick="submitCarico()">↑ Registra Carico</button>
+  </section>
+
+  <!-- ── SCARICO ── -->
+  <section class="tab-panel" id="tab-scarico">
+    <div class="panel-title">Scarico Merce</div>
+
+    <div class="form-group">
+      <label>Prodotto *</label>
+      <select id="s-prodotto" onchange="onProdottoScarico()">
+        <option value="">— Seleziona prodotto —</option>
+      </select>
+    </div>
+
+    <div class="form-group">
+      <label>Lotto *</label>
+      <select id="s-lotto" disabled onchange="onLottoScarico()">
+        <option value="">— Seleziona prima il prodotto —</option>
+      </select>
+    </div>
+
+    <div class="lot-info-box" id="s-lot-info"></div>
+
+    <div class="form-group">
+      <label>Quantità *</label>
+      <input type="number" id="s-qty" placeholder="0" min="0.01" step="0.01"
+             inputmode="decimal" oninput="validateQtyScarico()">
+      <div class="field-error" id="s-qty-error"></div>
+    </div>
+
+    <button class="btn-primary btn-scarico" onclick="submitScarico()">↓ Registra Scarico</button>
+  </section>
+
+  <!-- ── GIACENZE ── -->
+  <section class="tab-panel" id="tab-giacenze">
+    <div class="panel-header">
+      <div class="panel-title">Giacenze</div>
+      <input class="search-input" type="search" id="search-giacenze"
+             placeholder="Cerca…" oninput="renderGiacenze()">
+    </div>
+    <div id="cat-filter" style="display:flex;flex-wrap:wrap;gap:6px;padding:0 0 14px"></div>
+    <div id="giacenze-list">
+      <div class="empty-state"><div class="empty-icon">⏳</div><div class="empty-label">Caricamento…</div></div>
+    </div>
+  </section>
+
+  <!-- ── ALERT ── -->
+  <section class="tab-panel" id="tab-alert">
+    <div class="panel-title">Alert</div>
+    <div id="alerts-content">
+      <div class="empty-state"><div class="empty-icon">⏳</div><div class="empty-label">Caricamento…</div></div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ── TAB BAR ── -->
+<nav class="tab-bar">
+  <button class="tab-btn active" data-tab="home" onclick="switchTab('home')">
+    <span class="tab-icon">⌂</span><span class="tab-label">Home</span>
+  </button>
+  <button class="tab-btn" data-tab="carico" onclick="switchTab('carico')">
+    <span class="tab-icon">↑</span><span class="tab-label">Carico</span>
+  </button>
+  <button class="tab-btn" data-tab="scarico" onclick="switchTab('scarico')">
+    <span class="tab-icon">↓</span><span class="tab-label">Scarico</span>
+  </button>
+  <button class="tab-btn" data-tab="giacenze" onclick="switchTab('giacenze')">
+    <span class="tab-icon">▤</span><span class="tab-label">Giacenze</span>
+  </button>
+  <button class="tab-btn" data-tab="alert" onclick="switchTab('alert')">
+    <span class="tab-icon">⚑</span><span class="tab-label">Alert</span>
+    <span class="tab-badge" id="tab-alert-badge"></span>
+  </button>
+</nav>
+
+<!-- ── MODAL ETICHETTA ── -->
+<div class="modal-backdrop" id="modal-etichetta" onclick="bgClose(event)">
+  <div class="modal">
+    <div class="modal-title">Etichetta HACCP</div>
+    <div class="etichetta-card" id="eti-content"></div>
+    <div class="modal-actions">
+      <button class="btn-print" onclick="window.print()">🖨 Stampa</button>
+      <button class="btn-close-modal" onclick="closeModal()">Chiudi</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── STATE ──────────────────────────────────────────────────────────────────
+const S = {
+  prodotti:     [],
+  lottiScarico: [],
+  giacenze:     [],
+  alerts:       { scadenze: [], scorte: [], count: 0 },
+  unitaCarico:  '',
+  activeCat:    '',
+};
+
+// ── INIT ───────────────────────────────────────────────────────────────────
+async function init() {
+  renderHome();
+  await Promise.all([loadProdottiCarico(), loadGiacenze(), loadAlerts()]);
+  renderScaricoProdotti();
+}
+
+// ── TAB ────────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.tab === tab));
+  document.querySelectorAll('.tab-panel').forEach(p =>
+    p.classList.toggle('active', p.id === `tab-${tab}`));
+  if (tab === 'home')     renderHome();
+  if (tab === 'giacenze') { renderCatFilter(); renderGiacenze(); }
+  if (tab === 'alert')    renderAlerts();
+}
+
+// ── HOME ───────────────────────────────────────────────────────────────────
+function renderHome() {
+  const oggi = new Date().toLocaleDateString('it-IT', {
+    weekday: 'long', day: 'numeric', month: 'long', year: 'numeric'
+  });
+  const el = document.getElementById('home-date');
+  if (el) el.textContent = oggi.charAt(0).toUpperCase() + oggi.slice(1);
+
+  const count = S.alerts.count || 0;
+  const badge = document.getElementById('home-alert-badge');
+  if (badge) {
+    badge.textContent  = count > 0 ? count : '';
+    badge.style.display = count > 0 ? 'block' : 'none';
+  }
+}
+
+// ── CARICO ─────────────────────────────────────────────────────────────────
+async function loadProdottiCarico() {
+  const data = await api('/api/prodotti');
+  S.prodotti = data.prodotti || [];
+
+  const selProd = document.getElementById('c-prodotto');
+  selProd.innerHTML = '<option value="">— Seleziona prodotto —</option>' +
+    S.prodotti.map(p =>
+      `<option value="${esc(p.prodotto)}" data-fornitore="${esc(p.fornitore)}" data-unita="${esc(p.unita)}" data-categoria="${esc(p.categoria||'')}">${esc(p.prodotto)}</option>`
+    ).join('');
+
+  const fornitori = [...new Set(S.prodotti.map(p => p.fornitore).filter(Boolean))].sort();
+  const selFor = document.getElementById('c-fornitore');
+  selFor.innerHTML = '<option value="">— seleziona prodotto prima —</option>' +
+    fornitori.map(f => `<option value="${esc(f)}">${esc(f)}</option>`).join('');
+}
+
+function onProdottoCarico() {
+  const sel = document.getElementById('c-prodotto');
+  const opt = sel.options[sel.selectedIndex];
+  const fornitore = (opt && opt.dataset.fornitore) ? opt.dataset.fornitore : '';
+  const unita     = (opt && opt.dataset.unita)     ? opt.dataset.unita     : '';
+  const categoria = (opt && opt.dataset.categoria) ? opt.dataset.categoria : '';
+  S.unitaCarico = unita;
+  document.getElementById('c-fornitore').value = fornitore;
+  setFieldDisplay('c-unita',     unita     || '—', !!unita);
+  setFieldDisplay('c-categoria', categoria || '—', !!categoria);
+}
+
+function setFieldDisplay(id, text, hasVal) {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.classList.toggle('has-value', hasVal);
+}
+
+async function submitCarico() {
+  const prodotto  = document.getElementById('c-prodotto').value;
+  const fornitore = document.getElementById('c-fornitore').value.trim();
+  const lotto     = document.getElementById('c-lotto').value.trim();
+  const scadenza  = document.getElementById('c-scadenza').value;
+  const qty       = parseFloat(document.getElementById('c-qty').value);
+
+  if (!prodotto)          { toast('Seleziona il prodotto', 'error'); return; }
+  if (!fornitore)         { toast('Seleziona il fornitore', 'error'); return; }
+  if (!lotto)             { toast('Inserisci il numero di lotto', 'error'); return; }
+  if (!qty || qty <= 0)   { toast('Inserisci una quantità valida', 'error'); return; }
+
+  const btn = document.querySelector('#tab-carico .btn-primary');
+  btn.disabled = true; btn.textContent = '⏳ Registrazione…';
+
+  const data = await api('/api/carico', {
+    method: 'POST',
+    body: { fornitore, prodotto, lotto, scadenza, qty, unita: S.unitaCarico },
+  });
+
+  btn.disabled = false; btn.textContent = '↑ Registra Carico';
+
+  if (data.success) {
+    showEtichetta(data);
+    resetCarico();
+    await Promise.all([loadGiacenze(), loadAlerts()]);
+    renderScaricoProdotti();
+  } else {
+    toast(data.error || 'Errore durante il carico', 'error');
+  }
+}
+
+function resetCarico() {
+  document.getElementById('c-prodotto').value  = '';
+  document.getElementById('c-fornitore').selectedIndex = 0;
+  setFieldDisplay('c-unita', '—', false);
+  document.getElementById('c-lotto').value     = '';
+  document.getElementById('c-scadenza').value  = '';
+  document.getElementById('c-qty').value       = '';
+  S.unitaCarico = '';
+}
+
+// ── CAMERA SCAN ────────────────────────────────────────────────────────────
+function triggerCamera() {
+  document.getElementById('camera-input').click();
+}
+
+async function onCameraCapture(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const btn = document.getElementById('btn-scan');
+  btn.disabled = true; btn.textContent = '⏳ Analisi in corso…';
+
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const base64    = e.target.result;
+    const mediaType = file.type || 'image/jpeg';
+
+    const data = await api('/api/scan-label', {
+      method: 'POST',
+      body:   { image: base64, media_type: mediaType },
+    });
+
+    btn.disabled = false; btn.textContent = '📷 Scansiona etichetta';
+
+    if (data.success) {
+      if (data.lotto) {
+        document.getElementById('c-lotto').value = data.lotto;
+      }
+      if (data.scadenza) {
+        // Converte DD/MM/YYYY → YYYY-MM-DD per l'input date
+        const parts = String(data.scadenza).split('/');
+        if (parts.length === 3) {
+          document.getElementById('c-scadenza').value =
+            `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+        }
+      }
+      if (data.lotto || data.scadenza) {
+        toast('Etichetta letta ✓', 'success');
+      } else {
+        toast('Nessun dato trovato nell\'etichetta', 'error');
+      }
+    } else {
+      toast(data.error || 'Errore lettura etichetta', 'error');
+    }
+    input.value = '';
+  };
+  reader.readAsDataURL(file);
+}
+
+// ── SCARICO ────────────────────────────────────────────────────────────────
+function renderScaricoProdotti() {
+  const sel = document.getElementById('s-prodotto');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">— Seleziona prodotto —</option>' +
+    S.giacenze.map(g =>
+      `<option value="${esc(g.prodotto)}">${esc(g.prodotto)}</option>`
+    ).join('');
+  if (cur && S.giacenze.find(g => g.prodotto === cur)) {
+    sel.value = cur;
+  } else {
+    document.getElementById('s-lotto').innerHTML =
+      '<option value="">— Seleziona prima il prodotto —</option>';
+    document.getElementById('s-lotto').disabled = true;
+    document.getElementById('s-lot-info').classList.remove('visible');
+  }
+}
+
+async function onProdottoScarico() {
+  const prodotto = document.getElementById('s-prodotto').value;
+  const lottoSel = document.getElementById('s-lotto');
+  document.getElementById('s-lot-info').classList.remove('visible');
+
+  if (!prodotto) {
+    lottoSel.innerHTML = '<option value="">— Seleziona prima il prodotto —</option>';
+    lottoSel.disabled = true;
+    return;
+  }
+
+  lottoSel.disabled = true;
+  const data = await api(`/api/lotti?prodotto=${encodeURIComponent(prodotto)}`);
+  S.lottiScarico = data.lotti || [];
+
+  lottoSel.innerHTML = '<option value="">— Seleziona lotto —</option>' +
+    S.lottiScarico.map(l => {
+      const scadText = l.scadenza ? ` · scade ${fmtDate(l.scadenza)}` : '';
+      return `<option value="${esc(l.lotto)}">${esc(l.lotto)} — ${l.rimanenza} ${l.unita}${scadText}</option>`;
+    }).join('');
+  lottoSel.disabled = false;
+}
+
+function onLottoScarico() {
+  const lotto   = document.getElementById('s-lotto').value;
+  const infoBox = document.getElementById('s-lot-info');
+  // Reset errore qty
+  document.getElementById('s-qty-error').textContent = '';
+  document.getElementById('s-qty-error').classList.remove('visible');
+  document.getElementById('s-qty').classList.remove('input-error');
+  if (!lotto) { infoBox.classList.remove('visible'); return; }
+
+  const l = S.lottiScarico.find(x => x.lotto === lotto);
+  if (!l) { infoBox.classList.remove('visible'); return; }
+
+  const giorni  = l.scadenza ? daysTo(l.scadenza) : null;
+  const scadTxt = l.scadenza
+    ? `${fmtDate(l.scadenza)}${giorni !== null ? ` (${giorni}gg)` : ''}`
+    : '—';
+  const scadCls = giorni === null ? '' : giorni < 0 ? 'c-red' : giorni <= 7 ? 'c-orange' : 'c-green';
+
+  infoBox.innerHTML = `
+    <div class="lot-info-row">
+      <span>Disponibile</span>
+      <strong>${l.rimanenza} ${l.unita}</strong>
+    </div>
+    <div class="lot-info-row">
+      <span>Scadenza</span>
+      <strong class="${scadCls}">${scadTxt}</strong>
+    </div>
+    ${l.fornitore ? `<div class="lot-info-row"><span>Fornitore</span><strong>${esc(l.fornitore)}</strong></div>` : ''}
+  `;
+  infoBox.classList.add('visible');
+}
+
+function validateQtyScarico() {
+  const lotto  = document.getElementById('s-lotto').value;
+  const qtyEl  = document.getElementById('s-qty');
+  const errEl  = document.getElementById('s-qty-error');
+  const qty    = parseFloat(qtyEl.value);
+  const l      = S.lottiScarico.find(x => x.lotto === lotto);
+
+  if (l && qty > 0 && qty > l.rimanenza) {
+    errEl.textContent = `Non puoi scaricare più di ${l.rimanenza} ${l.unita} disponibili`;
+    errEl.classList.add('visible');
+    qtyEl.classList.add('input-error');
+    return false;
+  }
+  errEl.textContent = '';
+  errEl.classList.remove('visible');
+  qtyEl.classList.remove('input-error');
+  return true;
+}
+
+async function submitScarico() {
+  const prodotto = document.getElementById('s-prodotto').value;
+  const lotto    = document.getElementById('s-lotto').value;
+  const qty      = parseFloat(document.getElementById('s-qty').value);
+
+  if (!prodotto)        { toast('Seleziona il prodotto', 'error'); return; }
+  if (!lotto)           { toast('Seleziona il lotto', 'error'); return; }
+  if (!qty || qty <= 0) { toast('Inserisci una quantità valida', 'error'); return; }
+  if (!validateQtyScarico()) return;
+
+  const btn = document.querySelector('#tab-scarico .btn-primary');
+  btn.disabled = true; btn.textContent = '⏳ Registrazione…';
+
+  const data = await api('/api/scarico', { method: 'POST', body: { prodotto, lotto, qty } });
+
+  btn.disabled = false; btn.textContent = '↓ Registra Scarico';
+
+  if (data.success) {
+    toast(`Scarico registrato ✓  (rimanenza: ${data.rimanenza})`, 'success');
+    document.getElementById('s-qty').value = '';
+    await Promise.all([loadGiacenze(), loadAlerts()]);
+    renderScaricoProdotti();
+    await onProdottoScarico();
+  } else {
+    toast(data.error || 'Errore durante lo scarico', 'error');
+  }
+}
+
+// ── GIACENZE ───────────────────────────────────────────────────────────────
+async function loadGiacenze() {
+  const data = await api('/api/giacenze');
+  S.giacenze = data.giacenze || [];
+  if (document.querySelector('.tab-btn.active')?.dataset.tab === 'giacenze') {
+    renderCatFilter();
+    renderGiacenze();
+  }
+}
+
+function renderCatFilter() {
+  const cats = [...new Set(S.giacenze.map(g => g.categoria).filter(Boolean))].sort();
+  const el   = document.getElementById('cat-filter');
+  if (!cats.length) { el.style.display = 'none'; return; }
+  el.style.display = 'flex';
+  el.innerHTML = ['Tutti', ...cats].map(c =>
+    `<button class="cat-btn${(S.activeCat === c || (!S.activeCat && c==='Tutti')) ? ' active' : ''}"
+      onclick="S.activeCat=(this.textContent==='Tutti'?'':this.textContent);renderGiacenze();renderCatFilter()"
+    >${esc(c)}</button>`
+  ).join('');
+}
+
+function renderGiacenze() {
+  const q    = (document.getElementById('search-giacenze').value || '').toLowerCase();
+  let list   = S.giacenze;
+  if (S.activeCat) list = list.filter(g => g.categoria === S.activeCat);
+  if (q)           list = list.filter(g => g.prodotto.toLowerCase().includes(q));
+  const el   = document.getElementById('giacenze-list');
+
+  if (!list.length) {
+    el.innerHTML = `<div class="empty-state">
+      <div class="empty-icon">📦</div>
+      <div class="empty-label">${q ? 'Nessun prodotto trovato' : 'Nessuna giacenza'}</div>
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = list.map(g => {
+    const statusClass = g.sotto_scorta ? 'warn' : '';
+    const scortaLabel = g.scorta_min > 0 ? ` / min ${g.scorta_min}` : '';
+
+    const lotsHtml = g.lotti.map(l => {
+      const giorni  = l.scadenza ? daysTo(l.scadenza) : null;
+      const cls     = giorni === null ? '' : giorni < 0 ? 'danger' : giorni <= 3 ? 'danger' : giorni <= 7 ? 'warn' : 'ok';
+      const scadTxt = l.scadenza
+        ? `${fmtDate(l.scadenza)}${giorni !== null ? ` (${giorni}gg)` : ''}`
+        : '—';
+      return `<div class="lot-row">
+        <span class="lot-code">${esc(l.lotto)}</span>
+        <span class="lot-scad ${cls}">${scadTxt}</span>
+        <span class="lot-qty">${l.rimanenza}&nbsp;${esc(g.unita)}</span>
+      </div>`;
+    }).join('');
+
+    return `<div class="product-card">
+      <div class="product-header" onclick="toggleCard(this)">
+        <div class="product-info">
+          <div class="product-name">${esc(g.prodotto)}</div>
+          <div class="product-sub">${esc(g.fornitore || '—')}${g.prossima_scadenza ? `&nbsp;·&nbsp;pross. scad. ${fmtDate(g.prossima_scadenza)}` : ''}</div>
+          ${g.categoria ? `<span class="cat-badge">${esc(g.categoria)}</span>` : ''}
+        </div>
+        <div class="product-total ${statusClass}">${g.totale}&nbsp;${esc(g.unita)}${scortaLabel}</div>
+        <span class="expand-arrow">▾</span>
+      </div>
+      <div class="lot-list">${lotsHtml}</div>
+    </div>`;
+  }).join('');
+}
+
+function toggleCard(header) {
+  header.closest('.product-card').classList.toggle('open');
+}
+
+// ── ALERT ──────────────────────────────────────────────────────────────────
+async function loadAlerts() {
+  const data = await api('/api/alerts');
+  S.alerts = data;
+  const count = data.count || 0;
+
+  const badge = document.getElementById('tab-alert-badge');
+  badge.textContent   = count > 0 ? count : '';
+  badge.style.display = count > 0 ? 'flex' : 'none';
+
+  const dot = document.getElementById('hdr-alert-dot');
+  dot.style.display = count > 0 ? 'block' : 'none';
+
+  renderHome(); // Aggiorna badge sulla home card
+
+  if (document.querySelector('.tab-btn.active')?.dataset.tab === 'alert') {
+    renderAlerts();
+  }
+}
+
+function renderAlerts() {
+  const el = document.getElementById('alerts-content');
+  const { scadenze, scorte } = S.alerts;
+
+  if (!scadenze.length && !scorte.length) {
+    el.innerHTML = `<div class="empty-state">
+      <div class="empty-ok">✓</div>
+      <div class="empty-label" style="color:var(--green)">Nessun alert — tutto a posto</div>
+    </div>`;
+    return;
+  }
+
+  let html = '';
+
+  if (scadenze.length) {
+    html += `<div class="alerts-block">
+      <div class="alert-section-title">⚠ Scadenze (${scadenze.length})</div>`;
+    html += scadenze.map(a => {
+      const isScad = a.tipo === 'scaduto';
+      const cls    = isScad ? 'red' : 'orange';
+      const ggTxt  = a.giorni === null ? '' :
+                     a.giorni < 0 ? 'Scaduto' :
+                     a.giorni === 0 ? 'Scade oggi!' : `${a.giorni} giorni`;
+      const ggCls  = isScad ? 'red' : a.giorni !== null && a.giorni <= 3 ? 'red' : 'orange';
+      return `<div class="alert-card ${cls}">
+        <div class="alert-left">
+          <div class="alert-prodotto">${esc(a.prodotto)}</div>
+          <div class="alert-sub">Lotto&nbsp;${esc(a.lotto)}&nbsp;·&nbsp;${a.scadenza ? fmtDate(a.scadenza) : '—'}</div>
+          ${a.fornitore ? `<div class="alert-sub">${esc(a.fornitore)}</div>` : ''}
+          ${a.categoria ? `<span class="cat-badge">${esc(a.categoria)}</span>` : ''}
+        </div>
+        <div class="alert-right">
+          <div class="alert-qty">${a.rimanenza}&nbsp;${esc(a.unita)}</div>
+          <div class="alert-days ${ggCls}">${ggTxt}</div>
+        </div>
+      </div>`;
+    }).join('');
+    html += '</div>';
+  }
+
+  if (scorte.length) {
+    html += `<div class="alerts-block" style="${scadenze.length ? 'margin-top:24px' : ''}">
+      <div class="alert-section-title">📉 Sotto scorta (${scorte.length})</div>`;
+    html += scorte.map(a => `<div class="alert-card yellow">
+      <div class="alert-left">
+        <div class="alert-prodotto">${esc(a.prodotto)}</div>
+        <div class="alert-sub">${esc(a.fornitore || '—')}</div>
+      </div>
+      <div class="alert-right">
+        <div class="alert-qty">${a.totale}&nbsp;${esc(a.unita)}</div>
+        <div class="alert-days">min.&nbsp;${a.scorta_min}</div>
+      </div>
+    </div>`).join('');
+    html += '</div>';
+  }
+
+  el.innerHTML = html;
+}
+
+// ── ETICHETTA MODAL ────────────────────────────────────────────────────────
+function showEtichetta(d) {
+  const oggi = new Date().toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric' });
+  document.getElementById('eti-content').innerHTML = `
+    <div class="eti-header">HACCP — Magazzino Cucina</div>
+    <div class="eti-row"><span>Prodotto</span>   <strong>${esc(d.prodotto)}</strong></div>
+    <div class="eti-row"><span>Fornitore</span>  <strong>${esc(d.fornitore || '—')}</strong></div>
+    <div class="eti-row"><span>Lotto</span>      <strong>${esc(d.lotto)}</strong></div>
+    <div class="eti-row"><span>Scadenza</span>   <strong>${d.scadenza ? fmtDate(d.scadenza) : '—'}</strong></div>
+    <div class="eti-row"><span>Quantità</span>   <strong>${d.qty}&nbsp;${esc(d.unita || '')}</strong></div>
+    <div class="eti-row"><span>Data carico</span><strong>${oggi}</strong></div>
+    <div class="eti-row eti-id"><span>ID Movimento</span><strong>${esc(d.movimento_id)}</strong></div>
+  `;
+  document.getElementById('modal-etichetta').classList.add('open');
+  toast('Carico registrato ✓', 'success');
+}
+
+function closeModal() {
+  document.getElementById('modal-etichetta').classList.remove('open');
+}
+function bgClose(e) {
+  if (e.target === document.getElementById('modal-etichetta')) closeModal();
+}
+
+// ── SYNC ───────────────────────────────────────────────────────────────────
+async function syncAll() {
+  const btn = document.getElementById('btn-sync');
+  btn.classList.add('spinning');
+  toast('Sincronizzazione in corso…', 'info');
+  const data = await api('/api/sync', { method: 'POST' });
+  btn.classList.remove('spinning');
+  if (data.success) {
+    await Promise.all([loadProdottiCarico(), loadGiacenze(), loadAlerts()]);
+    renderScaricoProdotti();
+    toast(`Sincronizzato: ${data.listino} prodotti, ${data.registro} movimenti`, 'success');
+  } else {
+    toast(data.error || 'Errore sincronizzazione', 'error');
+  }
+}
+
+// ── UTILS ──────────────────────────────────────────────────────────────────
+async function api(url, opts = {}) {
+  try {
+    const res = await fetch(url, {
+      method:  opts.method || 'GET',
+      headers: opts.body ? { 'Content-Type': 'application/json' } : {},
+      body:    opts.body ? JSON.stringify(opts.body) : undefined,
+    });
+    if (res.status === 401) { window.location.href = '/login'; return { success: false }; }
+    return await res.json();
+  } catch (e) {
+    toast('Errore di rete', 'error');
+    return { success: false, error: e.message };
+  }
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  const [y, m, d] = iso.split('-');
+  return `${d}/${m}/${y}`;
+}
+
+function daysTo(iso) {
+  if (!iso) return null;
+  try {
+    const today = new Date(); today.setHours(0,0,0,0);
+    return Math.round((new Date(iso + 'T00:00:00') - today) / 86400000);
+  } catch { return null; }
+}
+
+function esc(s) {
+  if (s === null || s === undefined) return '';
+  return String(s)
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+let _toastT;
+function toast(msg, type = 'info') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `toast show ${type}`;
+  clearTimeout(_toastT);
+  _toastT = setTimeout(() => el.classList.remove('show'), 3600);
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
+
+init();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/static/sw.js', { scope: '/' })
+      .catch(e => console.warn('[SW]', e));
+  });
+}
+</script>
+</body>
+</html>

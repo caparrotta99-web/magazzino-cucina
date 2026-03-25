@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#c8a020"/>
+  <rect x="64" y="64" width="384" height="384" rx="64" fill="#f8f7f4" opacity="0.15"/>
+  <!-- Brigade toque / chef hat stylized -->
+  <rect x="156" y="290" width="200" height="30" rx="8" fill="#f8f7f4"/>
+  <rect x="136" y="320" width="240" height="48" rx="10" fill="#f8f7f4"/>
+  <!-- hat dome -->
+  <ellipse cx="256" cy="270" rx="100" ry="16" fill="#f8f7f4"/>
+  <path d="M156 270 Q156 170 256 165 Q356 170 356 270 Z" fill="#f8f7f4"/>
+  <!-- M letter -->
+  <text x="256" y="400" font-family="Georgia, serif" font-size="36" font-weight="bold"
+        fill="#c8a020" text-anchor="middle" dominant-baseline="middle" dy="8">B</text>
+</svg>

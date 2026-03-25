@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Reimposta Password — HACCP</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --accent: #c8a020;
+  --acc-bg: #faf3df;
+  --text:   #1a1815;
+  --muted:  #6e6355;
+  --border: #e6dfd4;
+  --surface:#fafaf8;
+  --white:  #ffffff;
+  --red:    #c83030;
+  --green:  #2a7a2a;
+  --grn-bg: rgba(42,122,42,.09);
+}
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { min-height: 100dvh; background: #f5f0e8; font-family: 'Outfit', sans-serif; color: var(--text); -webkit-font-smoothing: antialiased; }
+body { display: flex; align-items: center; justify-content: center; padding: 24px 16px; }
+.card { background: var(--white); border-radius: 24px; padding: 40px 28px 36px; width: 100%; max-width: 400px; box-shadow: 0 8px 40px rgba(0,0,0,.07); }
+.logo { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 32px; letter-spacing: .2px; }
+.logo span { color: var(--accent); }
+h1 { font-size: 24px; font-weight: 700; letter-spacing: -.3px; margin-bottom: 6px; }
+.sub { font-size: 14px; color: var(--muted); margin-bottom: 28px; line-height: 1.5; }
+.error { background: rgba(200,48,48,.07); border: 1.5px solid rgba(200,48,48,.2); border-radius: 10px; padding: 12px 14px; font-size: 14px; color: var(--red); margin-bottom: 20px; }
+.form-group { display: flex; flex-direction: column; gap: 7px; margin-bottom: 18px; }
+label { font-size: 11px; letter-spacing: .8px; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+input { background: var(--surface); border: 1.5px solid var(--border); border-radius: 12px; padding: 14px 16px; font-family: 'Outfit', sans-serif; font-size: 16px; color: var(--text); outline: none; width: 100%; transition: border-color .15s, box-shadow .15s; -webkit-appearance: none; }
+input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(200,160,32,.12); }
+input::placeholder { color: #a89880; }
+input[type="number"] { font-family: 'DM Mono', monospace; font-size: 22px; letter-spacing: 8px; text-align: center; }
+.btn { width: 100%; background: var(--accent); color: #fff; border: none; border-radius: 14px; padding: 16px; font-family: 'Outfit', sans-serif; font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 8px; transition: opacity .15s; letter-spacing: .2px; }
+.btn:hover { opacity: .9; } .btn:active { opacity: .8; }
+.footer { text-align: center; margin-top: 24px; font-size: 14px; color: var(--muted); }
+.footer a { color: var(--accent); font-weight: 600; text-decoration: none; }
+.footer a:hover { text-decoration: underline; }
+
+/* ── SUCCESS ── */
+.success-box {
+  background: var(--grn-bg);
+  border: 1.5px solid rgba(42,122,42,.25);
+  border-radius: 16px;
+  padding: 28px 20px;
+  text-align: center;
+  margin-bottom: 24px;
+}
+.success-icon { font-size: 40px; margin-bottom: 12px; }
+.success-title { font-size: 20px; font-weight: 700; color: var(--green); margin-bottom: 8px; }
+.success-msg { font-size: 14px; color: var(--muted); line-height: 1.5; }
+.btn-login {
+  display: block;
+  width: 100%;
+  background: var(--green);
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  padding: 16px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  text-align: center;
+  text-decoration: none;
+  transition: opacity .15s;
+  letter-spacing: .2px;
+}
+.btn-login:hover { opacity: .9; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo"><span>▲</span> HACCP Magazzino</div>
+
+  {% if success %}
+    <!-- ── STATO: PASSWORD AGGIORNATA ── -->
+    <div class="success-box">
+      <div class="success-icon">✓</div>
+      <div class="success-title">Password aggiornata</div>
+      <div class="success-msg">La tua password è stata reimpostata con successo. Puoi ora accedere con le nuove credenziali.</div>
+    </div>
+    <a href="/login" class="btn-login">Vai al login →</a>
+
+  {% else %}
+    <!-- ── STATO: FORM ── -->
+    <h1>Nuova password</h1>
+    <p class="sub">Inserisci il codice a 6 cifre ricevuto e scegli una nuova password.</p>
+
+    {% if error %}
+    <div class="error">{{ error }}</div>
+    {% endif %}
+
+    <form method="post" action="/reset-password">
+      <div class="form-group">
+        <label>Codice di recupero</label>
+        <input type="number" name="token" placeholder="000000"
+               required autofocus min="100000" max="999999"
+               inputmode="numeric" autocomplete="one-time-code">
+      </div>
+      <div class="form-group">
+        <label>Nuova password</label>
+        <input type="password" name="password" placeholder="Minimo 6 caratteri"
+               required autocomplete="new-password">
+      </div>
+      <div class="form-group">
+        <label>Conferma password</label>
+        <input type="password" name="password2" placeholder="Ripeti la password"
+               required autocomplete="new-password">
+      </div>
+      <button type="submit" class="btn">Reimposta password</button>
+    </form>
+
+    <div class="footer">
+      <a href="/forgot-password">← Genera un nuovo codice</a>
+    </div>
+  {% endif %}
+</div>
+</body>
+</html>

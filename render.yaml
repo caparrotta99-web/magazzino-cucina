@@ -1,0 +1,17 @@
+services:
+  - type: web
+    name: magazzino-cucina
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --timeout 120
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: GOOGLE_CREDENTIALS_JSON
+        sync: false          # inserisci il contenuto di credentials.json nel dashboard Render
+      - key: ANTHROPIC_API_KEY
+        sync: false          # inserisci la tua API key Anthropic nel dashboard Render
+    disk:
+      name: haccp-db
+      mountPath: /data
+      sizeGB: 1

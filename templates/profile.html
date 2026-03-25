@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Il mio profilo — HACCP</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --accent: #c8a020;
+  --acc-bg: #faf3df;
+  --text:   #1a1815;
+  --muted:  #6e6355;
+  --dim:    #a89880;
+  --border: #e6dfd4;
+  --surface:#fafaf8;
+  --white:  #ffffff;
+  --red:    #c83030;
+  --green:  #2a7a2a;
+  --grn-bg: rgba(42,122,42,.09);
+}
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { min-height: 100dvh; background: var(--white); font-family: 'Outfit', sans-serif; color: var(--text); -webkit-font-smoothing: antialiased; }
+
+/* ── HEADER ── */
+header {
+  height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  border-bottom: 1.5px solid var(--border);
+  background: var(--white);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.logo { font-weight: 700; font-size: 17px; }
+.logo span { color: var(--accent); }
+.btn-back {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 15px; font-weight: 500; color: var(--muted);
+  text-decoration: none; background: none;
+  border: 1.5px solid var(--border); border-radius: 10px;
+  padding: 8px 14px; cursor: pointer; transition: border-color .15s, color .15s;
+  font-family: 'Outfit', sans-serif;
+}
+.btn-back:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── CONTENT ── */
+main { max-width: 480px; margin: 0 auto; padding: 28px 18px 40px; }
+
+.avatar-row {
+  display: flex; align-items: center; gap: 16px; margin-bottom: 32px;
+}
+.avatar {
+  width: 56px; height: 56px; border-radius: 50%;
+  background: var(--acc-bg); border: 2px solid rgba(200,160,32,.3);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px; font-weight: 700; color: var(--accent);
+  font-family: 'DM Mono', monospace; flex-shrink: 0;
+}
+.avatar-info {}
+.avatar-name { font-size: 18px; font-weight: 700; }
+.avatar-role {
+  display: inline-block; margin-top: 4px;
+  font-size: 11px; font-weight: 600; padding: 2px 10px;
+  border-radius: 100px; font-family: 'DM Mono', monospace;
+}
+.avatar-role.admin { background: var(--acc-bg); color: var(--accent); border: 1px solid rgba(200,160,32,.3); }
+.avatar-role.staff { background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
+
+/* ── FEEDBACK ── */
+.msg-success {
+  background: var(--grn-bg); border: 1.5px solid rgba(42,122,42,.25);
+  border-radius: 12px; padding: 13px 16px;
+  font-size: 14px; font-weight: 600; color: var(--green);
+  margin-bottom: 24px; display: flex; align-items: center; gap: 8px;
+}
+.msg-error {
+  background: rgba(200,48,48,.07); border: 1.5px solid rgba(200,48,48,.2);
+  border-radius: 12px; padding: 13px 16px;
+  font-size: 14px; color: var(--red); margin-bottom: 24px;
+}
+
+/* ── SEZIONI ── */
+.section-title {
+  font-size: 13px; letter-spacing: .6px; text-transform: uppercase;
+  color: var(--muted); font-family: 'DM Mono', monospace; font-weight: 500;
+  margin-bottom: 16px; margin-top: 32px;
+  padding-bottom: 8px; border-bottom: 1px solid var(--border);
+}
+.section-title:first-of-type { margin-top: 0; }
+
+/* ── FORM ── */
+.form-group { display: flex; flex-direction: column; gap: 7px; margin-bottom: 18px; }
+label { font-size: 11px; letter-spacing: .8px; text-transform: uppercase; color: var(--muted); font-weight: 500; }
+input, select {
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: 12px; padding: 14px 16px;
+  font-family: 'Outfit', sans-serif; font-size: 16px; color: var(--text);
+  outline: none; width: 100%; transition: border-color .15s, box-shadow .15s;
+  -webkit-appearance: none; appearance: none;
+}
+input:focus, select:focus {
+  border-color: var(--accent); box-shadow: 0 0 0 3px rgba(200,160,32,.12);
+}
+input::placeholder { color: var(--dim); }
+input:disabled { opacity: .5; cursor: not-allowed; }
+.hint { font-size: 12px; color: var(--dim); font-family: 'DM Mono', monospace; }
+
+.btn {
+  width: 100%; background: var(--accent); color: #fff; border: none;
+  border-radius: 14px; padding: 16px; font-family: 'Outfit', sans-serif;
+  font-size: 16px; font-weight: 700; cursor: pointer; margin-top: 8px;
+  transition: opacity .15s; letter-spacing: .2px;
+}
+.btn:hover { opacity: .9; } .btn:active { opacity: .8; }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="/" class="btn-back">← App</a>
+  <div class="logo"><span>▲</span> HACCP</div>
+</header>
+
+<main>
+
+  <div class="avatar-row">
+    <div class="avatar">{{ user.nome[0]|upper }}</div>
+    <div class="avatar-info">
+      <div class="avatar-name">{{ user.nome }}</div>
+      <span class="avatar-role {{ user.role }}">{{ user.role }}</span>
+    </div>
+  </div>
+
+  {% if success %}
+  <div class="msg-success">✓ {{ success }}</div>
+  {% endif %}
+  {% if error %}
+  <div class="msg-error">{{ error }}</div>
+  {% endif %}
+
+  <form method="post" action="/profile">
+
+    <!-- ── DATI PERSONALI ── -->
+    <div class="section-title">Dati personali</div>
+
+    <div class="form-group">
+      <label>Nome e Cognome</label>
+      <input type="text" name="nome" value="{{ user.nome }}" required autocomplete="name">
+    </div>
+
+    <div class="form-group">
+      <label>Email</label>
+      <input type="email" name="email"
+             value="{{ user.email or '' }}"
+             placeholder="non impostata"
+             autocomplete="email" inputmode="email">
+    </div>
+
+    <div class="form-group">
+      <label>Numero di Telefono</label>
+      <input type="tel" name="telefono"
+             value="{{ user.telefono or '' }}"
+             placeholder="non impostato"
+             autocomplete="tel" inputmode="tel">
+    </div>
+
+    <div class="form-group">
+      <label>Reparto</label>
+      <input type="text" value="{{ user.reparto or '—' }}" disabled>
+      <span class="hint">Il reparto può essere modificato solo da un amministratore</span>
+    </div>
+
+    <!-- ── CAMBIO PASSWORD ── -->
+    <div class="section-title">Cambia password <span style="font-size:10px;font-weight:400;text-transform:none;letter-spacing:0">(opzionale — lascia vuoto per non cambiare)</span></div>
+
+    <div class="form-group">
+      <label>Password attuale</label>
+      <input type="password" name="current_password"
+             placeholder="richiesta solo per cambiare la password"
+             autocomplete="current-password">
+    </div>
+
+    <div class="form-group">
+      <label>Nuova password</label>
+      <input type="password" name="new_password"
+             placeholder="minimo 6 caratteri"
+             autocomplete="new-password">
+    </div>
+
+    <div class="form-group">
+      <label>Conferma nuova password</label>
+      <input type="password" name="new_password2"
+             placeholder="ripeti la nuova password"
+             autocomplete="new-password">
+    </div>
+
+    <button type="submit" class="btn">Salva modifiche</button>
+
+  </form>
+
+</main>
+
+</body>
+</html>

@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Accedi — HACCP Magazzino</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --accent: #c8a020;
+  --text:   #1a1815;
+  --muted:  #6e6355;
+  --border: #e6dfd4;
+  --surface:#fafaf8;
+  --white:  #ffffff;
+  --red:    #c83030;
+}
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  min-height: 100dvh;
+  background: #f5f0e8;
+  font-family: 'Outfit', sans-serif;
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+}
+body {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+}
+.card {
+  background: var(--white);
+  border-radius: 24px;
+  padding: 40px 28px 36px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 8px 40px rgba(0,0,0,.07);
+}
+.logo {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 32px;
+  letter-spacing: .2px;
+}
+.logo span { color: var(--accent); }
+h1 {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -.3px;
+  margin-bottom: 6px;
+}
+.sub {
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 28px;
+}
+.error {
+  background: rgba(200,48,48,.07);
+  border: 1.5px solid rgba(200,48,48,.2);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 14px;
+  color: var(--red);
+  margin-bottom: 20px;
+}
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  margin-bottom: 18px;
+}
+label {
+  font-size: 11px;
+  letter-spacing: .8px;
+  text-transform: uppercase;
+  color: var(--muted);
+  font-weight: 500;
+}
+input {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 16px;
+  color: var(--text);
+  outline: none;
+  width: 100%;
+  transition: border-color .15s, box-shadow .15s;
+  -webkit-appearance: none;
+}
+input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(200,160,32,.12);
+}
+input::placeholder { color: #a89880; }
+.btn {
+  width: 100%;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 14px;
+  padding: 16px;
+  font-family: 'Outfit', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 8px;
+  transition: opacity .15s;
+  letter-spacing: .2px;
+}
+.btn:hover  { opacity: .9; }
+.btn:active { opacity: .8; }
+.footer {
+  text-align: center;
+  margin-top: 24px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.footer a {
+  color: var(--accent);
+  font-weight: 600;
+  text-decoration: none;
+}
+.footer a:hover { text-decoration: underline; }
+.forgot-link {
+  font-size: 12px;
+  color: var(--accent);
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.forgot-link:hover { text-decoration: underline; }
+</style>
+</head>
+<body>
+<div class="card">
+  <div class="logo"><span>▲</span> HACCP Magazzino</div>
+  <h1>Accedi</h1>
+  <p class="sub">Inserisci email o numero di telefono</p>
+
+  {% if error %}
+  <div class="error">{{ error }}</div>
+  {% endif %}
+
+  <form method="post" action="/login" autocomplete="on">
+    <div class="form-group">
+      <label>Email o Telefono</label>
+      <input type="text" name="identifier" placeholder="es. mario@email.com" required
+             autocomplete="username" autofocus inputmode="email">
+    </div>
+    <div class="form-group">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px">
+        <label style="margin-bottom:0">Password</label>
+        <a href="/forgot-password" class="forgot-link">Hai dimenticato la password?</a>
+      </div>
+      <input type="password" name="password" placeholder="••••••••" required
+             autocomplete="current-password">
+    </div>
+    <button type="submit" class="btn">Accedi</button>
+  </form>
+
+  <div class="footer">
+    Non hai un account? <a href="/register">Registrati</a>
+  </div>
+</div>
+</body>
+</html>

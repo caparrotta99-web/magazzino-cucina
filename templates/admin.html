@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>Gestione Utenti — HACCP</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --accent: #c8a020;
+  --acc-bg: #faf3df;
+  --text:   #1a1815;
+  --muted:  #6e6355;
+  --dim:    #a89880;
+  --border: #e6dfd4;
+  --surface:#fafaf8;
+  --white:  #ffffff;
+  --red:    #c83030;
+  --red-bg: rgba(200,48,48,.08);
+  --green:  #2a7a2a;
+  --grn-bg: rgba(42,122,42,.09);
+}
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html { height: -webkit-fill-available; }
+body {
+  min-height: 100dvh;
+  background: var(--white);
+  font-family: 'Outfit', sans-serif;
+  color: var(--text);
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* ── HEADER ── */
+header {
+  height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 20px;
+  border-bottom: 1.5px solid var(--border);
+  background: var(--white);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.logo { font-weight: 700; font-size: 17px; }
+.logo span { color: var(--accent); }
+.btn-back {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 15px;
+  font-weight: 500;
+  color: var(--muted);
+  text-decoration: none;
+  background: none;
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: border-color .15s, color .15s;
+  font-family: 'Outfit', sans-serif;
+}
+.btn-back:hover { border-color: var(--accent); color: var(--accent); }
+
+/* ── CONTENT ── */
+main {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 28px 18px 40px;
+}
+.page-title {
+  font-size: 22px;
+  font-weight: 700;
+  margin-bottom: 6px;
+  letter-spacing: -.2px;
+}
+.page-sub {
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 28px;
+}
+
+/* ── USER CARDS ── */
+.user-list { display: flex; flex-direction: column; gap: 12px; }
+.user-card {
+  background: var(--white);
+  border: 1.5px solid var(--border);
+  border-radius: 16px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.user-card.is-admin { border-color: rgba(200,160,32,.4); background: #fffdf5; }
+.user-info { display: flex; align-items: flex-start; gap: 12px; }
+.user-avatar {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: var(--acc-bg);
+  border: 1.5px solid rgba(200,160,32,.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--accent);
+  flex-shrink: 0;
+  font-family: 'DM Mono', monospace;
+}
+.user-details { flex: 1; min-width: 0; }
+.user-nome {
+  font-weight: 600;
+  font-size: 16px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.user-contact {
+  font-size: 13px;
+  color: var(--muted);
+  margin-top: 2px;
+  font-family: 'DM Mono', monospace;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.user-badges {
+  display: flex;
+  gap: 6px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+}
+.badge {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 3px 10px;
+  border-radius: 100px;
+  font-family: 'DM Mono', monospace;
+}
+.badge.admin  { background: var(--acc-bg); color: var(--accent); border: 1px solid rgba(200,160,32,.3); }
+.badge.staff  { background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
+.badge.reparto { background: var(--grn-bg); color: var(--green); border: 1px solid rgba(42,122,42,.2); }
+
+/* ── ACTIONS ── */
+.user-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.user-actions form { margin: 0; }
+.btn-action {
+  font-family: 'Outfit', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 9px 16px;
+  border-radius: 10px;
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  transition: border-color .15s, color .15s, background .15s;
+}
+.btn-action:hover { border-color: var(--accent); color: var(--accent); }
+.btn-action.promote { border-color: rgba(200,160,32,.4); color: var(--accent); background: var(--acc-bg); }
+.btn-action.promote:hover { background: #f5e8b5; }
+.btn-action.demote  { }
+.btn-action.delete {
+  border-color: rgba(200,48,48,.3);
+  color: var(--red);
+  background: var(--red-bg);
+}
+.btn-action.delete:hover { background: rgba(200,48,48,.15); }
+
+.you-label {
+  font-size: 12px;
+  color: var(--dim);
+  font-style: italic;
+  align-self: center;
+}
+.empty {
+  text-align: center;
+  padding: 56px 24px;
+  color: var(--dim);
+}
+</style>
+</head>
+<body>
+
+<header>
+  <a href="/" class="btn-back">← App</a>
+  <div class="logo"><span>▲</span> HACCP</div>
+</header>
+
+<main>
+  <div class="page-title">Gestione Utenti</div>
+  <div class="page-sub">{{ users|length }} utente{% if users|length != 1 %}i{% endif %} registrat{% if users|length != 1 %}i{% endif %}</div>
+
+  <div class="user-list">
+    {% for u in users %}
+    <div class="user-card {% if u.role == 'admin' %}is-admin{% endif %}">
+      <div class="user-info">
+        <div class="user-avatar">{{ u.nome[0]|upper }}</div>
+        <div class="user-details">
+          <div class="user-nome">{{ u.nome }}</div>
+          <div class="user-contact">
+            {% if u.email %}{{ u.email }}{% endif %}
+            {% if u.email and u.telefono %} · {% endif %}
+            {% if u.telefono %}{{ u.telefono }}{% endif %}
+          </div>
+          <div class="user-badges">
+            <span class="badge {{ u.role }}">{{ u.role }}</span>
+            {% if u.reparto %}<span class="badge reparto">{{ u.reparto }}</span>{% endif %}
+          </div>
+        </div>
+      </div>
+
+      <div class="user-actions">
+        {% if u.id == current_user.id | int %}
+          <span class="you-label">Sei tu</span>
+        {% else %}
+          {% if u.role == 'staff' %}
+          <form method="post" action="/admin/role">
+            <input type="hidden" name="user_id" value="{{ u.id }}">
+            <input type="hidden" name="role" value="admin">
+            <button type="submit" class="btn-action promote">↑ Promuovi ad Admin</button>
+          </form>
+          {% else %}
+          <form method="post" action="/admin/role">
+            <input type="hidden" name="user_id" value="{{ u.id }}">
+            <input type="hidden" name="role" value="staff">
+            <button type="submit" class="btn-action demote">↓ Declassa a Staff</button>
+          </form>
+          {% endif %}
+
+          <form method="post" action="/admin/delete"
+                onsubmit="return confirm('Eliminare {{ u.nome }}? Questa azione non è reversibile.')">
+            <input type="hidden" name="user_id" value="{{ u.id }}">
+            <button type="submit" class="btn-action delete">✕ Elimina</button>
+          </form>
+        {% endif %}
+      </div>
+    </div>
+    {% else %}
+    <div class="empty">Nessun utente registrato.</div>
+    {% endfor %}
+  </div>
+</main>
+
+</body>
+</html>

@@ -40,12 +40,50 @@ _SYNS = {
 }
 
 
+def _parse_credentials_json(raw: str) -> dict:
+    """
+    Parsifica GOOGLE_CREDENTIALS_JSON gestendo i formati comuni
+    che emergono quando si incolla credentials.json in Render.
+    """
+    import json, ast
+
+    s = raw.strip()
+
+    # Tentativi in ordine dal più comune al più raro
+    attempts = [
+        s,                                      # 1. valore as-is
+        s[1:-1] if s[:1] == "'" else None,      # 2. avvolto in singole virgolette '...'
+        s[1:-1] if s[:1] == '"' else None,      # 3. avvolto in doppie virgolette "..."
+        s.replace('\\\\n', '\\n'),              # 4. \n doppiamente escaped (\\n → \n)
+    ]
+
+    last_err = None
+    for candidate in attempts:
+        if candidate is None:
+            continue
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError as e:
+            last_err = e
+
+    # Ultimo tentativo: ast.literal_eval per dict Python con singole virgolette
+    try:
+        result = ast.literal_eval(s)
+        if isinstance(result, dict):
+            return result
+    except (ValueError, SyntaxError):
+        pass
+
+    raise ValueError(
+        f"GOOGLE_CREDENTIALS_JSON non è parsabile: {last_err}\n"
+        f"Primi 120 caratteri: {repr(raw[:120])}"
+    )
+
+
 def _get_client():
-    # In produzione (Render) le credenziali arrivano come variabile d'ambiente JSON
     creds_json = os.environ.get('GOOGLE_CREDENTIALS_JSON')
     if creds_json:
-        import json
-        info = json.loads(creds_json)
+        info = _parse_credentials_json(creds_json)
         creds = Credentials.from_service_account_info(info, scopes=SCOPES)
     else:
         creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=SCOPES)

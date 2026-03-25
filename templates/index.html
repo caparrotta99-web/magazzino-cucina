@@ -5,31 +5,30 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>HACCP — Magazzino</title>
 <link rel="manifest" href="/static/manifest.json">
-<meta name="theme-color" content="#c8a020">
+<meta name="theme-color" content="#2d2d2d">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="HACCP">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Brigade">
 <link rel="apple-touch-icon" href="/static/icon.svg">
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
-  --accent:    #c8a020;
-  --acc-bg:    #faf3df;
-  --text:      #1a1815;
-  --muted:     #6e6355;
-  --dim:       #a89880;
-  --border:    #e6dfd4;
-  --surface:   #fafaf8;
-  --white:     #ffffff;
-  --red:       #c83030;
-  --red-bg:    rgba(200,48,48,.09);
-  --orange:    #c86010;
-  --ora-bg:    rgba(200,96,16,.09);
-  --green:     #2a7a2a;
-  --grn-bg:    rgba(42,122,42,.09);
+  --bg:        #f5f5f5;
+  --surface:   #ffffff;
+  --primary:   #2d2d2d;
+  --secondary: #4a4a4a;
+  --text:      #1a1a1a;
+  --muted:     #888888;
+  --border:    #e0e0e0;
+  --success:   #4caf50;
+  --suc-bg:    rgba(76,175,80,.12);
+  --error:     #f44336;
+  --err-bg:    rgba(244,67,54,.10);
+  --warning:   #ff9800;
+  --war-bg:    rgba(255,152,0,.10);
   --tab-btn-h: 62px;
-  --hdr-h:     58px;
+  --hdr-h:     60px;
 }
 
 /* ── RESET & BASE ── */
@@ -39,7 +38,7 @@
 }
 html { height: -webkit-fill-available; }
 body {
-  background: var(--white);
+  background: var(--bg);
   color: var(--text);
   font-family: 'Outfit', sans-serif;
   font-size: 16px;
@@ -58,9 +57,9 @@ header {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 16px 0 20px;
-  border-bottom: 1px solid var(--border);
-  background: var(--white);
+  padding: 0 14px 0 18px;
+  background: var(--surface);
+  box-shadow: 0 1px 0 var(--border), 0 2px 10px rgba(0,0,0,.05);
   position: sticky;
   top: 0;
   z-index: 50;
@@ -68,13 +67,13 @@ header {
   gap: 8px;
 }
 .logo {
-  font-weight: 700;
-  font-size: 17px;
-  letter-spacing: .3px;
-  color: var(--text);
+  font-family: 'DM Serif Display', serif;
+  font-size: 22px;
+  font-weight: 400;
+  letter-spacing: -.2px;
+  color: var(--primary);
   flex-shrink: 0;
 }
-.logo span { color: var(--accent); }
 .hdr-user {
   flex: 1;
   min-width: 0;
@@ -95,33 +94,30 @@ header {
   font-size: 11px;
   padding: 2px 8px;
   border-radius: 100px;
-  background: var(--acc-bg);
-  color: var(--accent);
-  font-family: 'DM Mono', monospace;
-  font-weight: 500;
+  background: #f0f0f0;
+  color: var(--secondary);
+  font-weight: 600;
   flex-shrink: 0;
 }
-.hdr-right { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.hdr-right { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
 .btn-icon {
   background: none;
   border: 1.5px solid var(--border);
   border-radius: 10px;
-  width: 40px; height: 40px;
+  width: 38px; height: 38px;
   display: flex; align-items: center; justify-content: center;
   color: var(--muted);
   cursor: pointer;
-  font-size: 18px;
-  line-height: 1;
   text-decoration: none;
   transition: border-color .15s, color .15s;
   flex-shrink: 0;
 }
-.btn-icon:hover  { border-color: var(--accent); color: var(--accent); }
-.btn-icon.spinning { animation: spin .7s linear infinite; }
+.btn-icon:hover { border-color: var(--primary); color: var(--primary); }
+.btn-icon.spinning svg { animation: spin .7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .hdr-alert-dot {
   width: 8px; height: 8px;
-  background: var(--red);
+  background: var(--error);
   border-radius: 50%;
   display: none;
   animation: pulse 2s ease-in-out infinite;
@@ -145,84 +141,89 @@ main {
 .tab-panel.active { display: block; }
 
 /* ── HOME ── */
-.home-greeting {
-  margin-bottom: 28px;
-}
+.home-greeting { margin-bottom: 28px; }
 .home-greeting h2 {
-  font-size: 22px;
-  font-weight: 700;
-  letter-spacing: -.2px;
+  font-family: 'DM Serif Display', serif;
+  font-size: 28px;
+  font-weight: 400;
+  letter-spacing: -.3px;
   margin-bottom: 4px;
+  color: var(--text);
 }
-.home-date {
-  font-size: 13px;
-  color: var(--muted);
-  font-family: 'DM Mono', monospace;
-}
+.home-date { font-size: 13px; color: var(--muted); }
 .home-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 12px;
+  gap: 14px;
 }
 .home-card {
-  background: var(--white);
-  border: 1.5px solid var(--border);
   border-radius: 20px;
-  padding: 28px 12px 22px;
+  padding: 28px 16px 24px;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 10px;
   cursor: pointer;
   text-align: center;
-  transition: background .12s, transform .1s;
+  transition: transform .12s, box-shadow .12s;
   position: relative;
-  border-top-width: 3px;
   font-family: 'Outfit', sans-serif;
   font-size: inherit;
+  border: 2px solid transparent;
+  box-shadow: 0 2px 12px rgba(0,0,0,.08);
 }
-.home-card:active { background: var(--surface); transform: scale(.97); }
-.home-card.carico  { border-top-color: var(--accent); }
-.home-card.scarico { border-top-color: #2a2520; }
-.home-card.giac    { border-top-color: var(--green); }
-.home-card.alert   { border-top-color: var(--red); }
+.home-card:active { transform: scale(.96); box-shadow: 0 1px 4px rgba(0,0,0,.06); }
+.home-card.carico  { background: var(--primary); color: #fff; }
+.home-card.scarico { background: var(--secondary); color: #fff; }
+.home-card.giac    { background: var(--surface); border-color: var(--primary); color: var(--text); }
+.home-card.alert   { background: var(--surface); border-color: var(--error); color: var(--text); }
 .home-icon {
-  font-size: 32px;
-  line-height: 1;
+  display: flex; align-items: center; justify-content: center;
   margin-bottom: 2px;
 }
+.home-card.carico .home-icon,
+.home-card.scarico .home-icon { color: rgba(255,255,255,.9); }
+.home-card.giac .home-icon  { color: var(--primary); }
+.home-card.alert .home-icon { color: var(--error); }
 .home-label {
-  font-size: 15px;
+  font-size: 16px;
   font-weight: 700;
-  color: var(--text);
   letter-spacing: -.1px;
+  line-height: 1;
 }
+.home-card.carico .home-label,
+.home-card.scarico .home-label { color: rgba(255,255,255,.95); }
+.home-card.giac .home-label  { color: var(--text); }
+.home-card.alert .home-label { color: var(--text); }
 .home-sub {
   font-size: 12px;
-  color: var(--muted);
   line-height: 1.3;
 }
+.home-card.carico .home-sub,
+.home-card.scarico .home-sub { color: rgba(255,255,255,.55); }
+.home-card.giac .home-sub,
+.home-card.alert .home-sub  { color: var(--muted); }
 .home-badge {
   position: absolute;
   top: 12px; right: 12px;
-  background: var(--red);
+  background: var(--error);
   color: #fff;
   border-radius: 100px;
   font-size: 10px;
   font-weight: 700;
   padding: 2px 7px;
-  font-family: 'DM Mono', monospace;
   display: none;
   line-height: 1.4;
 }
 
 /* ── TITOLI ── */
 .panel-title {
-  font-size: 22px;
-  font-weight: 700;
+  font-family: 'DM Serif Display', serif;
+  font-size: 26px;
+  font-weight: 400;
   color: var(--text);
   margin-bottom: 24px;
-  letter-spacing: -.2px;
+  letter-spacing: -.3px;
 }
 .panel-header {
   display: flex;
@@ -241,12 +242,11 @@ main {
   margin-bottom: 20px;
 }
 label {
-  font-size: 12px;
-  letter-spacing: .8px;
+  font-size: 11px;
+  letter-spacing: 1px;
   text-transform: uppercase;
   color: var(--muted);
-  font-family: 'DM Mono', monospace;
-  font-weight: 500;
+  font-weight: 600;
 }
 input, select, textarea {
   background: var(--surface);
@@ -263,12 +263,12 @@ input, select, textarea {
   -webkit-appearance: none;
 }
 input:focus, select:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(200,160,32,.12);
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(45,45,45,.08);
 }
-input::placeholder { color: var(--dim); }
+input::placeholder { color: #c0c0c0; }
 select {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' viewBox='0 0 14 9'%3E%3Cpath d='M1 1l6 6 6-6' stroke='%23a89880' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='9' viewBox='0 0 14 9'%3E%3Cpath d='M1 1l6 6 6-6' stroke='%23888888' stroke-width='1.8' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
   background-repeat: no-repeat;
   background-position: right 16px center;
   padding-right: 44px;
@@ -276,23 +276,21 @@ select {
 }
 input[type="date"] { color-scheme: light; }
 input:disabled, select:disabled { opacity: .45; cursor: not-allowed; }
-input.input-error { border-color: var(--red); }
-input.input-error:focus { box-shadow: 0 0 0 3px rgba(200,48,48,.12); }
+input.input-error { border-color: var(--error); }
+input.input-error:focus { box-shadow: 0 0 0 3px rgba(244,67,54,.10); }
 .field-error {
   font-size: 13px;
-  color: var(--red);
-  font-family: 'DM Mono', monospace;
+  color: var(--error);
   display: none;
 }
 .field-error.visible { display: block; }
 .field-display {
-  background: var(--surface);
+  background: #f8f8f8;
   border: 1.5px solid var(--border);
   border-radius: 12px;
   padding: 15px 16px;
-  color: var(--dim);
+  color: var(--muted);
   font-size: 16px;
-  font-family: 'DM Mono', monospace;
   min-height: 52px;
   line-height: 1.4;
 }
@@ -302,27 +300,27 @@ input.input-error:focus { box-shadow: 0 0 0 3px rgba(200,48,48,.12); }
 .btn-scan {
   width: 100%;
   background: var(--surface);
-  border: 1.5px dashed var(--accent);
+  border: 1.5px dashed var(--border);
   border-radius: 12px;
   padding: 14px 16px;
   font-family: 'Outfit', sans-serif;
   font-size: 15px;
   font-weight: 600;
-  color: var(--accent);
+  color: var(--secondary);
   cursor: pointer;
-  transition: background .15s, opacity .15s;
+  transition: background .15s, border-color .15s;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
 }
-.btn-scan:active  { background: var(--acc-bg); }
+.btn-scan:active  { background: #f0f0f0; border-color: var(--primary); }
 .btn-scan:disabled { opacity: .5; cursor: not-allowed; }
 
 /* ── PRIMARY BUTTON ── */
 .btn-primary {
   width: 100%;
-  background: var(--accent);
+  background: var(--primary);
   color: #fff;
   border: none;
   border-radius: 14px;
@@ -334,16 +332,17 @@ input.input-error:focus { box-shadow: 0 0 0 3px rgba(200,48,48,.12); }
   transition: opacity .15s, transform .1s;
   margin-top: 12px;
   letter-spacing: .2px;
+  box-shadow: 0 2px 8px rgba(45,45,45,.18);
 }
-.btn-primary:active  { opacity: .8; transform: scale(.99); }
+.btn-primary:active  { opacity: .85; transform: scale(.99); }
 .btn-primary:hover   { opacity: .9; }
-.btn-primary.btn-scarico { background: #2a2520; }
-.btn-primary:disabled { opacity: .45; cursor: not-allowed; transform: none; }
+.btn-primary.btn-scarico { background: var(--secondary); }
+.btn-primary:disabled { opacity: .4; cursor: not-allowed; transform: none; box-shadow: none; }
 
 /* ── LOT INFO BOX ── */
 .lot-info-box {
-  background: var(--acc-bg);
-  border: 1.5px solid rgba(200,160,32,.3);
+  background: #f8f8f8;
+  border: 1.5px solid var(--border);
   border-radius: 12px;
   padding: 14px 16px;
   margin-bottom: 20px;
@@ -357,18 +356,18 @@ input.input-error:focus { box-shadow: 0 0 0 3px rgba(200,48,48,.12); }
   padding: 5px 0;
   font-size: 15px;
 }
-.lot-info-row + .lot-info-row { border-top: 1px solid rgba(200,160,32,.2); }
+.lot-info-row + .lot-info-row { border-top: 1px solid var(--border); }
 .lot-info-row span {
   color: var(--muted);
   font-size: 11px;
-  font-family: 'DM Mono', monospace;
   text-transform: uppercase;
-  letter-spacing: .6px;
+  letter-spacing: .8px;
+  font-weight: 600;
 }
 .lot-info-row strong { font-weight: 600; }
-.lot-info-row strong.c-red    { color: var(--red); }
-.lot-info-row strong.c-orange { color: var(--orange); }
-.lot-info-row strong.c-green  { color: var(--green); }
+.lot-info-row strong.c-red    { color: var(--error); }
+.lot-info-row strong.c-orange { color: var(--warning); }
+.lot-info-row strong.c-green  { color: var(--success); }
 
 /* ── SEARCH ── */
 .search-input {
@@ -384,15 +383,16 @@ input.input-error:focus { box-shadow: 0 0 0 3px rgba(200,48,48,.12); }
   transition: border-color .15s;
   min-width: 0;
 }
-.search-input:focus { border-color: var(--accent); }
+.search-input:focus { border-color: var(--primary); }
 
 /* ── PRODUCT CARDS ── */
-#giacenze-list { display: flex; flex-direction: column; gap: 12px; }
+#giacenze-list { display: flex; flex-direction: column; gap: 10px; }
 .product-card {
-  background: var(--white);
+  background: var(--surface);
   border: 1.5px solid var(--border);
   border-radius: 16px;
   overflow: hidden;
+  box-shadow: 0 1px 4px rgba(0,0,0,.04);
 }
 .product-header {
   display: flex;
@@ -403,7 +403,7 @@ input.input-error:focus { box-shadow: 0 0 0 3px rgba(200,48,48,.12); }
   user-select: none;
   min-height: 64px;
 }
-.product-header:active { background: var(--surface); }
+.product-header:active { background: #f8f8f8; }
 .product-info { flex: 1; min-width: 0; }
 .product-name {
   font-weight: 600;
@@ -419,8 +419,8 @@ input.input-error:focus { box-shadow: 0 0 0 3px rgba(200,48,48,.12); }
   font-weight: 600;
   padding: 2px 8px;
   border-radius: 20px;
-  background: rgba(200,160,32,.12);
-  color: #8a6800;
+  background: #f0f0f0;
+  color: var(--secondary);
   margin-top: 4px;
 }
 .cat-btn {
@@ -435,28 +435,28 @@ input.input-error:focus { box-shadow: 0 0 0 3px rgba(200,48,48,.12); }
   transition: all .15s;
 }
 .cat-btn.active {
-  background: var(--accent);
-  border-color: var(--accent);
+  background: var(--primary);
+  border-color: var(--primary);
   color: #fff;
 }
 .product-total {
-  font-family: 'DM Mono', monospace;
   font-size: 13px;
-  font-weight: 500;
+  font-weight: 600;
   white-space: nowrap;
   padding: 6px 12px;
   border-radius: 100px;
-  background: var(--grn-bg);
-  color: var(--green);
+  background: var(--suc-bg);
+  color: var(--success);
   flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
 }
-.product-total.warn { background: var(--ora-bg); color: var(--orange); }
+.product-total.warn { background: var(--war-bg); color: var(--warning); }
 .expand-arrow {
-  font-size: 13px;
-  color: var(--dim);
+  color: var(--muted);
   transition: transform .22s ease;
   flex-shrink: 0;
   margin-left: 2px;
+  display: flex; align-items: center;
 }
 .product-card.open .expand-arrow { transform: rotate(180deg); }
 .lot-list { display: none; border-top: 1px solid var(--border); }
@@ -472,40 +472,39 @@ input.input-error:focus { box-shadow: 0 0 0 3px rgba(200,48,48,.12); }
 }
 .lot-row:last-child { border-bottom: none; }
 .lot-code {
-  font-family: 'DM Mono', monospace;
   font-size: 13px;
   font-weight: 500;
   color: var(--text);
   flex-shrink: 0;
   min-width: 90px;
+  font-variant-numeric: tabular-nums;
 }
 .lot-scad {
-  font-family: 'DM Mono', monospace;
   font-size: 12px;
+  font-weight: 600;
   padding: 4px 9px;
   border-radius: 100px;
   white-space: nowrap;
 }
-.lot-scad.ok     { background: var(--grn-bg); color: var(--green); }
-.lot-scad.warn   { background: var(--ora-bg); color: var(--orange); }
-.lot-scad.danger { background: var(--red-bg); color: var(--red); }
+.lot-scad.ok     { background: var(--suc-bg); color: var(--success); }
+.lot-scad.warn   { background: var(--war-bg); color: var(--warning); }
+.lot-scad.danger { background: var(--err-bg); color: var(--error); }
 .lot-qty {
   margin-left: auto;
-  font-family: 'DM Mono', monospace;
   font-size: 13px;
   color: var(--muted);
   white-space: nowrap;
   flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
 }
 
 /* ── ALERT CARDS ── */
 .alert-section-title {
-  font-size: 12px;
-  letter-spacing: 1px;
+  font-size: 11px;
+  letter-spacing: 1.2px;
   text-transform: uppercase;
   color: var(--muted);
-  font-family: 'DM Mono', monospace;
-  font-weight: 500;
+  font-weight: 600;
   margin: 0 0 12px;
 }
 .alerts-block + .alerts-block { margin-top: 28px; }
@@ -519,10 +518,12 @@ input.input-error:focus { box-shadow: 0 0 0 3px rgba(200,48,48,.12); }
   padding: 16px 18px;
   margin-bottom: 10px;
   min-height: 64px;
+  background: var(--surface);
+  box-shadow: 0 1px 4px rgba(0,0,0,.04);
 }
-.alert-card.red    { background: var(--red-bg); border-color: rgba(200,48,48,.2); }
-.alert-card.orange { background: var(--ora-bg); border-color: rgba(200,96,16,.2); }
-.alert-card.yellow { background: #fffbe6; border-color: rgba(200,160,32,.25); }
+.alert-card.red    { background: var(--err-bg); border-color: rgba(244,67,54,.25); }
+.alert-card.orange { background: var(--war-bg); border-color: rgba(255,152,0,.25); }
+.alert-card.yellow { background: #fff8f0; border-color: rgba(255,152,0,.2); }
 .alert-left { flex: 1; min-width: 0; }
 .alert-prodotto {
   font-weight: 600;
@@ -533,32 +534,32 @@ input.input-error:focus { box-shadow: 0 0 0 3px rgba(200,48,48,.12); }
 }
 .alert-sub { font-size: 13px; color: var(--muted); margin-top: 3px; }
 .alert-right { text-align: right; flex-shrink: 0; }
-.alert-qty { font-family: 'DM Mono', monospace; font-size: 14px; font-weight: 600; }
-.alert-days { font-size: 12px; font-family: 'DM Mono', monospace; color: var(--muted); margin-top: 3px; }
-.alert-days.red    { color: var(--red); }
-.alert-days.orange { color: var(--orange); }
+.alert-qty { font-size: 14px; font-weight: 700; font-variant-numeric: tabular-nums; }
+.alert-days { font-size: 12px; color: var(--muted); margin-top: 3px; font-variant-numeric: tabular-nums; }
+.alert-days.red    { color: var(--error); }
+.alert-days.orange { color: var(--warning); }
 
 /* ── EMPTY STATE ── */
 .empty-state {
   text-align: center;
   padding: 56px 24px;
-  color: var(--dim);
+  color: var(--muted);
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 10px;
 }
-.empty-icon  { font-size: 40px; }
+.empty-icon  { display: flex; justify-content: center; color: var(--border); }
 .empty-label { font-size: 16px; }
-.empty-ok    { color: var(--green); font-size: 36px; }
+.empty-ok    { color: var(--success); }
 
 /* ── TAB BAR ── */
 .tab-bar {
   position: fixed;
   bottom: 0; left: 0; right: 0;
   display: flex;
-  background: var(--white);
-  border-top: 1.5px solid var(--border);
+  background: var(--surface);
+  box-shadow: 0 -1px 0 var(--border), 0 -4px 20px rgba(0,0,0,.06);
   z-index: 100;
   padding-bottom: env(safe-area-inset-bottom, 0px);
 }
@@ -572,7 +573,7 @@ input.input-error:focus { box-shadow: 0 0 0 3px rgba(200,48,48,.12); }
   background: none;
   border: none;
   cursor: pointer;
-  color: var(--dim);
+  color: #aaaaaa;
   font-family: 'Outfit', sans-serif;
   font-size: 10px;
   font-weight: 500;
@@ -585,20 +586,19 @@ input.input-error:focus { box-shadow: 0 0 0 3px rgba(200,48,48,.12); }
   user-select: none;
 }
 .tab-btn:active { opacity: .7; }
-.tab-btn.active { color: var(--accent); }
-.tab-icon { font-size: 22px; line-height: 1; display: block; }
+.tab-btn.active { color: var(--primary); }
+.tab-icon { display: flex; align-items: center; justify-content: center; }
 .tab-label { line-height: 1; }
 .tab-badge {
   position: absolute;
   top: 8px;
   right: calc(50% - 20px);
-  background: var(--red);
+  background: var(--error);
   color: #fff;
   border-radius: 100px;
   font-size: 9px;
   font-weight: 700;
   padding: 2px 5px;
-  font-family: 'DM Mono', monospace;
   min-width: 17px;
   text-align: center;
   display: none;
@@ -617,7 +617,7 @@ input.input-error:focus { box-shadow: 0 0 0 3px rgba(200,48,48,.12); }
 }
 .modal-backdrop.open { display: flex; }
 .modal {
-  background: var(--white);
+  background: var(--surface);
   border-radius: 24px 24px 0 0;
   width: 100%;
   max-width: 560px;
@@ -636,22 +636,22 @@ input.input-error:focus { box-shadow: 0 0 0 3px rgba(200,48,48,.12); }
   to   { transform: translateY(0);    opacity: 1; }
 }
 .modal-title {
-  font-size: 20px;
-  font-weight: 700;
+  font-family: 'DM Serif Display', serif;
+  font-size: 22px;
+  font-weight: 400;
   margin-bottom: 22px;
-  color: var(--accent);
+  color: var(--primary);
   letter-spacing: -.2px;
 }
 .etichetta-card {
-  background: var(--surface);
-  border: 2px solid var(--border);
+  background: #f8f8f8;
+  border: 1.5px solid var(--border);
   border-radius: 16px;
   padding: 20px;
   margin-bottom: 22px;
 }
 .eti-header {
   text-align: center;
-  font-family: 'DM Mono', monospace;
   font-size: 11px;
   letter-spacing: 2px;
   text-transform: uppercase;
@@ -670,15 +670,15 @@ input.input-error:focus { box-shadow: 0 0 0 3px rgba(200,48,48,.12); }
 }
 .eti-row:last-child { border-bottom: none; }
 .eti-row span {
-  font-family: 'DM Mono', monospace;
   font-size: 11px;
   letter-spacing: .8px;
   text-transform: uppercase;
   color: var(--muted);
   flex-shrink: 0;
+  font-weight: 600;
 }
 .eti-row strong { font-size: 15px; font-weight: 600; text-align: right; word-break: break-word; }
-.eti-id strong  { font-family: 'DM Mono', monospace; font-size: 14px; color: var(--accent); }
+.eti-id strong  { font-size: 14px; color: var(--primary); font-variant-numeric: tabular-nums; }
 .modal-actions  { display: flex; gap: 12px; }
 .modal-actions button {
   flex: 1;
@@ -691,8 +691,8 @@ input.input-error:focus { box-shadow: 0 0 0 3px rgba(200,48,48,.12); }
   transition: opacity .15s;
   border: none;
 }
-.btn-print       { background: var(--accent); color: #fff; }
-.btn-close-modal { background: var(--surface); color: var(--muted); border: 1.5px solid var(--border) !important; }
+.btn-print       { background: var(--primary); color: #fff; }
+.btn-close-modal { background: #f0f0f0; color: var(--secondary); }
 .modal-actions button:active { opacity: .75; }
 
 /* ── TOAST ── */
@@ -701,7 +701,7 @@ input.input-error:focus { box-shadow: 0 0 0 3px rgba(200,48,48,.12); }
   bottom: calc(var(--tab-btn-h) + env(safe-area-inset-bottom, 0px) + 14px);
   left: 50%;
   transform: translateX(-50%) translateY(10px);
-  background: var(--text);
+  background: var(--primary);
   color: #fff;
   border-radius: 100px;
   padding: 11px 22px;
@@ -718,9 +718,9 @@ input.input-error:focus { box-shadow: 0 0 0 3px rgba(200,48,48,.12); }
   box-shadow: 0 4px 20px rgba(0,0,0,.18);
 }
 .toast.show    { opacity: 1; transform: translateX(-50%) translateY(0); }
-.toast.success { background: var(--green); }
-.toast.error   { background: var(--red); }
-.toast.info    { background: var(--accent); }
+.toast.success { background: var(--success); }
+.toast.error   { background: var(--error); }
+.toast.info    { background: var(--secondary); }
 
 /* ── PRINT ── */
 @media print {
@@ -732,17 +732,17 @@ input.input-error:focus { box-shadow: 0 0 0 3px rgba(200,48,48,.12); }
 /* ── DESKTOP ── */
 @media (min-width: 640px) {
   .tab-panel   { padding: 32px 28px 8px; }
-  .panel-title { font-size: 24px; }
-  .tab-icon    { font-size: 18px; }
+  .panel-title { font-size: 30px; }
+  .tab-icon svg { width: 18px; height: 18px; }
   .tab-btn     { font-size: 11px; height: 56px; }
-  .home-grid   { grid-template-columns: repeat(2, 1fr); max-width: 420px; }
+  .home-grid   { grid-template-columns: repeat(2, 1fr); max-width: 440px; }
 }
 </style>
 </head>
 <body>
 
 <header>
-  <div class="logo"><span>▲</span> HACCP</div>
+  <div class="logo">Brigade</div>
   <div class="hdr-user">
     <span class="hdr-nome">{{ current_user.nome }}</span>
     {% if current_user.reparto %}
@@ -751,12 +751,20 @@ input.input-error:focus { box-shadow: 0 0 0 3px rgba(200,48,48,.12); }
   </div>
   <div class="hdr-right">
     <div class="hdr-alert-dot" id="hdr-alert-dot"></div>
-    <a href="/profile" class="btn-icon" title="Il mio profilo">👤</a>
+    <a href="/profile" class="btn-icon" title="Il mio profilo">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+    </a>
     {% if current_user.role == 'admin' %}
-    <a href="/admin" class="btn-icon" title="Gestione utenti">⚙</a>
+    <a href="/admin" class="btn-icon" title="Gestione utenti">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+    </a>
     {% endif %}
-    <button class="btn-icon" id="btn-sync" title="Sincronizza Sheets" onclick="syncAll()">⟳</button>
-    <a href="/logout" class="btn-icon" title="Esci">⎋</a>
+    <button class="btn-icon" id="btn-sync" title="Sincronizza Sheets" onclick="syncAll()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+    </button>
+    <a href="/logout" class="btn-icon" title="Esci">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+    </a>
   </div>
 </header>
 
@@ -770,22 +778,30 @@ input.input-error:focus { box-shadow: 0 0 0 3px rgba(200,48,48,.12); }
     </div>
     <div class="home-grid">
       <button class="home-card carico" onclick="switchTab('carico')">
-        <div class="home-icon">↑</div>
+        <div class="home-icon">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+        </div>
         <div class="home-label">Carico</div>
         <div class="home-sub">Registra entrata merce</div>
       </button>
       <button class="home-card scarico" onclick="switchTab('scarico')">
-        <div class="home-icon">↓</div>
+        <div class="home-icon">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+        </div>
         <div class="home-label">Scarico</div>
         <div class="home-sub">Registra uscita merce</div>
       </button>
       <button class="home-card giac" onclick="switchTab('giacenze')">
-        <div class="home-icon">▤</div>
+        <div class="home-icon">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+        </div>
         <div class="home-label">Giacenze</div>
         <div class="home-sub">Stock attuale per lotto</div>
       </button>
       <button class="home-card alert" onclick="switchTab('alert')">
-        <div class="home-icon">⚑</div>
+        <div class="home-icon">
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        </div>
         <div class="home-label">Alert</div>
         <div class="home-sub">Scadenze e scorte minime</div>
         <span class="home-badge" id="home-alert-badge"></span>
@@ -824,7 +840,8 @@ input.input-error:focus { box-shadow: 0 0 0 3px rgba(200,48,48,.12); }
     <div class="form-group">
       <label>Scansione automatica etichetta</label>
       <button type="button" class="btn-scan" id="btn-scan" onclick="triggerCamera()">
-        📷 Scansiona etichetta
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        Scansiona etichetta
       </button>
       <input type="file" id="camera-input" accept="image/*" capture="environment"
              style="display:none" onchange="onCameraCapture(this)">
@@ -846,7 +863,7 @@ input.input-error:focus { box-shadow: 0 0 0 3px rgba(200,48,48,.12); }
       <input type="number" id="c-qty" placeholder="0" min="0.01" step="0.01" inputmode="decimal">
     </div>
 
-    <button class="btn-primary" onclick="submitCarico()">↑ Registra Carico</button>
+    <button class="btn-primary" onclick="submitCarico()">Registra Carico</button>
   </section>
 
   <!-- ── SCARICO ── -->
@@ -876,7 +893,7 @@ input.input-error:focus { box-shadow: 0 0 0 3px rgba(200,48,48,.12); }
       <div class="field-error" id="s-qty-error"></div>
     </div>
 
-    <button class="btn-primary btn-scarico" onclick="submitScarico()">↓ Registra Scarico</button>
+    <button class="btn-primary btn-scarico" onclick="submitScarico()">Registra Scarico</button>
   </section>
 
   <!-- ── GIACENZE ── -->
@@ -888,7 +905,7 @@ input.input-error:focus { box-shadow: 0 0 0 3px rgba(200,48,48,.12); }
     </div>
     <div id="cat-filter" style="display:flex;flex-wrap:wrap;gap:6px;padding:0 0 14px"></div>
     <div id="giacenze-list">
-      <div class="empty-state"><div class="empty-icon">⏳</div><div class="empty-label">Caricamento…</div></div>
+      <div class="empty-state"><div class="empty-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg></div><div class="empty-label">Caricamento…</div></div>
     </div>
   </section>
 
@@ -896,7 +913,7 @@ input.input-error:focus { box-shadow: 0 0 0 3px rgba(200,48,48,.12); }
   <section class="tab-panel" id="tab-alert">
     <div class="panel-title">Alert</div>
     <div id="alerts-content">
-      <div class="empty-state"><div class="empty-icon">⏳</div><div class="empty-label">Caricamento…</div></div>
+      <div class="empty-state"><div class="empty-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg></div><div class="empty-label">Caricamento…</div></div>
     </div>
   </section>
 
@@ -905,19 +922,24 @@ input.input-error:focus { box-shadow: 0 0 0 3px rgba(200,48,48,.12); }
 <!-- ── TAB BAR ── -->
 <nav class="tab-bar">
   <button class="tab-btn active" data-tab="home" onclick="switchTab('home')">
-    <span class="tab-icon">⌂</span><span class="tab-label">Home</span>
+    <span class="tab-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
+    <span class="tab-label">Home</span>
   </button>
   <button class="tab-btn" data-tab="carico" onclick="switchTab('carico')">
-    <span class="tab-icon">↑</span><span class="tab-label">Carico</span>
+    <span class="tab-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg></span>
+    <span class="tab-label">Carico</span>
   </button>
   <button class="tab-btn" data-tab="scarico" onclick="switchTab('scarico')">
-    <span class="tab-icon">↓</span><span class="tab-label">Scarico</span>
+    <span class="tab-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg></span>
+    <span class="tab-label">Scarico</span>
   </button>
   <button class="tab-btn" data-tab="giacenze" onclick="switchTab('giacenze')">
-    <span class="tab-icon">▤</span><span class="tab-label">Giacenze</span>
+    <span class="tab-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg></span>
+    <span class="tab-label">Giacenze</span>
   </button>
   <button class="tab-btn" data-tab="alert" onclick="switchTab('alert')">
-    <span class="tab-icon">⚑</span><span class="tab-label">Alert</span>
+    <span class="tab-icon"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span>
+    <span class="tab-label">Alert</span>
     <span class="tab-badge" id="tab-alert-badge"></span>
   </button>
 </nav>
@@ -1029,14 +1051,14 @@ async function submitCarico() {
   if (!qty || qty <= 0)   { toast('Inserisci una quantità valida', 'error'); return; }
 
   const btn = document.querySelector('#tab-carico .btn-primary');
-  btn.disabled = true; btn.textContent = '⏳ Registrazione…';
+  btn.disabled = true; btn.textContent = 'Registrazione…';
 
   const data = await api('/api/carico', {
     method: 'POST',
     body: { fornitore, prodotto, lotto, scadenza, qty, unita: S.unitaCarico },
   });
 
-  btn.disabled = false; btn.textContent = '↑ Registra Carico';
+  btn.disabled = false; btn.textContent = 'Registra Carico';
 
   if (data.success) {
     showEtichetta(data);
@@ -1068,7 +1090,7 @@ async function onCameraCapture(input) {
   if (!file) return;
 
   const btn = document.getElementById('btn-scan');
-  btn.disabled = true; btn.textContent = '⏳ Analisi in corso…';
+  btn.disabled = true; btn.textContent = 'Analisi in corso…';
 
   const reader = new FileReader();
   reader.onload = async (e) => {
@@ -1080,7 +1102,7 @@ async function onCameraCapture(input) {
       body:   { image: base64, media_type: mediaType },
     });
 
-    btn.disabled = false; btn.textContent = '📷 Scansiona etichetta';
+    btn.disabled = false; btn.textContent = 'Scansiona etichetta';
 
     if (data.success) {
       if (data.lotto) {
@@ -1210,11 +1232,11 @@ async function submitScarico() {
   if (!validateQtyScarico()) return;
 
   const btn = document.querySelector('#tab-scarico .btn-primary');
-  btn.disabled = true; btn.textContent = '⏳ Registrazione…';
+  btn.disabled = true; btn.textContent = 'Registrazione…';
 
   const data = await api('/api/scarico', { method: 'POST', body: { prodotto, lotto, qty } });
 
-  btn.disabled = false; btn.textContent = '↓ Registra Scarico';
+  btn.disabled = false; btn.textContent = 'Registra Scarico';
 
   if (data.success) {
     toast(`Scarico registrato ✓  (rimanenza: ${data.rimanenza})`, 'success');
@@ -1258,7 +1280,7 @@ function renderGiacenze() {
 
   if (!list.length) {
     el.innerHTML = `<div class="empty-state">
-      <div class="empty-icon">📦</div>
+      <div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div>
       <div class="empty-label">${q ? 'Nessun prodotto trovato' : 'Nessuna giacenza'}</div>
     </div>`;
     return;
@@ -1289,7 +1311,7 @@ function renderGiacenze() {
           ${g.categoria ? `<span class="cat-badge">${esc(g.categoria)}</span>` : ''}
         </div>
         <div class="product-total ${statusClass}">${g.totale}&nbsp;${esc(g.unita)}${scortaLabel}</div>
-        <span class="expand-arrow">▾</span>
+        <span class="expand-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></span>
       </div>
       <div class="lot-list">${lotsHtml}</div>
     </div>`;
@@ -1326,8 +1348,8 @@ function renderAlerts() {
 
   if (!scadenze.length && !scorte.length) {
     el.innerHTML = `<div class="empty-state">
-      <div class="empty-ok">✓</div>
-      <div class="empty-label" style="color:var(--green)">Nessun alert — tutto a posto</div>
+      <div class="empty-ok"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
+      <div class="empty-label" style="color:var(--success)">Nessun alert — tutto a posto</div>
     </div>`;
     return;
   }
@@ -1336,7 +1358,7 @@ function renderAlerts() {
 
   if (scadenze.length) {
     html += `<div class="alerts-block">
-      <div class="alert-section-title">⚠ Scadenze (${scadenze.length})</div>`;
+      <div class="alert-section-title">Scadenze (${scadenze.length})</div>`;
     html += scadenze.map(a => {
       const isScad = a.tipo === 'scaduto';
       const cls    = isScad ? 'red' : 'orange';
@@ -1362,7 +1384,7 @@ function renderAlerts() {
 
   if (scorte.length) {
     html += `<div class="alerts-block" style="${scadenze.length ? 'margin-top:24px' : ''}">
-      <div class="alert-section-title">📉 Sotto scorta (${scorte.length})</div>`;
+      <div class="alert-section-title">Sotto scorta (${scorte.length})</div>`;
     html += scorte.map(a => `<div class="alert-card yellow">
       <div class="alert-left">
         <div class="alert-prodotto">${esc(a.prodotto)}</div>

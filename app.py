@@ -25,7 +25,7 @@ from database import (
     create_user, get_user_by_login, get_user_by_id,
     get_all_users, update_user_role, delete_user,
     create_reset_token, get_reset_token, use_reset_token, update_user_password,
-    update_user_profile, is_contact_taken, get_feed,
+    update_user_profile, update_user_reparto, is_contact_taken, get_feed,
 )
 from sheets import load_listino, load_registro, append_registro
 
@@ -240,7 +240,8 @@ def profile():
         new_pw   =  request.form.get('new_password')     or ''
         new_pw2  =  request.form.get('new_password2')    or ''
 
-        uid = int(current_user.id)
+        uid       = int(current_user.id)
+        is_admin  = current_user.role == 'admin'
 
         if not nome:
             error = 'Il nome non può essere vuoto'
@@ -259,11 +260,15 @@ def profile():
                 error = 'Le nuove password non coincidono'
             else:
                 update_user_profile(uid, nome, email, telefono)
+                if is_admin:
+                    update_user_reparto(uid, (request.form.get('reparto') or '').strip())
                 update_user_password(uid, generate_password_hash(new_pw, method='pbkdf2:sha256'))
                 success = 'Profilo e password aggiornati con successo'
                 user = get_user_by_id(uid)
         else:
             update_user_profile(uid, nome, email, telefono)
+            if is_admin:
+                update_user_reparto(uid, (request.form.get('reparto') or '').strip())
             success = 'Profilo aggiornato con successo'
             user = get_user_by_id(uid)
 

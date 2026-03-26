@@ -489,6 +489,13 @@ def update_user_profile(user_id, nome, email, telefono):
         )
 
 
+def update_user_reparto(user_id, reparto):
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE users SET reparto = ? WHERE id = ?", (reparto, user_id)
+        )
+
+
 def is_contact_taken(identifier, exclude_user_id):
     """Restituisce True se email/telefono è già usata da un altro utente."""
     with get_conn() as conn:

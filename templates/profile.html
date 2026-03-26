@@ -170,8 +170,12 @@ input:disabled { opacity: .5; cursor: not-allowed; }
 
     <div class="form-group">
       <label>Reparto</label>
+      {% if user.role == 'admin' %}
+      <input type="text" name="reparto" value="{{ user.reparto or '' }}" placeholder="es. Cucina, Sala…">
+      {% else %}
       <input type="text" value="{{ user.reparto or '—' }}" disabled>
       <span class="hint">Il reparto può essere modificato solo da un amministratore</span>
+      {% endif %}
     </div>
 
     <!-- ── CAMBIO PASSWORD ── -->

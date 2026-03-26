@@ -1262,11 +1262,8 @@ const S = {
 // ── INIT ─────────────────────────────────────────────────────────────────
 async function init() {
   setHdrDate();
-  // Seed spesa badge from localStorage before async loads complete
-  try { S.listaSpesa = JSON.parse(localStorage.getItem(_LS_KEY) || '[]'); } catch { S.listaSpesa = []; }
-  _updateSpesaBadge();
   animHomeCards();
-  await Promise.all([loadProdottiCarico(), loadGiacenze(), loadAlerts(), loadFeed()]);
+  await Promise.all([loadProdottiCarico(), loadGiacenze(), loadAlerts(), loadFeed(), loadListaSpesa()]);
   renderScaricoProdotti();
 }
 
@@ -1727,26 +1724,25 @@ function renderAlerts() {
   el.innerHTML = html;
 }
 
-function addToListaFromAlert(a) {
+async function addToListaFromAlert(a) {
   const exists = S.listaSpesa.find(i => i.prodotto === a.prodotto && i.fornitore === a.fornitore);
   if (exists) { toast('Prodotto già in lista', 'info'); return; }
 
-  const qtaOrdinare = Math.max(0, (a.scorta_min || 0) - (a.totale || 0));
-  S.listaSpesa.push({
-    id:          `${a.prodotto}__${a.fornitore}__${Date.now()}`,
-    prodotto:    a.prodotto,
-    fornitore:   a.fornitore || '',
-    unita:       a.unita || '',
-    qtaAttuale:  a.totale || 0,
-    scorta_min:  a.scorta_min || 0,
-    qtaOrdinare: Math.round(qtaOrdinare * 100) / 100,
-    categoria:   a.categoria || '',
-    checked:     false,
-    auto:        true,
+  const quantita = Math.round(Math.max(0, (a.scorta_min || 0) - (a.totale || 0)) * 100) / 100;
+  const result = await api('/api/lista-spesa', {
+    method: 'POST',
+    body: {
+      prodotto:  a.prodotto,
+      fornitore: a.fornitore || '',
+      categoria: a.categoria || '',
+      quantita,
+      unita:     a.unita || '',
+    },
   });
-  _saveListaSpesa();
+  if (!result.success) { toast(result.error || 'Errore', 'error'); return; }
+
+  await loadListaSpesa();
   toast('Prodotto aggiunto alla lista spesa', 'success');
-  // Refresh alert page so button turns into checkmark
   renderAlerts();
 }
 
@@ -1796,55 +1792,29 @@ function bgClose(e)   { if (e.target === document.getElementById('modal-etichett
 
 // ── LISTA SPESA ───────────────────────────────────────────────────────────
 
-const _LS_KEY = 'brigadeListaSpesa';
-
-function _saveListaSpesa() {
-  localStorage.setItem(_LS_KEY, JSON.stringify(S.listaSpesa));
-  _updateSpesaBadge();
-}
-
 function _updateSpesaBadge() {
-  const n = S.listaSpesa.filter(i => !i.checked).length;
+  const n = S.listaSpesa.filter(i => !i.completato).length;
   const el = document.getElementById('home-spesa-num');
   if (el) el.textContent = n;
 }
 
-function loadListaSpesa() {
-  // Load persisted list
-  try {
-    S.listaSpesa = JSON.parse(localStorage.getItem(_LS_KEY) || '[]');
-  } catch { S.listaSpesa = []; }
+function _enrichItem(item) {
+  // Lookup live stock data at render time
+  const giac = S.giacenze.find(g => g.prodotto === item.prodotto);
+  const prod = S.prodotti.find(p => p.prodotto === item.prodotto);
+  return {
+    ...item,
+    checked:    !!item.completato,
+    qtaAttuale: giac ? giac.totale : 0,
+    scorta_min: prod ? prod.scorta_min : 0,
+  };
+}
 
-  // Auto-add sotto-scorta items not already present
-  const scorte = S.alerts.scorte || [];
-  for (const s of scorte) {
-    const exists = S.listaSpesa.find(i => i.prodotto === s.prodotto && i.fornitore === s.fornitore);
-    if (!exists) {
-      const qtaOrdinare = Math.max(0, (s.scorta_min || 0) - (s.totale || 0));
-      S.listaSpesa.push({
-        id:          `${s.prodotto}__${s.fornitore}__${Date.now()}__${Math.random()}`,
-        prodotto:    s.prodotto,
-        fornitore:   s.fornitore || '',
-        unita:       s.unita || 'kg',
-        qtaAttuale:  s.totale || 0,
-        scorta_min:  s.scorta_min || 0,
-        qtaOrdinare: Math.round(qtaOrdinare * 100) / 100,
-        categoria:   s.categoria || '',
-        checked:     false,
-        auto:        true,
-      });
-    } else {
-      // Refresh qtaAttuale for existing auto-items
-      if (exists.auto) {
-        exists.qtaAttuale = s.totale || 0;
-        const qtaOrdinare = Math.max(0, (s.scorta_min || 0) - exists.qtaAttuale);
-        exists.qtaOrdinare = Math.round(qtaOrdinare * 100) / 100;
-      }
-    }
-  }
-
-  _saveListaSpesa();
-  renderListaSpesa();
+async function loadListaSpesa() {
+  const data = await api('/api/lista-spesa');
+  S.listaSpesa = (data.items || []).map(_enrichItem);
+  _updateSpesaBadge();
+  if (S.activePage === 'lista-spesa') renderListaSpesa();
 }
 
 function _populateSpesaFornitori() {
@@ -1884,15 +1854,16 @@ const _CAT_DISPLAY = {
 };
 
 function _spesaItem(item) {
+  const sottoScorta = item.scorta_min > 0 && item.qtaAttuale < item.scorta_min;
   return `
     <div class="spesa-item ${item.checked ? 'checked' : ''}">
-      <div class="spesa-check" onclick="toggleSpesaCheck('${esc(item.id)}')">
+      <div class="spesa-check" onclick="toggleSpesaCheck(${item.id})">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
       </div>
       <div class="spesa-info">
         <div class="spesa-name">
           ${esc(item.prodotto)}
-          ${item.auto ? '<span class="spesa-auto-tag">SOTTO SCORTA</span>' : ''}
+          ${sottoScorta ? '<span class="spesa-auto-tag">SOTTO SCORTA</span>' : ''}
         </div>
         <div class="spesa-sub">
           ${esc(item.fornitore || '—')}
@@ -1901,10 +1872,10 @@ function _spesaItem(item) {
         </div>
       </div>
       <div class="spesa-right">
-        <div class="spesa-qty">${item.qtaOrdinare > 0 ? item.qtaOrdinare : '—'}</div>
+        <div class="spesa-qty">${item.quantita > 0 ? item.quantita : '—'}</div>
         <div class="spesa-qty-lbl">${esc(item.unita)}</div>
       </div>
-      <button class="btn-spesa-del" onclick="removeSpesaItem('${esc(item.id)}')" title="Rimuovi">
+      <button class="btn-spesa-del" onclick="removeSpesaItem(${item.id})" title="Rimuovi">
         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>`;
@@ -1930,7 +1901,7 @@ function setSpesaFilter(forn, btn) {
 
 function renderListaSpesa() {
   // Update counter (always across full list, not filtered)
-  const pendenti = S.listaSpesa.filter(i => !i.checked).length;
+  const pendenti = S.listaSpesa.filter(i => !i.completato).length;
   const ctr = document.getElementById('spesa-counter');
   if (ctr) ctr.innerHTML = `<strong>${pendenti}</strong> prodott${pendenti === 1 ? 'o' : 'i'} da ordinare`;
 
@@ -1943,7 +1914,7 @@ function renderListaSpesa() {
     container.innerHTML = `
       <div class="empty-state">
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
-        <p>Lista vuota — i prodotti sotto scorta vengono aggiunti automaticamente</p>
+        <p>Lista vuota — aggiungi prodotti manualmente o tramite il bottone 🛒 nella pagina Alert</p>
       </div>`;
     return;
   }
@@ -1992,25 +1963,31 @@ function renderListaSpesa() {
   }).join('');
 }
 
-function toggleSpesaCheck(id) {
+async function toggleSpesaCheck(id) {
   const item = S.listaSpesa.find(i => i.id === id);
   if (!item) return;
-  item.checked = !item.checked;
-  _saveListaSpesa();
+  const newVal = !item.completato;
+  // Optimistic update
+  item.completato = newVal;
+  item.checked    = newVal;
+  _updateSpesaBadge();
   renderListaSpesa();
+  await api(`/api/lista-spesa/${id}`, { method: 'PATCH', body: { completato: newVal } });
 }
 
-function removeSpesaItem(id) {
+async function removeSpesaItem(id) {
   S.listaSpesa = S.listaSpesa.filter(i => i.id !== id);
-  _saveListaSpesa();
+  _updateSpesaBadge();
   renderListaSpesa();
+  await api(`/api/lista-spesa/${id}`, { method: 'DELETE' });
 }
 
-function svuotaLista() {
+async function svuotaLista() {
   if (!S.listaSpesa.length) return;
   S.listaSpesa = [];
-  _saveListaSpesa();
+  _updateSpesaBadge();
   renderListaSpesa();
+  await api('/api/lista-spesa', { method: 'DELETE' });
   toast('Lista svuotata', 'info');
 }
 
@@ -2040,26 +2017,24 @@ function confirmAddProdotto() {
   const prod = S.prodotti.find(p => p.prodotto === prodotto);
   const scorta_min = prod ? prod.scorta_min : 0;
 
-  S.listaSpesa.push({
-    id:          `${prodotto}__manual__${Date.now()}`,
-    prodotto,
-    fornitore,
-    unita:       unita || '',
-    qtaAttuale,
-    scorta_min,
-    qtaOrdinare: qty,
-    categoria:   prod?.categoria || '',
-    checked:     false,
-    auto:        false,
+  const result = await api('/api/lista-spesa', {
+    method: 'POST',
+    body: {
+      prodotto,
+      fornitore,
+      categoria: prod?.categoria || '',
+      quantita:  qty,
+      unita:     unita || '',
+    },
   });
+  if (!result.success) { toast(result.error || 'Errore', 'error'); return; }
 
-  _saveListaSpesa();
-  renderListaSpesa();
   selF.value = '';
   selP.innerHTML = '<option value="">Seleziona prima il fornitore</option>';
   selP.disabled = true;
   qtyEl.value = '';
   document.getElementById('spesa-add-panel').classList.remove('open');
+  await loadListaSpesa();
   toast(`${prodotto} aggiunto alla lista`, 'success');
 }
 

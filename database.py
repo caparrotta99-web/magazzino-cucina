@@ -149,6 +149,16 @@ def db_init():
                 expires_at TEXT NOT NULL,
                 used       INTEGER NOT NULL DEFAULT 0
             )""",
+            f"""CREATE TABLE IF NOT EXISTS lista_spesa (
+                id         {pk},
+                prodotto   TEXT NOT NULL,
+                fornitore  TEXT NOT NULL DEFAULT '',
+                categoria  TEXT NOT NULL DEFAULT '',
+                quantita   REAL NOT NULL DEFAULT 0,
+                unita      TEXT NOT NULL DEFAULT '',
+                completato INTEGER NOT NULL DEFAULT 0,
+                created_at TEXT NOT NULL
+            )""",
             "CREATE INDEX IF NOT EXISTS idx_reg_prod_lotto ON registro(prodotto, lotto)",
             "CREATE INDEX IF NOT EXISTS idx_reg_mov_id     ON registro(movimento_id)",
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email    ON users(email)",
@@ -487,6 +497,45 @@ def update_user_profile(user_id, nome, email, telefono):
             "UPDATE users SET nome = ?, email = ?, telefono = ? WHERE id = ?",
             (nome, email or None, telefono or None, user_id)
         )
+
+
+# ─── LISTA SPESA ─────────────────────────────────────────────────────────────
+
+def get_lista_spesa():
+    with get_conn() as conn:
+        cur = conn.execute(
+            "SELECT * FROM lista_spesa ORDER BY created_at ASC, id ASC"
+        )
+        return _rows(cur)
+
+
+def add_lista_spesa_item(prodotto, fornitore, categoria, quantita, unita):
+    from datetime import datetime
+    with get_conn() as conn:
+        return conn.execute_insert(
+            "INSERT INTO lista_spesa (prodotto, fornitore, categoria, quantita, unita, completato, created_at) "
+            "VALUES (?, ?, ?, ?, ?, 0, ?)",
+            (prodotto, fornitore or '', categoria or '', float(quantita or 0),
+             unita or '', datetime.now().isoformat())
+        )
+
+
+def update_lista_spesa_completato(item_id, completato):
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE lista_spesa SET completato = ? WHERE id = ?",
+            (1 if completato else 0, item_id)
+        )
+
+
+def delete_lista_spesa_item(item_id):
+    with get_conn() as conn:
+        conn.execute("DELETE FROM lista_spesa WHERE id = ?", (item_id,))
+
+
+def clear_lista_spesa():
+    with get_conn() as conn:
+        conn.execute("DELETE FROM lista_spesa")
 
 
 def update_user_reparto(user_id, reparto):

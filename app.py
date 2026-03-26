@@ -26,6 +26,8 @@ from database import (
     get_all_users, update_user_role, delete_user,
     create_reset_token, get_reset_token, use_reset_token, update_user_password,
     update_user_profile, update_user_reparto, is_contact_taken, get_feed,
+    get_lista_spesa, add_lista_spesa_item, update_lista_spesa_completato,
+    delete_lista_spesa_item, clear_lista_spesa,
 )
 from sheets import load_listino, load_registro, append_registro
 
@@ -362,6 +364,53 @@ def api_giacenze():
 @login_required
 def api_alerts():
     return jsonify({'success': True, **get_alerts()})
+
+
+# ─── LISTA SPESA ──────────────────────────────────────────────────────────────
+
+@app.route('/api/lista-spesa', methods=['GET'])
+@login_required
+def api_lista_spesa_get():
+    return jsonify({'items': get_lista_spesa()})
+
+
+@app.route('/api/lista-spesa', methods=['POST'])
+@login_required
+def api_lista_spesa_add():
+    data     = request.get_json() or {}
+    prodotto = (data.get('prodotto') or '').strip()
+    if not prodotto:
+        return jsonify({'error': 'prodotto richiesto'}), 400
+    new_id = add_lista_spesa_item(
+        prodotto,
+        (data.get('fornitore')  or '').strip(),
+        (data.get('categoria')  or '').strip(),
+        data.get('quantita', 0),
+        (data.get('unita') or '').strip(),
+    )
+    return jsonify({'id': new_id, 'success': True})
+
+
+@app.route('/api/lista-spesa/<int:item_id>', methods=['PATCH'])
+@login_required
+def api_lista_spesa_patch(item_id):
+    data = request.get_json() or {}
+    update_lista_spesa_completato(item_id, bool(data.get('completato', False)))
+    return jsonify({'success': True})
+
+
+@app.route('/api/lista-spesa/<int:item_id>', methods=['DELETE'])
+@login_required
+def api_lista_spesa_delete_one(item_id):
+    delete_lista_spesa_item(item_id)
+    return jsonify({'success': True})
+
+
+@app.route('/api/lista-spesa', methods=['DELETE'])
+@login_required
+def api_lista_spesa_clear():
+    clear_lista_spesa()
+    return jsonify({'success': True})
 
 
 @app.route('/api/feed')

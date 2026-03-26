@@ -222,14 +222,23 @@ def append_registro(row_data):
     n_cols = len(headers) if headers else len(REGISTRO_COLS)
     new_row = [''] * n_cols
 
+    # Carico e Scarico sono mutualmente esclusivi: solo uno dei due può
+    # avere un valore in una stessa riga.
+    carico_val  = row_data.get('carico',  0) or 0
+    scarico_val = row_data.get('scarico', 0) or 0
+    if carico_val:
+        scarico_val = ''   # riga di carico → scarico vuoto
+    elif scarico_val:
+        carico_val  = ''   # riga di scarico → carico vuoto
+
     field_vals = {
         'data':         row_data.get('data', ''),
         'fornitore':    row_data.get('fornitore', ''),
         'prodotto':     row_data.get('prodotto', ''),
         'lotto':        row_data.get('lotto', ''),
         'scadenza':     row_data.get('scadenza', ''),
-        'carico':       row_data.get('carico', 0),
-        'scarico':      row_data.get('scarico', 0),
+        'carico':       carico_val,
+        'scarico':      scarico_val,
         'unita':        row_data.get('unita', ''),
         'etichetta':    row_data.get('etichetta', ''),
         'movimento_id': row_data.get('movimento_id', ''),

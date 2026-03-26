@@ -731,13 +731,18 @@ main {
 .btn-spesa-confirm:active { opacity: .8; }
 .spesa-group { margin-bottom: 22px; }
 .spesa-group-hdr {
-  font-size: 11px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .6px; color: var(--muted);
-  padding: 0 4px; margin-bottom: 8px;
+  font-size: 12px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .5px; color: var(--navy);
+  padding: 0 4px; margin-bottom: 10px;
   display: flex; align-items: center; gap: 8px;
 }
 .spesa-group-hdr::after {
   content: ''; flex: 1; height: 1px; background: var(--border);
+}
+.spesa-cat-count {
+  font-size: 10px; font-weight: 600; color: var(--muted);
+  background: #f1f5f9; border-radius: 100px;
+  padding: 1px 7px; flex-shrink: 0;
 }
 .spesa-item {
   background: rgba(255,255,255,.92);
@@ -1170,6 +1175,11 @@ main {
       </div>
     </div>
 
+    <!-- Filtro fornitore -->
+    <div class="filter-row" id="spesa-filter-pills" style="margin-bottom:16px">
+      <button class="fpill active" onclick="setSpesaFilter('all', this)">Tutti</button>
+    </div>
+
     <!-- Panel aggiunta manuale -->
     <div class="spesa-add-panel" id="spesa-add-panel">
       <div class="fgroup" style="margin-bottom:10px">
@@ -1237,7 +1247,8 @@ const S = {
   unitaCarico:  '',
   activePage:   'home',
   giacFilter:   'all',
-  listaSpesa:   [],
+  listaSpesa:      [],
+  spesaFornFilter: 'all',
 };
 
 // ── INIT ─────────────────────────────────────────────────────────────────
@@ -1778,6 +1789,7 @@ function loadListaSpesa() {
         qtaAttuale:  s.totale || 0,
         scorta_min:  s.scorta_min || 0,
         qtaOrdinare: Math.round(qtaOrdinare * 100) / 100,
+        categoria:   s.categoria || '',
         checked:     false,
         auto:        true,
       });
@@ -1819,10 +1831,70 @@ function onSpesaFornitore() {
   selP.disabled = false;
 }
 
+const _CAT_ORDER = ['Carne','Pesce','Verdure','Latticini','Secchi','Bevande','Surgelati','Spezie'];
+const _CAT_DISPLAY = {
+  'Carne':     'Carne',
+  'Pesce':     'Pesce',
+  'Verdure':   'Verdure / Frutta',
+  'Latticini': 'Latticini',
+  'Secchi':    'Secchi / Dispensa',
+  'Bevande':   'Bevande',
+  'Surgelati': 'Surgelati',
+  'Spezie':    'Spezie / Condimenti',
+};
+
+function _spesaItem(item) {
+  return `
+    <div class="spesa-item ${item.checked ? 'checked' : ''}">
+      <div class="spesa-check" onclick="toggleSpesaCheck('${esc(item.id)}')">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <div class="spesa-info">
+        <div class="spesa-name">
+          ${esc(item.prodotto)}
+          ${item.auto ? '<span class="spesa-auto-tag">SOTTO SCORTA</span>' : ''}
+        </div>
+        <div class="spesa-sub">
+          ${esc(item.fornitore || '—')}
+          ${item.qtaAttuale > 0 ? ` · Attuale: ${item.qtaAttuale}${item.unita ? ' ' + esc(item.unita) : ''}` : ''}
+          ${item.scorta_min ? ` · Min: ${item.scorta_min}${item.unita ? ' ' + esc(item.unita) : ''}` : ''}
+        </div>
+      </div>
+      <div class="spesa-right">
+        <div class="spesa-qty">${item.qtaOrdinare > 0 ? item.qtaOrdinare : '—'}</div>
+        <div class="spesa-qty-lbl">${esc(item.unita)}</div>
+      </div>
+      <button class="btn-spesa-del" onclick="removeSpesaItem('${esc(item.id)}')" title="Rimuovi">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>`;
+}
+
+function renderSpesaFilterPills() {
+  const row = document.getElementById('spesa-filter-pills');
+  if (!row) return;
+  const fornitori = [...new Set(S.listaSpesa.map(i => i.fornitore).filter(Boolean))].sort();
+  row.innerHTML =
+    `<button class="fpill ${S.spesaFornFilter === 'all' ? 'active' : ''}" onclick="setSpesaFilter('all', this)">Tutti</button>` +
+    fornitori.map(f =>
+      `<button class="fpill ${S.spesaFornFilter === f ? 'active' : ''}" onclick="setSpesaFilter('${esc(f)}', this)">${esc(f)}</button>`
+    ).join('');
+}
+
+function setSpesaFilter(forn, btn) {
+  S.spesaFornFilter = forn;
+  document.querySelectorAll('#spesa-filter-pills .fpill').forEach(b => b.classList.remove('active'));
+  if (btn) btn.classList.add('active');
+  renderListaSpesa();
+}
+
 function renderListaSpesa() {
+  // Update counter (always across full list, not filtered)
   const pendenti = S.listaSpesa.filter(i => !i.checked).length;
   const ctr = document.getElementById('spesa-counter');
   if (ctr) ctr.innerHTML = `<strong>${pendenti}</strong> prodott${pendenti === 1 ? 'o' : 'i'} da ordinare`;
+
+  renderSpesaFilterPills();
 
   const container = document.getElementById('spesa-list');
   if (!container) return;
@@ -1836,49 +1908,48 @@ function renderListaSpesa() {
     return;
   }
 
-  // Group by fornitore
+  // Apply fornitore filter
+  const visible = S.spesaFornFilter === 'all'
+    ? S.listaSpesa
+    : S.listaSpesa.filter(i => i.fornitore === S.spesaFornFilter);
+
+  if (!visible.length) {
+    container.innerHTML = `<div class="empty-state"><p>Nessun prodotto per questo fornitore</p></div>`;
+    return;
+  }
+
+  // Group by categoria with fixed order; unknowns go to end
   const groups = {};
-  for (const item of S.listaSpesa) {
-    const key = item.fornitore || '— Senza fornitore';
-    if (!groups[key]) groups[key] = [];
-    groups[key].push(item);
+  for (const item of visible) {
+    const cat = (item.categoria || '').trim() || 'Altro';
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(item);
   }
 
-  // Sort: unchecked first within each group
-  for (const key of Object.keys(groups)) {
-    groups[key].sort((a, b) => a.checked - b.checked);
+  // Sort within each group: unchecked first, then alphabetically
+  for (const g of Object.values(groups)) {
+    g.sort((a, b) => a.checked - b.checked || a.prodotto.localeCompare(b.prodotto, 'it'));
   }
 
-  const fornitori = Object.keys(groups).sort();
-  container.innerHTML = fornitori.map(forn => `
-    <div class="spesa-group">
-      <div class="spesa-group-hdr">${esc(forn)}</div>
-      ${groups[forn].map(item => `
-        <div class="spesa-item ${item.checked ? 'checked' : ''}" id="si-${CSS.escape(item.id)}">
-          <div class="spesa-check" onclick="toggleSpesaCheck('${esc(item.id)}')">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-          </div>
-          <div class="spesa-info">
-            <div class="spesa-name">
-              ${esc(item.prodotto)}
-              ${item.auto ? '<span class="spesa-auto-tag">SOTTO SCORTA</span>' : ''}
-            </div>
-            <div class="spesa-sub">
-              Attuale: ${item.qtaAttuale} ${esc(item.unita)}
-              ${item.scorta_min ? ` · Min: ${item.scorta_min} ${esc(item.unita)}` : ''}
-            </div>
-          </div>
-          <div class="spesa-right">
-            <div class="spesa-qty">${item.qtaOrdinare > 0 ? item.qtaOrdinare : '—'}</div>
-            <div class="spesa-qty-lbl">${esc(item.unita)}</div>
-          </div>
-          <button class="btn-spesa-del" onclick="removeSpesaItem('${esc(item.id)}')" title="Rimuovi">
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-          </button>
+  // Build ordered category keys
+  const orderedCats = [
+    ..._CAT_ORDER.filter(c => groups[c]),
+    ...Object.keys(groups).filter(c => !_CAT_ORDER.includes(c)).sort(),
+  ];
+
+  container.innerHTML = orderedCats.map(cat => {
+    const label = _CAT_DISPLAY[cat] || cat;
+    const items = groups[cat];
+    const count = items.length;
+    return `
+      <div class="spesa-group">
+        <div class="spesa-group-hdr">
+          ${esc(label)}
+          <span class="spesa-cat-count">${count}</span>
         </div>
-      `).join('')}
-    </div>
-  `).join('');
+        ${items.map(item => _spesaItem(item)).join('')}
+      </div>`;
+  }).join('');
 }
 
 function toggleSpesaCheck(id) {
@@ -1937,6 +2008,7 @@ function confirmAddProdotto() {
     qtaAttuale,
     scorta_min,
     qtaOrdinare: qty,
+    categoria:   prod?.categoria || '',
     checked:     false,
     auto:        false,
   });

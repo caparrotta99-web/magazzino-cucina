@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(python3 -:*)"
+      "Bash(python3 -:*)",
+      "Bash(python3 -c \"import database; print\\(''Import OK''\\); database.db_init\\(\\); print\\(''db_init OK''\\); rows = database.get_all_prodotti\\(\\); print\\(f''get_all_prodotti: {len\\(rows\\)} rows''\\); users = database.get_all_users\\(\\); print\\(f''get_all_users: {len\\(users\\)} users''\\)\")"
     ]
   }
 }

@@ -1,76 +1,161 @@
-import sqlite3
 import os
+import re
+import sqlite3
 from datetime import date, timedelta
 from collections import OrderedDict
 
-# Su Render il disco persistente è montato in /data
+DATABASE_URL = os.environ.get('DATABASE_URL', '')
+if DATABASE_URL.startswith('postgres://'):
+    DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
+_USE_PG = bool(DATABASE_URL)
+
 _data_dir = '/data' if os.path.isdir('/data') else os.path.dirname(__file__)
 DB_PATH = os.path.join(_data_dir, 'haccp.db')
 
+if _USE_PG:
+    import psycopg2
+    import psycopg2.extras
+
+
+def _adapt(sql):
+    """Translate SQLite SQL syntax to PostgreSQL."""
+    has_ignore = bool(re.search(r'\bINSERT\s+OR\s+IGNORE\b', sql, re.IGNORECASE))
+    sql = re.sub(r'\bINSERT\s+OR\s+IGNORE\b', 'INSERT', sql, flags=re.IGNORECASE)
+    sql = sql.replace('?', '%s')
+    if has_ignore and 'ON CONFLICT' not in sql.upper():
+        sql = sql.rstrip().rstrip(';') + ' ON CONFLICT DO NOTHING'
+    return sql
+
+
+class _DBConn:
+    """
+    Thin wrapper that normalises SQLite and PostgreSQL APIs.
+
+    Usage:
+        with get_conn() as conn:
+            cur = conn.execute(sql, params)
+            rows = [dict(r) for r in cur.fetchall()]
+    """
+
+    def __init__(self):
+        if _USE_PG:
+            self._conn = psycopg2.connect(DATABASE_URL)
+            self._cur  = self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
+            self._sqlite = False
+        else:
+            self._conn = sqlite3.connect(DB_PATH)
+            self._conn.row_factory = sqlite3.Row
+            self._conn.execute('PRAGMA journal_mode=WAL')
+            self._cur  = None
+            self._sqlite = True
+
+    def execute(self, sql, params=()):
+        """Run a single statement, returning the underlying cursor."""
+        if _USE_PG:
+            self._cur.execute(_adapt(sql), params or ())
+            return self._cur
+        return self._conn.execute(sql, params)
+
+    def executemany(self, sql, seq):
+        if _USE_PG:
+            psycopg2.extras.execute_batch(self._cur, _adapt(sql), seq)
+        else:
+            self._conn.executemany(sql, seq)
+
+    def execute_insert(self, sql, params=()):
+        """Execute an INSERT and return the new row id."""
+        if _USE_PG:
+            adapted = _adapt(sql)
+            if 'RETURNING' not in adapted.upper():
+                adapted = adapted.rstrip().rstrip(';') + ' RETURNING id'
+            self._cur.execute(adapted, params or ())
+            return self._cur.fetchone()['id']
+        cur = self._conn.execute(sql, params)
+        return cur.lastrowid
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, *args):
+        if exc_type:
+            self._conn.rollback()
+        else:
+            self._conn.commit()
+        if _USE_PG:
+            self._cur.close()
+        self._conn.close()
+
 
 def get_conn():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    conn.execute("PRAGMA journal_mode=WAL")
-    return conn
+    return _DBConn()
+
+
+def _rows(cur):
+    """Convert cursor results to a list of plain dicts (works for both backends)."""
+    return [dict(r) for r in cur.fetchall()]
+
+
+def _row(cur):
+    """Convert a single cursor result to a plain dict (or None)."""
+    r = cur.fetchone()
+    return dict(r) if r else None
 
 
 def db_init():
+    pk = 'SERIAL PRIMARY KEY' if _USE_PG else 'INTEGER PRIMARY KEY AUTOINCREMENT'
+
     with get_conn() as conn:
-        conn.executescript("""
-        CREATE TABLE IF NOT EXISTS listino (
-            id         INTEGER PRIMARY KEY AUTOINCREMENT,
-            prodotto   TEXT NOT NULL,
-            fornitore  TEXT NOT NULL DEFAULT '',
-            unita      TEXT NOT NULL DEFAULT 'kg',
-            scorta_min REAL NOT NULL DEFAULT 0,
-            categoria  TEXT NOT NULL DEFAULT '',
-            UNIQUE(prodotto, fornitore)
-        );
+        for stmt in [
+            f"""CREATE TABLE IF NOT EXISTS listino (
+                id         {pk},
+                prodotto   TEXT NOT NULL,
+                fornitore  TEXT NOT NULL DEFAULT '',
+                unita      TEXT NOT NULL DEFAULT 'kg',
+                scorta_min REAL NOT NULL DEFAULT 0,
+                categoria  TEXT NOT NULL DEFAULT '',
+                UNIQUE(prodotto, fornitore)
+            )""",
+            f"""CREATE TABLE IF NOT EXISTS registro (
+                id           {pk},
+                gs_row       INTEGER DEFAULT NULL,
+                data         TEXT NOT NULL,
+                fornitore    TEXT NOT NULL DEFAULT '',
+                prodotto     TEXT NOT NULL,
+                lotto        TEXT NOT NULL DEFAULT '',
+                scadenza     TEXT NOT NULL DEFAULT '',
+                carico       REAL NOT NULL DEFAULT 0,
+                scarico      REAL NOT NULL DEFAULT 0,
+                unita        TEXT NOT NULL DEFAULT 'kg',
+                etichetta    TEXT NOT NULL DEFAULT '',
+                movimento_id TEXT NOT NULL DEFAULT '',
+                rimanenza    REAL NOT NULL DEFAULT 0,
+                operatore    TEXT NOT NULL DEFAULT '',
+                reparto      TEXT NOT NULL DEFAULT ''
+            )""",
+            f"""CREATE TABLE IF NOT EXISTS users (
+                id       {pk},
+                nome     TEXT NOT NULL,
+                email    TEXT,
+                telefono TEXT,
+                password TEXT NOT NULL,
+                reparto  TEXT NOT NULL DEFAULT '',
+                role     TEXT NOT NULL DEFAULT 'staff'
+            )""",
+            f"""CREATE TABLE IF NOT EXISTS reset_tokens (
+                id         {pk},
+                user_id    INTEGER NOT NULL,
+                token      TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                used       INTEGER NOT NULL DEFAULT 0
+            )""",
+            "CREATE INDEX IF NOT EXISTS idx_reg_prod_lotto ON registro(prodotto, lotto)",
+            "CREATE INDEX IF NOT EXISTS idx_reg_mov_id     ON registro(movimento_id)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email    ON users(email)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_telefono ON users(telefono)",
+        ]:
+            conn.execute(stmt)
 
-        CREATE TABLE IF NOT EXISTS registro (
-            id           INTEGER PRIMARY KEY AUTOINCREMENT,
-            gs_row       INTEGER DEFAULT NULL,
-            data         TEXT NOT NULL,
-            fornitore    TEXT NOT NULL DEFAULT '',
-            prodotto     TEXT NOT NULL,
-            lotto        TEXT NOT NULL DEFAULT '',
-            scadenza     TEXT NOT NULL DEFAULT '',
-            carico       REAL NOT NULL DEFAULT 0,
-            scarico      REAL NOT NULL DEFAULT 0,
-            unita        TEXT NOT NULL DEFAULT 'kg',
-            etichetta    TEXT NOT NULL DEFAULT '',
-            movimento_id TEXT NOT NULL DEFAULT '',
-            rimanenza    REAL NOT NULL DEFAULT 0,
-            operatore    TEXT NOT NULL DEFAULT '',
-            reparto      TEXT NOT NULL DEFAULT ''
-        );
-
-        CREATE TABLE IF NOT EXISTS users (
-            id       INTEGER PRIMARY KEY AUTOINCREMENT,
-            nome     TEXT NOT NULL,
-            email    TEXT,
-            telefono TEXT,
-            password TEXT NOT NULL,
-            reparto  TEXT NOT NULL DEFAULT '',
-            role     TEXT NOT NULL DEFAULT 'staff'
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_reg_prod_lotto ON registro(prodotto, lotto);
-        CREATE INDEX IF NOT EXISTS idx_reg_mov_id     ON registro(movimento_id);
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email    ON users(email);
-        CREATE UNIQUE INDEX IF NOT EXISTS idx_users_telefono ON users(telefono);
-
-        CREATE TABLE IF NOT EXISTS reset_tokens (
-            id         INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id    INTEGER NOT NULL,
-            token      TEXT NOT NULL,
-            expires_at TEXT NOT NULL,
-            used       INTEGER NOT NULL DEFAULT 0
-        );
-        """)
-
-        # Migration: add columns to existing tables
+        # Migrations: add columns that may not exist in older DBs
         for table, col, defn in [
             ('registro', 'operatore', "TEXT NOT NULL DEFAULT ''"),
             ('registro', 'reparto',   "TEXT NOT NULL DEFAULT ''"),
@@ -97,45 +182,46 @@ def replace_listino(rows):
 
 def get_fornitori():
     with get_conn() as conn:
-        rows = conn.execute(
+        cur = conn.execute(
             "SELECT DISTINCT fornitore FROM listino WHERE fornitore != '' ORDER BY fornitore"
-        ).fetchall()
-        return [r['fornitore'] for r in rows]
+        )
+        return [r['fornitore'] for r in cur.fetchall()]
 
 
 def get_all_prodotti():
     with get_conn() as conn:
-        rows = conn.execute(
+        cur = conn.execute(
             "SELECT prodotto, fornitore, unita, scorta_min, categoria FROM listino ORDER BY prodotto"
-        ).fetchall()
-        return [dict(r) for r in rows]
+        )
+        return _rows(cur)
 
 
 def get_prodotti_by_fornitore(fornitore):
     with get_conn() as conn:
-        rows = conn.execute(
+        cur = conn.execute(
             "SELECT prodotto, fornitore, unita, scorta_min, categoria FROM listino "
             "WHERE fornitore = ? ORDER BY prodotto",
             (fornitore,)
-        ).fetchall()
-        return [dict(r) for r in rows]
+        )
+        return _rows(cur)
 
 
 # ─── REGISTRO ────────────────────────────────────────────────────────────────
 
 def get_ultima_rimanenza(prodotto, lotto):
     with get_conn() as conn:
-        row = conn.execute(
+        cur = conn.execute(
             "SELECT rimanenza FROM registro WHERE prodotto = ? AND lotto = ? "
             "ORDER BY id DESC LIMIT 1",
             (prodotto, lotto)
-        ).fetchone()
+        )
+        row = _row(cur)
         return float(row['rimanenza']) if row else 0.0
 
 
 def insert_movimento(row):
     with get_conn() as conn:
-        cur = conn.execute(
+        return conn.execute_insert(
             """INSERT INTO registro
                (gs_row, data, fornitore, prodotto, lotto, scadenza,
                 carico, scarico, unita, etichetta, movimento_id, rimanenza,
@@ -148,12 +234,11 @@ def insert_movimento(row):
                 row.get('operatore', ''), row.get('reparto', ''),
             )
         )
-        return cur.lastrowid
 
 
 def get_lotti_attivi(prodotto):
     with get_conn() as conn:
-        rows = conn.execute(
+        cur = conn.execute(
             """SELECT r.lotto, r.scadenza, r.rimanenza, r.unita, r.fornitore, r.etichetta
                FROM registro r
                WHERE r.prodotto = ?
@@ -166,13 +251,13 @@ def get_lotti_attivi(prodotto):
                  CASE WHEN r.scadenza = '' OR r.scadenza IS NULL THEN 1 ELSE 0 END,
                  r.scadenza ASC""",
             (prodotto,)
-        ).fetchall()
-        return [dict(r) for r in rows]
+        )
+        return _rows(cur)
 
 
 def get_giacenze():
     with get_conn() as conn:
-        rows = conn.execute(
+        cur = conn.execute(
             """SELECT r.prodotto, r.fornitore, r.lotto, r.scadenza,
                       r.rimanenza, r.unita, r.etichetta,
                       l.scorta_min, l.categoria
@@ -186,7 +271,8 @@ def get_giacenze():
                ORDER BY r.prodotto,
                  CASE WHEN r.scadenza = '' OR r.scadenza IS NULL THEN 1 ELSE 0 END,
                  r.scadenza ASC"""
-        ).fetchall()
+        )
+        rows = _rows(cur)
 
     grouped = OrderedDict()
     for r in rows:
@@ -225,7 +311,7 @@ def get_alerts():
     limite_str = (today + timedelta(days=7)).isoformat()
 
     with get_conn() as conn:
-        scad_rows = conn.execute(
+        scad_rows = _rows(conn.execute(
             """SELECT r.prodotto, r.lotto, r.scadenza, r.rimanenza, r.unita, r.fornitore,
                       COALESCE(l.categoria, '') AS categoria
                FROM registro r
@@ -239,9 +325,9 @@ def get_alerts():
                AND r.scadenza <= ?
                ORDER BY r.scadenza ASC""",
             (limite_str,)
-        ).fetchall()
+        ))
 
-        scorte_rows = conn.execute(
+        scorte_rows = _rows(conn.execute(
             """WITH latest AS (
                    SELECT r.prodotto, r.rimanenza
                    FROM registro r
@@ -259,7 +345,7 @@ def get_alerts():
                LEFT JOIN totali t ON t.prodotto = l.prodotto
                WHERE l.scorta_min > 0 AND COALESCE(t.totale, 0) < l.scorta_min
                ORDER BY l.prodotto"""
-        ).fetchall()
+        ))
 
     scadenze = []
     for r in scad_rows:
@@ -268,14 +354,14 @@ def get_alerts():
         except ValueError:
             giorni = None
         scadenze.append({
-            **dict(r),
+            **r,
             'giorni': giorni,
             'tipo':   'scaduto' if (giorni is not None and giorni < 0) else 'in_scadenza',
         })
 
     return {
         'scadenze': scadenze,
-        'scorte':   [dict(r) for r in scorte_rows],
+        'scorte':   scorte_rows,
         'count':    len(scadenze) + len(scorte_rows),
     }
 
@@ -315,27 +401,27 @@ def get_user_by_login(identifier):
     if not identifier:
         return None
     with get_conn() as conn:
-        row = conn.execute(
+        cur = conn.execute(
             "SELECT * FROM users WHERE email = ? OR telefono = ? LIMIT 1",
             (identifier, identifier)
-        ).fetchone()
-        return dict(row) if row else None
+        )
+        return _row(cur)
 
 
 def get_user_by_id(user_id):
     with get_conn() as conn:
-        row = conn.execute(
+        cur = conn.execute(
             "SELECT * FROM users WHERE id = ?", (user_id,)
-        ).fetchone()
-        return dict(row) if row else None
+        )
+        return _row(cur)
 
 
 def get_all_users():
     with get_conn() as conn:
-        rows = conn.execute(
+        cur = conn.execute(
             "SELECT id, nome, email, telefono, reparto, role FROM users ORDER BY nome"
-        ).fetchall()
-        return [dict(r) for r in rows]
+        )
+        return _rows(cur)
 
 
 def update_user_role(user_id, role):
@@ -364,11 +450,11 @@ def create_reset_token(user_id, token, expires_at):
 
 def get_reset_token(token):
     with get_conn() as conn:
-        row = conn.execute(
+        cur = conn.execute(
             "SELECT * FROM reset_tokens WHERE token = ? AND used = 0 LIMIT 1",
             (token,)
-        ).fetchone()
-        return dict(row) if row else None
+        )
+        return _row(cur)
 
 
 def use_reset_token(token_id):
@@ -394,21 +480,22 @@ def update_user_profile(user_id, nome, email, telefono):
 def is_contact_taken(identifier, exclude_user_id):
     """Restituisce True se email/telefono è già usata da un altro utente."""
     with get_conn() as conn:
-        row = conn.execute(
+        cur = conn.execute(
             "SELECT id FROM users WHERE (email = ? OR telefono = ?) AND id != ?",
             (identifier, identifier, exclude_user_id)
-        ).fetchone()
-        return row is not None
+        )
+        return _row(cur) is not None
 
 
 def get_feed(limit=40):
     """Ultimi movimenti per il feed home."""
     with get_conn() as conn:
-        rows = conn.execute("""
-            SELECT id, data, fornitore, prodotto, lotto, scadenza,
-                   carico, scarico, unita, operatore, reparto, movimento_id
-            FROM registro
-            ORDER BY id DESC
-            LIMIT ?
-        """, (limit,)).fetchall()
-        return [dict(r) for r in rows]
+        cur = conn.execute(
+            """SELECT id, data, fornitore, prodotto, lotto, scadenza,
+                      carico, scarico, unita, operatore, reparto, movimento_id
+               FROM registro
+               ORDER BY id DESC
+               LIMIT ?""",
+            (limit,)
+        )
+        return _rows(cur)

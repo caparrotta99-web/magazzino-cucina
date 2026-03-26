@@ -721,9 +721,7 @@ main {
   display: none;
 }
 .spesa-add-panel.open { display: block; }
-.spesa-add-row { display: flex; gap: 8px; align-items: flex-end; margin-top: 12px; }
-.spesa-add-row .fselect-wrap { flex: 1; }
-.spesa-add-qty { width: 80px; flex-shrink: 0; }
+.spesa-add-row { display: flex; gap: 8px; align-items: center; margin-top: 4px; }
 .btn-spesa-confirm {
   height: 52px; padding: 0 16px; flex-shrink: 0;
   background: var(--navy); color: #fff; border: none; border-radius: 12px;
@@ -1174,18 +1172,26 @@ main {
 
     <!-- Panel aggiunta manuale -->
     <div class="spesa-add-panel" id="spesa-add-panel">
-      <div class="flabel">Prodotto da aggiungere</div>
-      <div class="spesa-add-row">
+      <div class="fgroup" style="margin-bottom:10px">
+        <div class="flabel">Fornitore</div>
         <div class="fselect-wrap">
-          <select class="fselect" id="spesa-sel-prodotto">
-            <option value="">Scegli prodotto…</option>
+          <select class="fselect" id="spesa-sel-fornitore" onchange="onSpesaFornitore()">
+            <option value="">Seleziona fornitore…</option>
           </select>
         </div>
-        <input class="finput spesa-add-qty" type="number" id="spesa-add-qty"
-               min="0" step="0.1" placeholder="Qtà">
-        <input class="finput spesa-add-unit" type="text" id="spesa-add-unit"
-               maxlength="8" placeholder="Unità" style="width:68px;flex-shrink:0">
-        <button class="btn-spesa-confirm" onclick="confirmAddProdotto()">OK</button>
+      </div>
+      <div class="fgroup" style="margin-bottom:10px">
+        <div class="flabel">Prodotto</div>
+        <div class="fselect-wrap">
+          <select class="fselect" id="spesa-sel-prodotto" disabled>
+            <option value="">Seleziona prima il fornitore</option>
+          </select>
+        </div>
+      </div>
+      <div class="spesa-add-row">
+        <input class="finput" type="number" id="spesa-add-qty"
+               min="0" step="0.1" placeholder="Quantità (opzionale)" style="flex:1">
+        <button class="btn-spesa-confirm" onclick="confirmAddProdotto()">Aggiungi</button>
       </div>
     </div>
 
@@ -1786,17 +1792,31 @@ function loadListaSpesa() {
   }
 
   _saveListaSpesa();
-  _populateSpesaSelect();
   renderListaSpesa();
 }
 
-function _populateSpesaSelect() {
-  const sel = document.getElementById('spesa-sel-prodotto');
-  if (!sel) return;
-  const cur = sel.value;
-  sel.innerHTML = '<option value="">Scegli prodotto…</option>' +
-    S.prodotti.map(p => `<option value="${esc(p.prodotto)}|${esc(p.fornitore)}|${esc(p.unita)}">${esc(p.prodotto)}${p.fornitore ? ' — ' + esc(p.fornitore) : ''}</option>`).join('');
-  if (cur) sel.value = cur;
+function _populateSpesaFornitori() {
+  const selF = document.getElementById('spesa-sel-fornitore');
+  if (!selF) return;
+  const fornitori = [...new Set(S.prodotti.map(p => p.fornitore).filter(Boolean))].sort();
+  selF.innerHTML = '<option value="">Seleziona fornitore…</option>' +
+    fornitori.map(f => `<option value="${esc(f)}">${esc(f)}</option>`).join('');
+  const selP = document.getElementById('spesa-sel-prodotto');
+  if (selP) { selP.innerHTML = '<option value="">Seleziona prima il fornitore</option>'; selP.disabled = true; }
+}
+
+function onSpesaFornitore() {
+  const fornitore = document.getElementById('spesa-sel-fornitore').value;
+  const selP = document.getElementById('spesa-sel-prodotto');
+  if (!fornitore) {
+    selP.innerHTML = '<option value="">Seleziona prima il fornitore</option>';
+    selP.disabled = true;
+    return;
+  }
+  const filtered = S.prodotti.filter(p => p.fornitore === fornitore);
+  selP.innerHTML = '<option value="">Scegli prodotto…</option>' +
+    filtered.map(p => `<option value="${esc(p.prodotto)}|${esc(p.unita)}">${esc(p.prodotto)}</option>`).join('');
+  selP.disabled = false;
 }
 
 function renderListaSpesa() {
@@ -1888,22 +1908,22 @@ function toggleAddPanel() {
   if (!panel) return;
   panel.classList.toggle('open');
   if (panel.classList.contains('open')) {
-    _populateSpesaSelect();
+    _populateSpesaFornitori();
     document.getElementById('spesa-add-qty').value = '';
-    document.getElementById('spesa-add-unit').value = '';
   }
 }
 
 function confirmAddProdotto() {
-  const sel = document.getElementById('spesa-sel-prodotto');
+  const selF = document.getElementById('spesa-sel-fornitore');
+  const selP = document.getElementById('spesa-sel-prodotto');
   const qtyEl = document.getElementById('spesa-add-qty');
-  if (!sel || !sel.value) { toast('Scegli un prodotto', 'error'); return; }
+  if (!selF?.value) { toast('Seleziona il fornitore', 'error'); return; }
+  if (!selP?.value) { toast('Seleziona il prodotto', 'error'); return; }
 
-  const [prodotto, fornitore] = sel.value.split('|');
-  const qty  = parseFloat(qtyEl.value) || 0;
-  const unita = (document.getElementById('spesa-add-unit').value || '').trim();
+  const fornitore = selF.value;
+  const [prodotto, unita] = selP.value.split('|');
+  const qty = parseFloat(qtyEl.value) || 0;
 
-  // Find giacenza attuale
   const giac = S.giacenze.find(g => g.prodotto === prodotto);
   const qtaAttuale = giac ? giac.totale : 0;
   const prod = S.prodotti.find(p => p.prodotto === prodotto);
@@ -1913,7 +1933,7 @@ function confirmAddProdotto() {
     id:          `${prodotto}__manual__${Date.now()}`,
     prodotto,
     fornitore,
-    unita,
+    unita:       unita || '',
     qtaAttuale,
     scorta_min,
     qtaOrdinare: qty,
@@ -1923,7 +1943,9 @@ function confirmAddProdotto() {
 
   _saveListaSpesa();
   renderListaSpesa();
-  sel.value = '';
+  selF.value = '';
+  selP.innerHTML = '<option value="">Seleziona prima il fornitore</option>';
+  selP.disabled = true;
   qtyEl.value = '';
   document.getElementById('spesa-add-panel').classList.remove('open');
   toast(`${prodotto} aggiunto alla lista`, 'success');

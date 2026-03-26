@@ -104,6 +104,7 @@ def _row(cur):
 def db_init():
     pk = 'SERIAL PRIMARY KEY' if _USE_PG else 'INTEGER PRIMARY KEY AUTOINCREMENT'
 
+    # ── Step 1: create tables and indexes in a single transaction ──────────────
     with get_conn() as conn:
         for stmt in [
             f"""CREATE TABLE IF NOT EXISTS listino (
@@ -155,14 +156,25 @@ def db_init():
         ]:
             conn.execute(stmt)
 
-        # Migrations: add columns that may not exist in older DBs
-        for table, col, defn in [
-            ('registro', 'operatore', "TEXT NOT NULL DEFAULT ''"),
-            ('registro', 'reparto',   "TEXT NOT NULL DEFAULT ''"),
-            ('listino',  'categoria', "TEXT NOT NULL DEFAULT ''"),
-        ]:
+    # ── Step 2: migrations — each in its own connection/transaction ────────────
+    # On PostgreSQL a failed statement aborts the whole transaction, so we use
+    # ADD COLUMN IF NOT EXISTS (PG 9.6+) which never fails.
+    # On SQLite we keep the try/except approach.
+    migrations = [
+        ('registro', 'operatore', "TEXT NOT NULL DEFAULT ''"),
+        ('registro', 'reparto',   "TEXT NOT NULL DEFAULT ''"),
+        ('listino',  'categoria', "TEXT NOT NULL DEFAULT ''"),
+    ]
+    for table, col, defn in migrations:
+        if _USE_PG:
+            with get_conn() as conn:
+                conn.execute(
+                    f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {col} {defn}"
+                )
+        else:
             try:
-                conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {defn}")
+                with get_conn() as conn:
+                    conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {defn}")
             except Exception:
                 pass  # Column already exists
 

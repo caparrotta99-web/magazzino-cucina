@@ -2,575 +2,1004 @@
 <html lang="it">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>HACCP — Magazzino</title>
-<link rel="manifest" href="/static/manifest.json">
-<meta name="theme-color" content="#2d2d2d">
-<meta name="mobile-web-app-capable" content="yes">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0f1f3d">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Brigade">
-<link rel="apple-touch-icon" href="/static/icon.svg">
+<title>Brigade — HACCP</title>
+<link rel="manifest" href="/static/manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
-:root {
-  --bg:      #fafafa;
-  --surface: #ffffff;
-  --text:    #262626;
-  --muted:   #8e8e8e;
-  --border:  #dbdbdb;
-  --blue:    #0095f6;
-  --error:   #ed4956;
-  --success: #3dd68c;
-  --warning: #ff9800;
-  --tab-btn-h: 49px;
-  --hdr-h:     44px;
+/* ─── RESET ─────────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  margin: 0; padding: 0; box-sizing: border-box;
+  -webkit-tap-highlight-color: transparent;
 }
-*,*::before,*::after { margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent; }
-html { height:-webkit-fill-available; }
+html { height: -webkit-fill-available; }
 body {
-  background:var(--bg);
-  color:var(--text);
-  font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',Arial,sans-serif;
-  font-size:14px;
-  line-height:1.5;
-  min-height:100dvh;
-  min-height:-webkit-fill-available;
-  display:flex;
-  flex-direction:column;
-  overscroll-behavior:none;
-  -webkit-font-smoothing:antialiased;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: #ffffff;
+  color: #0f1f3d;
+  min-height: 100dvh;
+  min-height: -webkit-fill-available;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* ── HEADER ── */
+/* ─── CSS VARIABLES ─────────────────────────────────────────────────────── */
+:root {
+  --navy:    #0f1f3d;
+  --navy2:   #1a3a6b;
+  --accent:  #2563eb;
+  --text:    #0f1f3d;
+  --muted:   #64748b;
+  --border:  #e2e8f0;
+  --bg:      #ffffff;
+  --success: #059669;
+  --warning: #d97706;
+  --error:   #dc2626;
+  --hdr-h:   62px;
+  --shadow:     0 4px 24px rgba(15,31,61,.08), 0 1px 4px rgba(15,31,61,.04);
+  --shadow-lg:  0 8px 40px rgba(15,31,61,.14), 0 2px 8px rgba(15,31,61,.06);
+}
+
+/* ─── ANIMATED BLOBS ────────────────────────────────────────────────────── */
+.blob-layer {
+  position: fixed; inset: 0; z-index: 0;
+  pointer-events: none; overflow: hidden;
+}
+.blob {
+  position: absolute; border-radius: 50%;
+  filter: blur(72px); opacity: 0.42;
+}
+.blob-1 {
+  width: 520px; height: 520px; background: #dbeafe;
+  top: -140px; left: -160px;
+  animation: blobDrift1 26s ease-in-out infinite;
+}
+.blob-2 {
+  width: 420px; height: 420px; background: #bfdbfe;
+  bottom: -100px; right: -120px; opacity: 0.38;
+  animation: blobDrift2 32s ease-in-out infinite;
+}
+.blob-3 {
+  width: 320px; height: 320px; background: #93c5fd;
+  top: 38%; left: 52%; transform: translate(-50%, -50%); opacity: 0.28;
+  animation: blobDrift3 22s ease-in-out infinite;
+}
+.blob-4 {
+  width: 240px; height: 240px; background: #dbeafe;
+  top: 18%; right: -50px; opacity: 0.32;
+  animation: blobDrift4 28s ease-in-out infinite;
+}
+@keyframes blobDrift1 {
+  0%,100% { transform: translate(0,0) scale(1); }
+  33%      { transform: translate(28px,-36px) scale(1.04); }
+  66%      { transform: translate(-18px,22px) scale(.96); }
+}
+@keyframes blobDrift2 {
+  0%,100% { transform: translate(0,0) scale(1); }
+  40%      { transform: translate(-38px,28px) scale(1.07); }
+  70%      { transform: translate(22px,-18px) scale(.97); }
+}
+@keyframes blobDrift3 {
+  0%,100% { transform: translate(-50%,-50%) scale(1); }
+  50%      { transform: translate(-50%,-50%) scale(1.12); }
+}
+@keyframes blobDrift4 {
+  0%,100% { transform: translate(0,0); }
+  50%      { transform: translate(-28px,36px); }
+}
+
+/* ─── HEADER ────────────────────────────────────────────────────────────── */
 header {
-  height:var(--hdr-h);
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  padding:0 12px;
-  background:var(--surface);
-  border-bottom:1px solid var(--border);
-  position:sticky;
-  top:0;
-  z-index:50;
-  flex-shrink:0;
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  height: var(--hdr-h);
+  background: rgba(255,255,255,.88);
+  backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  border-bottom: 1px solid rgba(226,232,240,.7);
+  box-shadow: 0 1px 16px rgba(15,31,61,.07);
+  display: flex; align-items: center;
+  padding: 0 14px 0 20px; gap: 12px;
 }
+.hdr-logo-block { flex: 1; min-width: 0; }
 .logo {
-  font-size:26px;
-  font-weight:700;
-  font-style:italic;
-  letter-spacing:-1.5px;
-  background:linear-gradient(135deg,#fcb045 0%,#fd1d1d 45%,#833ab4 100%);
-  -webkit-background-clip:text;
-  -webkit-text-fill-color:transparent;
-  background-clip:text;
+  font-size: 21px; font-weight: 700; color: var(--navy);
+  letter-spacing: -.5px; line-height: 1.1;
 }
-.hdr-user { display:none; }
-.hdr-right { display:flex;align-items:center;gap:8px; }
+.hdr-sub {
+  font-size: 11px; color: var(--muted); margin-top: 1px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.hdr-sub strong { color: var(--navy); font-weight: 600; }
+.hdr-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
 .btn-icon {
-  background:none;border:none;
-  width:36px;height:36px;
-  display:flex;align-items:center;justify-content:center;
-  color:var(--text);cursor:pointer;text-decoration:none;flex-shrink:0;
+  width: 40px; height: 40px; border-radius: 12px;
+  background: none; border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  color: var(--navy); transition: background .15s ease;
+  flex-shrink: 0;
 }
-.btn-icon:active { opacity:.6; }
-.btn-icon.spinning svg { animation:spin .7s linear infinite; }
-@keyframes spin { to { transform:rotate(360deg); } }
-.hdr-alert-dot { width:8px;height:8px;background:var(--error);border-radius:50%;display:none;flex-shrink:0; }
+.btn-icon:active { background: rgba(15,31,61,.07); }
+.btn-icon.spinning svg { animation: spin .7s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.hdr-alert-dot {
+  width: 8px; height: 8px; background: var(--error);
+  border-radius: 50%; display: none; flex-shrink: 0;
+}
 
-/* ── MAIN ── */
+/* ─── MAIN CONTENT ──────────────────────────────────────────────────────── */
 main {
-  flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;
-  padding-bottom:calc(var(--tab-btn-h) + env(safe-area-inset-bottom,0px));
-  background:var(--bg);
+  position: relative; z-index: 1;
+  margin-top: var(--hdr-h);
+  min-height: calc(100dvh - var(--hdr-h));
 }
-.tab-panel { display:none; }
-.tab-panel.active { display:block; }
+.page {
+  display: none;
+  padding: 24px 16px 60px;
+  max-width: 600px; margin: 0 auto;
+  animation: pgFadeIn .22s ease;
+}
+.page.active { display: block; }
+@keyframes pgFadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
 
-/* ── STORIES ROW ── */
-.stories-row {
-  display:flex;gap:2px;padding:10px 4px 10px 10px;
-  overflow-x:auto;scrollbar-width:none;
-  background:var(--surface);border-bottom:1px solid var(--border);
+/* ─── DRAWER ────────────────────────────────────────────────────────────── */
+.drawer-overlay {
+  display: none; position: fixed; inset: 0; z-index: 200;
+  background: rgba(0,0,0,0); transition: background .28s ease;
 }
-.stories-row::-webkit-scrollbar { display:none; }
-.story-item {
-  display:flex;flex-direction:column;align-items:center;gap:5px;
-  cursor:pointer;flex-shrink:0;padding:0 6px;-webkit-user-select:none;
+.drawer-overlay.open { display: block; background: rgba(0,0,0,.5); }
+.drawer {
+  position: fixed; top: 0; right: 0; bottom: 0;
+  width: min(310px, 84vw);
+  background: var(--navy); z-index: 201;
+  transform: translateX(100%);
+  transition: transform .3s cubic-bezier(.4,0,.2,1);
+  display: flex; flex-direction: column; overflow-y: auto;
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 16px);
 }
-.story-item:active .story-ring { opacity:.7; }
-.story-ring {
-  width:58px;height:58px;border-radius:50%;
-  background:linear-gradient(135deg,#fcb045 0%,#fd1d1d 50%,#833ab4 100%);
-  padding:2.5px;
-}
-.story-inner {
-  width:100%;height:100%;background:#fff;border-radius:50%;
-  display:flex;align-items:center;justify-content:center;
-  border:2px solid #fff;color:var(--text);
-}
-.story-label { font-size:10px;color:var(--text);text-align:center;max-width:68px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
+.drawer.open { transform: translateX(0); }
 
-/* ── FEED ── */
-.feed-section { padding-top:6px; }
-.feed-date-hdr { padding:10px 14px 6px;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px; }
-.feed-post { background:var(--surface);border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin-bottom:8px; }
-.post-hdr { display:flex;align-items:center;padding:10px 12px;gap:10px; }
-.post-avatar {
-  width:32px;height:32px;border-radius:50%;
-  display:flex;align-items:center;justify-content:center;
-  flex-shrink:0;color:#fff;font-size:12px;font-weight:700;
+.drawer-hdr {
+  padding: 40px 20px 20px;
+  border-bottom: 1px solid rgba(255,255,255,.1);
+  display: flex; align-items: center; gap: 14px; flex-shrink: 0;
 }
-.post-avatar.carico  { background:#262626; }
-.post-avatar.scarico { background:#4a4a4a; }
-.post-meta { flex:1;min-width:0; }
-.post-prodotto { font-weight:600;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
-.post-sub { font-size:11px;color:var(--muted); }
-.post-visual { padding:0 12px 10px;display:flex;align-items:center;gap:10px; }
-.post-type-pill {
-  font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;
-  padding:3px 9px;border-radius:100px;flex-shrink:0;
+.drw-avatar {
+  width: 48px; height: 48px; border-radius: 50%;
+  background: var(--accent);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 18px; font-weight: 700; color: #fff; flex-shrink: 0;
 }
-.post-type-pill.carico  { background:#f0f0f0;color:#262626; }
-.post-type-pill.scarico { background:var(--error);color:#fff; }
-.post-qty { font-size:20px;font-weight:300;color:var(--text);flex:1; }
-.post-lotto-row { padding:0 12px 10px;font-size:12px;color:var(--muted); }
-.post-lotto-row strong { color:var(--text);font-weight:500; }
-.feed-empty { text-align:center;padding:40px 24px;color:var(--muted);font-size:14px; }
+.drw-name  { font-size: 15px; font-weight: 600; color: #fff; line-height: 1.3; }
+.drw-dept  { font-size: 12px; color: rgba(255,255,255,.5); margin-top: 2px; }
 
-/* ── FORM PANELS (slide up) ── */
-.form-panel {
-  position:fixed;top:0;left:0;right:0;bottom:0;
-  z-index:150;background:var(--surface);
-  overflow-y:auto;-webkit-overflow-scrolling:touch;display:none;
+.drawer-nav { flex: 1; padding: 14px 12px; }
+.drw-item {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; padding: 13px 16px; border-radius: 14px;
+  border: none; background: var(--navy2); color: #fff;
+  font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 500;
+  cursor: pointer; margin-bottom: 6px; text-align: left;
+  text-decoration: none;
+  /* stagger start state */
+  opacity: 0; transform: translateX(20px);
+  transition: opacity .22s ease, transform .22s ease, background .15s, color .15s;
 }
-.form-panel.active { display:block;animation:igSlideUp .28s cubic-bezier(.4,0,.2,1); }
-@keyframes igSlideUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
-.form-nav {
-  position:sticky;top:0;background:var(--surface);border-bottom:1px solid var(--border);
-  display:flex;align-items:center;height:44px;padding:0 6px;z-index:10;
+.drawer.open .drw-item { opacity: 1; transform: translateX(0); }
+.drawer.open .drw-item:nth-child(1) { transition-delay: .04s; }
+.drawer.open .drw-item:nth-child(2) { transition-delay: .08s; }
+.drawer.open .drw-item:nth-child(3) { transition-delay: .12s; }
+.drawer.open .drw-item:nth-child(4) { transition-delay: .16s; }
+.drawer.open .drw-item:nth-child(5) { transition-delay: .20s; }
+.drawer.open .drw-item:nth-child(6) { transition-delay: .24s; }
+.drawer.open .drw-item:nth-child(7) { transition-delay: .28s; }
+.drawer.open .drw-item:nth-child(8) { transition-delay: .32s; }
+.drw-item:active { opacity: .75; }
+.drw-item.active { background: #fff; color: var(--navy); }
+.drw-item span.lbl { flex: 1; }
+.drw-badge {
+  background: var(--error); color: #fff; font-size: 10px; font-weight: 700;
+  padding: 2px 6px; border-radius: 100px; min-width: 18px;
+  text-align: center; line-height: 1.4; display: none;
 }
-.form-nav-close {
-  background:none;border:none;cursor:pointer;
-  width:40px;height:40px;display:flex;align-items:center;justify-content:center;
-  color:var(--text);-webkit-user-select:none;
+.drw-badge.show { display: block; }
+.drw-sep {
+  height: 1px; background: rgba(255,255,255,.1);
+  margin: 8px 0 14px;
 }
-.form-nav-title { flex:1;text-align:center;font-weight:600;font-size:15px;color:var(--text); }
-.form-nav-action {
-  background:none;border:none;cursor:pointer;
-  color:var(--blue);font-size:14px;font-weight:600;
-  font-family:inherit;
-  padding:8px 8px;-webkit-user-select:none;
-  min-width:64px;text-align:right;border-radius:6px;
-}
-.form-nav-action:active { opacity:.6; }
-.form-nav-action:disabled { opacity:.4;cursor:not-allowed; }
-.form-body { padding:0 16px 48px;max-width:560px;margin:0 auto; }
+.drw-logout { background: rgba(220,38,38,.2); color: #fca5a5; }
+.drw-logout:active { background: rgba(220,38,38,.35); }
 
-/* Underline inputs */
-.ul-group { border-bottom:1px solid var(--border); }
-.ul-label { font-size:11px;color:var(--muted);padding-top:14px;display:block;font-weight:400; }
-.ul-input {
-  width:100%;border:none;border-radius:0;background:transparent;
-  padding:8px 0 12px;font-family:inherit;font-size:16px;color:var(--text);
-  outline:none;appearance:none;-webkit-appearance:none;
+/* ─── HOME — 2×2 CARDS ──────────────────────────────────────────────────── */
+.home-grid {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 13px; padding-top: 4px;
 }
-.ul-input::placeholder { color:#c7c7c7; }
-.ul-input:disabled { opacity:.5; }
-.ul-select {
-  width:100%;border:none;border-radius:0;background:transparent;
-  padding:8px 20px 12px 0;font-family:inherit;font-size:16px;color:var(--text);
-  outline:none;appearance:none;-webkit-appearance:none;
-  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%238e8e8e' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-  background-repeat:no-repeat;background-position:right 2px center;cursor:pointer;
+.hcard {
+  border-radius: 20px; padding: 20px 16px 18px;
+  cursor: pointer; display: flex; flex-direction: column; gap: 14px;
+  min-height: 140px; position: relative; overflow: hidden;
+  /* entrance animation */
+  opacity: 0; transform: translateY(18px);
+  transition: opacity .3s ease, transform .3s ease, box-shadow .15s, scale .15s;
 }
-.ul-select:disabled { opacity:.5;cursor:not-allowed; }
-.ul-display { padding:8px 0 12px;font-size:16px;color:var(--muted);min-height:44px; }
-.ul-display.has-value { color:var(--text); }
-.ul-error { font-size:12px;color:var(--error);padding:0 0 10px;display:none; }
-.ul-error.visible { display:block; }
-.input-error-ul { border-bottom:1px solid var(--error) !important; }
+.hcard.visible { opacity: 1; transform: translateY(0); }
+.hcard:active  { scale: .965; }
 
-/* Lot info box */
-.lot-info-box { background:#f9f9f9;border-radius:10px;padding:12px 14px;margin:12px 0;display:none; }
-.lot-info-box.visible { display:block; }
-.lot-info-row { display:flex;justify-content:space-between;align-items:center;padding:4px 0;font-size:14px; }
-.lot-info-row+.lot-info-row { border-top:1px solid var(--border); }
-.lot-info-row span { font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px; }
-.lot-info-row strong { font-weight:600; }
-.lot-info-row strong.c-red    { color:var(--error); }
-.lot-info-row strong.c-orange { color:var(--warning); }
-.lot-info-row strong.c-green  { color:var(--success); }
+.hcard-carico {
+  background: var(--navy); color: #fff;
+  box-shadow: var(--shadow-lg);
+}
+.hcard-scarico {
+  background: var(--navy2); color: #fff;
+  box-shadow: var(--shadow-lg);
+}
+.hcard-giacenze {
+  background: rgba(255,255,255,.72);
+  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  border: 2px solid var(--navy);
+  box-shadow: var(--shadow);
+  color: var(--navy);
+}
+.hcard-alert {
+  background: rgba(255,255,255,.72);
+  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  border: 2px solid var(--error);
+  box-shadow: var(--shadow);
+  color: var(--navy);
+}
+.hcard-icon {
+  width: 40px; height: 40px; border-radius: 12px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.hcard-carico   .hcard-icon { background: rgba(255,255,255,.14); }
+.hcard-scarico  .hcard-icon { background: rgba(255,255,255,.12); }
+.hcard-giacenze .hcard-icon { background: rgba(15,31,61,.06); }
+.hcard-alert    .hcard-icon { background: rgba(220,38,38,.07); }
+.hcard-label { font-size: 16px; font-weight: 600; line-height: 1.2; }
+.hcard-sub   { font-size: 12px; opacity: .68; margin-top: 1px; }
+.hcard-alert-num {
+  font-size: 38px; font-weight: 700; color: var(--error);
+  line-height: 1; margin-bottom: 2px;
+}
+.hcard-alert-lbl { font-size: 12px; color: var(--muted); }
 
-/* Scan button */
+/* ─── PAGE HEADER ───────────────────────────────────────────────────────── */
+.pg-title { font-size: 22px; font-weight: 700; color: var(--navy); margin-bottom: 2px; }
+.pg-sub   { font-size: 13px; color: var(--muted); margin-bottom: 22px; }
+
+/* ─── FORM CARD ─────────────────────────────────────────────────────────── */
+.form-card {
+  background: rgba(255,255,255,.92);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border-radius: 18px; padding: 20px 16px;
+  box-shadow: var(--shadow);
+  border: 1px solid rgba(226,232,240,.8);
+  margin-bottom: 14px;
+}
+.fgroup { margin-bottom: 16px; }
+.fgroup:last-child { margin-bottom: 0; }
+.flabel {
+  display: block; font-size: 11px; font-weight: 600;
+  color: var(--muted); text-transform: uppercase; letter-spacing: .5px;
+  margin-bottom: 8px;
+}
+.finput, .fselect, .ftextarea {
+  width: 100%; height: 52px; padding: 0 16px;
+  border: 1.5px solid var(--border); border-radius: 12px;
+  background: #fff; color: var(--text);
+  font-family: 'Inter', sans-serif; font-size: 16px; font-weight: 400;
+  outline: none; transition: border-color .2s, box-shadow .2s;
+  -webkit-appearance: none; appearance: none;
+}
+.ftextarea {
+  height: auto; padding: 14px 16px;
+  resize: vertical; min-height: 84px;
+}
+.finput:focus, .fselect:focus, .ftextarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(37,99,235,.11);
+}
+.finput::placeholder, .ftextarea::placeholder { color: #c4cdd8; }
+.finput:disabled, .fselect:disabled {
+  background: #f8fafc; color: var(--muted); cursor: not-allowed;
+}
+.fselect-wrap { position: relative; }
+.fselect-wrap::after {
+  content: ''; position: absolute; right: 16px; top: 50%; transform: translateY(-50%);
+  width: 0; height: 0;
+  border-left: 5px solid transparent; border-right: 5px solid transparent;
+  border-top: 6px solid var(--muted); pointer-events: none;
+}
+.fselect { padding-right: 40px; cursor: pointer; }
+.freadonly {
+  height: 52px; padding: 0 16px;
+  background: #f8fafc; border: 1.5px solid var(--border); border-radius: 12px;
+  display: flex; align-items: center;
+  font-size: 16px; color: var(--muted);
+}
+.freadonly.has-val { color: var(--text); font-weight: 500; }
+.ferror { font-size: 12px; color: var(--error); margin-top: 6px; display: none; }
+.ferror.show { display: block; }
+
+/* ─── SCAN BUTTON ───────────────────────────────────────────────────────── */
 .btn-scan {
-  width:100%;background:none;border:1px solid var(--border);border-radius:8px;
-  padding:12px 16px;font-family:inherit;font-size:14px;font-weight:500;color:var(--text);
-  cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;margin:16px 0;
+  width: 100%; height: 52px;
+  background: rgba(37,99,235,.06);
+  border: 1.5px dashed var(--accent); border-radius: 12px;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600;
+  color: var(--accent); cursor: pointer;
+  transition: background .15s; margin: 6px 0 14px;
 }
-.btn-scan:active { background:#f9f9f9; }
-.btn-scan:disabled { opacity:.5;cursor:not-allowed; }
+.btn-scan:active    { background: rgba(37,99,235,.13); }
+.btn-scan:disabled  { opacity: .5; cursor: not-allowed; }
 
-.form-section-title { font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;padding:18px 0 4px; }
+/* ─── PRIMARY BUTTON ────────────────────────────────────────────────────── */
+.btn-primary {
+  width: 100%; height: 54px;
+  background: var(--navy); color: #fff;
+  border: none; border-radius: 16px;
+  font-family: 'Inter', sans-serif; font-size: 16px; font-weight: 600;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  margin-top: 8px;
+  box-shadow: 0 4px 18px rgba(15,31,61,.26);
+  transition: transform .15s, box-shadow .15s, opacity .15s;
+}
+.btn-primary:active   { transform: scale(.98); box-shadow: none; }
+.btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; }
+.spinner {
+  width: 18px; height: 18px;
+  border: 2.5px solid rgba(255,255,255,.3);
+  border-top-color: #fff; border-radius: 50%;
+  animation: spin .7s linear infinite; display: none; flex-shrink: 0;
+}
+.btn-primary.loading .spinner  { display: block; }
+.btn-primary.loading .btn-lbl  { opacity: .7; }
 
-/* ── GIACENZE — IG GRID ── */
-.ig-toolbar {
-  display:flex;align-items:center;padding:8px 12px;gap:8px;
-  background:var(--surface);border-bottom:1px solid var(--border);
-  position:sticky;top:0;z-index:5;
+/* ─── LOT INFO BOX ──────────────────────────────────────────────────────── */
+.lot-info-box {
+  background: rgba(37,99,235,.05);
+  border: 1.5px solid rgba(37,99,235,.18);
+  border-radius: 12px; padding: 14px 16px;
+  margin-top: 4px; display: none;
 }
-.ig-search {
-  flex:1;background:#efefef;border:none;border-radius:10px;
-  padding:7px 12px;font-family:inherit;font-size:14px;color:var(--text);outline:none;
+.lot-info-box.show { display: block; }
+.lot-info-row {
+  display: flex; justify-content: space-between; align-items: center;
+  padding: 5px 0; font-size: 14px;
 }
-.ig-search::placeholder { color:var(--muted); }
-.cat-filter-row {
-  display:flex;gap:6px;padding:8px 12px;overflow-x:auto;scrollbar-width:none;
-  border-bottom:1px solid var(--border);background:var(--surface);
-}
-.cat-filter-row::-webkit-scrollbar { display:none; }
-.cat-chip {
-  flex-shrink:0;font-size:12px;font-weight:500;padding:4px 14px;border-radius:100px;
-  border:1px solid var(--border);background:var(--surface);color:var(--text);
-  cursor:pointer;white-space:nowrap;font-family:inherit;
-}
-.cat-chip.active { background:var(--text);border-color:var(--text);color:#fff; }
-.ig-grid { display:grid;grid-template-columns:repeat(3,1fr);gap:2px;padding:2px; }
-.ig-cell {
-  aspect-ratio:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
-  padding:8px 5px;cursor:pointer;position:relative;overflow:hidden;
-  text-align:center;background:var(--surface);-webkit-user-select:none;
-}
-.ig-cell:active { opacity:.7; }
-.ig-cell-name { font-size:10px;font-weight:600;color:var(--text);line-height:1.2;max-height:2.4em;overflow:hidden;margin-bottom:4px;word-break:break-word; }
-.ig-cell-qty  { font-size:15px;font-weight:700;color:var(--text);line-height:1; }
-.ig-cell-unit { font-size:9px;color:var(--muted);margin-top:2px; }
-.ig-cell-dot  { position:absolute;top:5px;right:5px;width:6px;height:6px;border-radius:50%; }
-.ig-cell-dot.ok     { background:var(--success); }
-.ig-cell-dot.warn   { background:var(--warning); }
-.ig-cell-dot.danger { background:var(--error); }
+.lot-info-row + .lot-info-row { border-top: 1px solid rgba(37,99,235,.1); }
+.lot-info-row span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; }
+.lot-info-row strong { font-weight: 600; }
+.c-green  { color: var(--success); }
+.c-orange { color: var(--warning); }
+.c-red    { color: var(--error); }
 
-/* Lot detail bottom sheet */
-.lot-detail-overlay { display:none;position:fixed;inset:0;z-index:200;background:rgba(0,0,0,.55);align-items:flex-end;justify-content:center; }
-.lot-detail-overlay.open { display:flex; }
-.lot-detail-sheet {
-  background:#fff;border-radius:20px 20px 0 0;width:100%;max-width:560px;
-  max-height:75dvh;overflow-y:auto;
-  animation:igSlideUp .25s cubic-bezier(.4,0,.2,1);
-  padding:0 0 calc(16px + env(safe-area-inset-bottom,0px));
+/* ─── ETICHETTA BOX ─────────────────────────────────────────────────────── */
+.eti-box {
+  background: var(--navy); border-radius: 18px;
+  padding: 20px; margin-top: 16px; display: none;
 }
-.lot-detail-handle { width:36px;height:4px;background:var(--border);border-radius:2px;margin:10px auto 12px; }
-.lot-detail-title  { font-size:15px;font-weight:600;padding:0 16px 12px;border-bottom:1px solid var(--border); }
-.lot-detail-row    { display:flex;align-items:center;justify-content:space-between;padding:13px 16px;border-bottom:1px solid var(--border);gap:12px; }
-.lot-detail-row:last-child { border-bottom:none; }
-.lot-detail-lotto  { font-size:13px;font-weight:500; }
-.lot-detail-meta   { font-size:11px;color:var(--muted);margin-top:2px; }
-.lot-scad { font-size:11px;font-weight:600;padding:3px 9px;border-radius:100px;white-space:nowrap;flex-shrink:0; }
-.lot-scad.ok     { background:rgba(61,214,140,.12);color:#1a9960; }
-.lot-scad.warn   { background:rgba(255,152,0,.12);color:var(--warning); }
-.lot-scad.danger { background:rgba(237,73,86,.12);color:var(--error); }
-
-/* ── ALERT PANEL ── */
-.alert-section-title { font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;padding:14px 14px 8px; }
-.alerts-block+.alerts-block { border-top:8px solid var(--bg); }
-.alert-card { display:flex;align-items:center;gap:12px;padding:14px;border-bottom:1px solid var(--border);background:var(--surface); }
-.alert-card:last-child { border-bottom:none; }
-.alert-indicator { width:4px;align-self:stretch;border-radius:2px;flex-shrink:0;min-height:40px; }
-.alert-card.red .alert-indicator    { background:var(--error); }
-.alert-card.orange .alert-indicator { background:var(--warning); }
-.alert-card.yellow .alert-indicator { background:#fcb045; }
-.alert-left { flex:1;min-width:0; }
-.alert-prodotto { font-weight:600;font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap; }
-.alert-sub  { font-size:11px;color:var(--muted);margin-top:2px; }
-.alert-right { text-align:right;flex-shrink:0; }
-.alert-qty  { font-size:14px;font-weight:700; }
-.alert-days { font-size:11px;color:var(--muted);margin-top:2px; }
-.alert-days.red    { color:var(--error); }
-.alert-days.orange { color:var(--warning); }
-.cat-badge  { display:inline-block;font-size:10px;font-weight:600;padding:1px 7px;border-radius:100px;background:#f0f0f0;color:var(--muted);margin-top:3px; }
-
-/* ── EMPTY STATES ── */
-.empty-state { text-align:center;padding:60px 24px;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:12px; }
-.empty-icon  { display:flex;justify-content:center;color:var(--border); }
-.empty-ok    { color:var(--success); }
-.empty-label { font-size:14px; }
-
-/* ── TAB BAR ── */
-.tab-bar {
-  position:fixed;bottom:0;left:0;right:0;display:flex;
-  background:var(--surface);border-top:1px solid var(--border);
-  z-index:100;padding-bottom:env(safe-area-inset-bottom,0px);
+.eti-box.show { display: block; }
+.eti-hdr-lbl {
+  font-size: 10px; letter-spacing: 2px; text-transform: uppercase;
+  color: rgba(255,255,255,.45); text-align: center;
+  padding-bottom: 14px; border-bottom: 1px solid rgba(255,255,255,.1);
+  margin-bottom: 4px;
 }
-.tab-btn {
-  flex:1;display:flex;align-items:center;justify-content:center;
-  background:none;border:none;cursor:pointer;color:var(--text);
-  height:var(--tab-btn-h);padding:0;position:relative;
-  -webkit-user-select:none;user-select:none;
+.eti-row {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding: 9px 0; border-bottom: 1px solid rgba(255,255,255,.08); gap: 12px;
 }
-.tab-btn:active { opacity:.6; }
-.tab-icon-outline { display:flex; }
-.tab-icon-filled  { display:none; }
-.tab-btn.active .tab-icon-outline { display:none; }
-.tab-btn.active .tab-icon-filled  { display:flex; }
-.tab-badge {
-  position:absolute;top:6px;right:calc(50% - 18px);
-  background:var(--error);color:#fff;border-radius:100px;
-  font-size:9px;font-weight:700;padding:2px 5px;min-width:16px;
-  text-align:center;display:none;line-height:1.4;
+.eti-row:last-child { border-bottom: none; }
+.eti-row span { font-size: 11px; color: rgba(255,255,255,.5); text-transform: uppercase; letter-spacing: .4px; flex-shrink: 0; }
+.eti-row strong { font-size: 13px; font-weight: 600; color: #fff; text-align: right; word-break: break-word; }
+
+/* ─── SEARCH BAR ────────────────────────────────────────────────────────── */
+.search-wrap { position: relative; margin-bottom: 12px; }
+.search-wrap svg {
+  position: absolute; left: 14px; top: 50%; transform: translateY(-50%);
+  color: var(--muted); pointer-events: none;
+}
+.search-input {
+  width: 100%; height: 50px; padding: 0 16px 0 46px;
+  border: 1.5px solid var(--border); border-radius: 14px;
+  background: #fff; color: var(--text);
+  font-family: 'Inter', sans-serif; font-size: 16px;
+  outline: none; -webkit-appearance: none; appearance: none;
+  transition: border-color .2s;
+}
+.search-input:focus { border-color: var(--accent); }
+
+/* ─── FILTER PILLS ──────────────────────────────────────────────────────── */
+.filter-row {
+  display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none;
+  padding-bottom: 6px; margin-bottom: 16px;
+}
+.filter-row::-webkit-scrollbar { display: none; }
+.fpill {
+  flex-shrink: 0; height: 36px; padding: 0 16px;
+  border-radius: 100px; border: 1.5px solid var(--border);
+  background: #fff; color: var(--muted);
+  font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500;
+  cursor: pointer; white-space: nowrap;
+  display: flex; align-items: center; gap: 6px;
+  transition: all .15s;
+}
+.fpill.active { background: var(--navy); border-color: var(--navy); color: #fff; }
+.fpill:active { opacity: .7; }
+.fselect-pill {
+  flex-shrink: 0; height: 36px; padding: 0 32px 0 14px;
+  border-radius: 100px; border: 1.5px solid var(--border);
+  background: #fff; color: var(--muted);
+  font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 500;
+  cursor: pointer; outline: none;
+  -webkit-appearance: none; appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2364748b' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 12px center;
+  transition: all .15s;
+}
+.fselect-pill.active {
+  background-color: var(--navy); border-color: var(--navy); color: #fff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='7' viewBox='0 0 10 7'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%23ffffff' stroke-width='1.5' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+/* compat div for old renderCatFilter calls */
+#cat-filter { display: none !important; }
+
+/* ─── GIACENZE CARDS ────────────────────────────────────────────────────── */
+.giac-list { display: flex; flex-direction: column; gap: 10px; }
+.giac-card {
+  background: rgba(255,255,255,.92);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  border-radius: 16px; padding: 16px;
+  box-shadow: var(--shadow);
+  border: 1px solid rgba(226,232,240,.8);
+  cursor: pointer; transition: scale .15s;
+}
+.giac-card:active { scale: .99; }
+.giac-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.giac-name     { font-size: 16px; font-weight: 600; color: var(--navy); }
+.giac-fornitore { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.giac-qty-big  { font-size: 28px; font-weight: 700; color: var(--navy); line-height: 1; text-align: right; }
+.giac-unit     { font-size: 12px; color: var(--muted); text-align: right; }
+.giac-lots { border-top: 1px solid var(--border); padding-top: 10px; display: flex; flex-direction: column; gap: 6px; }
+.giac-lot-row  { display: flex; align-items: center; gap: 8px; font-size: 13px; }
+.giac-lot-code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12px; }
+.giac-lot-qty  { font-size: 12px; font-weight: 600; color: var(--navy); white-space: nowrap; }
+.scad-badge {
+  font-size: 11px; font-weight: 600; padding: 2px 10px;
+  border-radius: 100px; white-space: nowrap; flex-shrink: 0;
+}
+.scad-ok     { background: rgba(5,150,105,.1);  color: var(--success); }
+.scad-warn   { background: rgba(217,119,6,.1);  color: var(--warning); }
+.scad-danger { background: rgba(220,38,38,.1);  color: var(--error);   }
+.cat-badge {
+  display: inline-block; font-size: 10px; font-weight: 500;
+  padding: 2px 8px; border-radius: 100px;
+  background: #f1f5f9; color: var(--muted);
 }
 
-/* ── MODAL / ETICHETTA ── */
-.modal-backdrop { display:none;position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:250;align-items:flex-end;justify-content:center; }
-.modal-backdrop.open { display:flex; }
+/* ─── ALERT CARDS ───────────────────────────────────────────────────────── */
+.alert-sec-hdr {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .6px; color: var(--muted); margin: 16px 0 10px;
+}
+.alert-sec-hdr:first-child { margin-top: 0; }
+.alert-card {
+  background: rgba(255,255,255,.92);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  border-radius: 16px; padding: 14px 16px;
+  box-shadow: var(--shadow);
+  display: flex; align-items: center; gap: 12px;
+  border-left: 4px solid transparent; margin-bottom: 8px;
+}
+.alert-card.danger  { border-left-color: var(--error); }
+.alert-card.warning { border-left-color: var(--warning); }
+.alert-card.scorta  { border-left-color: #f59e0b; }
+.alert-ico {
+  width: 36px; height: 36px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+.alert-ico.danger  { background: rgba(220,38,38,.1); color: var(--error); }
+.alert-ico.warning { background: rgba(217,119,6,.1); color: var(--warning); }
+.alert-ico.scorta  { background: rgba(245,158,11,.1); color: #f59e0b; }
+.alert-info     { flex: 1; min-width: 0; }
+.alert-prodotto { font-size: 14px; font-weight: 600; color: var(--navy); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.alert-sub      { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.alert-right    { text-align: right; flex-shrink: 0; }
+.alert-qty  { font-size: 14px; font-weight: 700; color: var(--navy); }
+.alert-days { font-size: 11px; margin-top: 2px; font-weight: 600; }
+.alert-days.red    { color: var(--error); }
+.alert-days.orange { color: var(--warning); }
+
+/* ─── EMPTY STATE ───────────────────────────────────────────────────────── */
+.empty-state {
+  text-align: center; padding: 56px 20px; color: var(--muted);
+  display: flex; flex-direction: column; align-items: center; gap: 12px;
+}
+.empty-state svg { color: var(--border); }
+.empty-state p { font-size: 14px; }
+
+/* ─── MODAL ETICHETTA ───────────────────────────────────────────────────── */
+.modal-backdrop {
+  display: none; position: fixed; inset: 0; z-index: 300;
+  background: rgba(0,0,0,.5);
+  align-items: flex-end; justify-content: center;
+}
+.modal-backdrop.open { display: flex; }
 .modal {
-  background:var(--surface);border-radius:20px 20px 0 0;width:100%;max-width:560px;
-  padding:0 0 calc(20px + env(safe-area-inset-bottom,0px));
-  animation:igSlideUp .25s cubic-bezier(.4,0,.2,1);
-  max-height:90dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  background: #fff; border-radius: 24px 24px 0 0;
+  width: 100%; max-width: 560px;
+  max-height: 90dvh; overflow-y: auto;
+  animation: sheetUp .25s cubic-bezier(.4,0,.2,1);
+  padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
 }
-@media (min-height:700px) {
-  .modal-backdrop { align-items:center; }
-  .modal { border-radius:20px;max-width:460px;margin:20px;padding-bottom:0; }
+@media (min-height: 700px) {
+  .modal-backdrop { align-items: center; }
+  .modal { border-radius: 24px; max-width: 460px; margin: 20px; padding-bottom: 0; }
 }
-.modal-handle { width:36px;height:4px;background:var(--border);border-radius:2px;margin:10px auto; }
-.modal-title { font-size:15px;font-weight:600;text-align:center;padding:4px 16px 14px;border-bottom:1px solid var(--border);color:var(--text); }
-.etichetta-card { padding:16px;border-bottom:1px solid var(--border); }
-.eti-header { text-align:center;font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);padding-bottom:12px;border-bottom:1px solid var(--border);margin-bottom:12px; }
-.eti-row { display:flex;justify-content:space-between;align-items:baseline;padding:9px 0;border-bottom:1px solid var(--border);gap:14px; }
-.eti-row:last-child { border-bottom:none; }
-.eti-row span { font-size:10px;letter-spacing:.5px;text-transform:uppercase;color:var(--muted);flex-shrink:0; }
-.eti-row strong { font-size:14px;font-weight:600;text-align:right;word-break:break-word; }
-.eti-id strong  { font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums; }
-.modal-actions  { display:flex;border-top:1px solid var(--border); }
-.modal-actions button { flex:1;padding:16px;font-family:inherit;font-size:14px;font-weight:600;cursor:pointer;border:none;background:none; }
-.btn-print       { color:var(--blue);border-right:1px solid var(--border); }
-.btn-close-modal { color:var(--text); }
-.modal-actions button:active { background:#fafafa; }
+@keyframes sheetUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+.modal-handle {
+  width: 40px; height: 4px; background: var(--border);
+  border-radius: 2px; margin: 12px auto;
+}
+.modal-title {
+  font-size: 16px; font-weight: 700; color: var(--navy);
+  text-align: center; padding: 4px 20px 16px;
+  border-bottom: 1px solid var(--border);
+}
+.modal-body { padding: 20px; }
+.modal-actions { display: flex; border-top: 1px solid var(--border); }
+.modal-actions button {
+  flex: 1; padding: 16px;
+  font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600;
+  cursor: pointer; border: none; background: none;
+}
+.btn-print       { color: var(--accent); border-right: 1px solid var(--border); }
+.btn-close-modal { color: var(--navy); }
+.modal-actions button:active { background: #f8fafc; }
 
-/* ── TOAST ── */
+/* ─── LOT DETAIL SHEET ──────────────────────────────────────────────────── */
+.lot-detail-overlay {
+  display: none; position: fixed; inset: 0; z-index: 300;
+  background: rgba(0,0,0,.5);
+  align-items: flex-end; justify-content: center;
+}
+.lot-detail-overlay.open { display: flex; }
+.lot-detail-sheet {
+  background: #fff; border-radius: 24px 24px 0 0;
+  width: 100%; max-width: 560px;
+  max-height: 75dvh; overflow-y: auto;
+  animation: sheetUp .25s cubic-bezier(.4,0,.2,1);
+  padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+}
+.lot-detail-handle {
+  width: 40px; height: 4px; background: var(--border);
+  border-radius: 2px; margin: 12px auto;
+}
+.lot-detail-title {
+  font-size: 15px; font-weight: 700; color: var(--navy);
+  padding: 0 20px 14px; border-bottom: 1px solid var(--border);
+}
+.lot-detail-row {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 20px; border-bottom: 1px solid var(--border); gap: 12px;
+}
+.lot-detail-row:last-child { border-bottom: none; }
+.lot-detail-lotto { font-size: 13px; font-weight: 600; color: var(--navy); }
+.lot-detail-meta  { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.lot-scad-pill {
+  font-size: 11px; font-weight: 600; padding: 4px 12px;
+  border-radius: 100px; flex-shrink: 0;
+}
+
+/* ─── TOAST (top-right) ─────────────────────────────────────────────────── */
 .toast {
-  position:fixed;
-  bottom:calc(var(--tab-btn-h) + env(safe-area-inset-bottom,0px) + 10px);
-  left:50%;transform:translateX(-50%) translateY(10px);
-  background:rgba(38,38,38,.92);color:#fff;border-radius:8px;
-  padding:10px 18px;font-size:13px;z-index:300;opacity:0;pointer-events:none;
-  transition:all .2s cubic-bezier(.2,.8,.4,1);white-space:nowrap;
-  max-width:80vw;overflow:hidden;text-overflow:ellipsis;
+  position: fixed; top: calc(var(--hdr-h) + 10px); right: 16px; z-index: 400;
+  background: var(--navy); color: #fff;
+  border-radius: 12px; padding: 11px 18px;
+  font-size: 13px; font-weight: 500;
+  box-shadow: 0 8px 32px rgba(0,0,0,.2);
+  max-width: 280px; word-break: break-word;
+  transform: translateX(calc(100% + 24px));
+  transition: transform .25s cubic-bezier(.4,0,.2,1);
+  pointer-events: none;
 }
-.toast.show    { opacity:1;transform:translateX(-50%) translateY(0); }
-.toast.success { background:rgba(61,214,140,.92);color:#0a3d20; }
-.toast.error   { background:rgba(237,73,86,.92); }
+.toast.show    { transform: translateX(0); }
+.toast.success { background: var(--success); }
+.toast.error   { background: var(--error); }
+.toast.info    { background: var(--navy); }
 
-/* ── PRINT ── */
+/* ─── HOME FEED ─────────────────────────────────────────────────────────── */
+.feed-section-hdr {
+  font-size: 11px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .6px; color: var(--muted); margin-bottom: 10px;
+}
+.feed-item {
+  background: rgba(255,255,255,.92);
+  backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
+  border-radius: 14px; padding: 13px 14px;
+  box-shadow: var(--shadow); border: 1px solid rgba(226,232,240,.8);
+  display: flex; align-items: center; gap: 12px; margin-bottom: 8px;
+}
+.feed-dot {
+  width: 36px; height: 36px; border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0;
+}
+.feed-dot.carico  { background: var(--navy); }
+.feed-dot.scarico { background: var(--navy2); }
+.feed-info  { flex: 1; min-width: 0; }
+.feed-prod  { font-size: 13px; font-weight: 600; color: var(--navy); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.feed-sub   { font-size: 11px; color: var(--muted); margin-top: 1px; }
+.feed-right { text-align: right; flex-shrink: 0; }
+.feed-qty   { font-size: 14px; font-weight: 700; color: var(--navy); }
+.feed-tipo  {
+  font-size: 10px; font-weight: 600; letter-spacing: .5px;
+  padding: 2px 8px; border-radius: 100px; margin-top: 2px; display: inline-block;
+}
+.feed-tipo.carico  { background: rgba(15,31,61,.08);  color: var(--navy); }
+.feed-tipo.scarico { background: rgba(220,38,38,.08); color: var(--error); }
+.feed-empty { font-size: 13px; color: var(--muted); text-align: center; padding: 20px 0; }
+
+/* ─── PRINT ─────────────────────────────────────────────────────────────── */
 @media print {
-  header,.tab-bar,.modal-actions,.toast { display:none !important; }
-  .modal-backdrop { display:flex !important;position:static !important;background:none !important; }
+  .blob-layer, header, .drawer-overlay, .drawer,
+  .modal-actions, .toast { display: none !important; }
+  .modal-backdrop {
+    display: flex !important; position: static !important;
+    background: none !important;
+  }
 }
 
-/* ── OLD COMPAT (hidden by new rules, kept for JS that may reference) ── */
-.form-group,.btn-primary { display:none; }
+/* ─── RESPONSIVE ────────────────────────────────────────────────────────── */
+@media (min-width: 600px) {
+  .page { padding: 32px 24px 72px; }
+  .home-grid { gap: 16px; }
+  .hcard { padding: 26px 20px 22px; min-height: 152px; }
+}
 </style>
 </head>
 <body>
 
+<!-- ── BLOB BACKGROUND ─────────────────────────────────────────────────── -->
+<div class="blob-layer" aria-hidden="true">
+  <div class="blob blob-1"></div>
+  <div class="blob blob-2"></div>
+  <div class="blob blob-3"></div>
+  <div class="blob blob-4"></div>
+</div>
+
+<!-- ── HEADER ──────────────────────────────────────────────────────────── -->
 <header>
-  <div class="logo">Brigade</div>
-  <div class="hdr-user">
-    <span class="hdr-nome">{{ current_user.nome }}</span>
-    {% if current_user.reparto %}
-    <span class="hdr-reparto">{{ current_user.reparto }}</span>
-    {% endif %}
+  <div class="hdr-logo-block">
+    <div class="logo">Brigade</div>
+    <div class="hdr-sub">
+      <span id="hdr-date"></span>
+      {% if current_user.is_authenticated %}
+      &nbsp;·&nbsp;<strong>{{ current_user.nome }}{% if current_user.reparto %} — {{ current_user.reparto }}{% endif %}</strong>
+      {% endif %}
+    </div>
   </div>
-  <div class="hdr-right">
+  <div class="hdr-actions">
     <div class="hdr-alert-dot" id="hdr-alert-dot"></div>
-    <a href="/profile" class="btn-icon" title="Il mio profilo">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-    </a>
-    {% if current_user.role == 'admin' %}
-    <a href="/admin" class="btn-icon" title="Gestione utenti">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-    </a>
-    {% endif %}
-    <button class="btn-icon" id="btn-sync" title="Sincronizza Sheets" onclick="syncAll()">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+    <button class="btn-icon" id="btn-sync" title="Sincronizza" onclick="syncAll()">
+      <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+        <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+      </svg>
     </button>
-    <a href="/logout" class="btn-icon" title="Esci">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-    </a>
+    <button class="btn-icon" id="btn-hamburger" onclick="openDrawer()" aria-label="Menu" aria-expanded="false">
+      <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="3" y1="6"  x2="21" y2="6"/>
+        <line x1="3" y1="12" x2="21" y2="12"/>
+        <line x1="3" y1="18" x2="21" y2="18"/>
+      </svg>
+    </button>
   </div>
 </header>
 
+<!-- ── DRAWER OVERLAY ──────────────────────────────────────────────────── -->
+<div class="drawer-overlay" id="drawer-overlay" onclick="closeDrawer()"></div>
+
+<!-- ── DRAWER ──────────────────────────────────────────────────────────── -->
+<nav class="drawer" id="drawer" aria-hidden="true">
+  <div class="drawer-hdr">
+    <div class="drw-avatar">
+      {{ current_user.nome[0]|upper if current_user.is_authenticated else '?' }}
+    </div>
+    <div>
+      <div class="drw-name">{{ current_user.nome if current_user.is_authenticated else 'Utente' }}</div>
+      <div class="drw-dept">{{ current_user.reparto if current_user.reparto else 'Nessun reparto' }}</div>
+    </div>
+  </div>
+
+  <div class="drawer-nav">
+    <button class="drw-item active" data-page="home" onclick="navTo('home')">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      <span class="lbl">Home</span>
+    </button>
+
+    <button class="drw-item" data-page="carico" onclick="navTo('carico')">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+      <span class="lbl">Carico</span>
+    </button>
+
+    <button class="drw-item" data-page="scarico" onclick="navTo('scarico')">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+      <span class="lbl">Scarico</span>
+    </button>
+
+    <button class="drw-item" data-page="giacenze" onclick="navTo('giacenze')">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+      <span class="lbl">Giacenze</span>
+    </button>
+
+    <button class="drw-item" data-page="alert" onclick="navTo('alert')">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+      <span class="lbl">Alert</span>
+      <span class="drw-badge" id="drw-alert-badge"></span>
+    </button>
+
+    {% if current_user.is_authenticated %}
+    <button class="drw-item" onclick="window.location='/profile'; closeDrawer()">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+      <span class="lbl">Profilo</span>
+    </button>
+    {% if current_user.role == 'admin' %}
+    <button class="drw-item" onclick="window.location='/admin'; closeDrawer()">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      <span class="lbl">Admin</span>
+    </button>
+    {% endif %}
+    {% endif %}
+
+    <div class="drw-sep"></div>
+
+    <a href="/logout" class="drw-item drw-logout" style="text-decoration:none">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+      <span class="lbl">Esci</span>
+    </a>
+  </div>
+</nav>
+
+<!-- ── MAIN ─────────────────────────────────────────────────────────────── -->
 <main>
 
-  <!-- ── HOME ── -->
-  <section class="tab-panel active" id="tab-home">
-    <!-- Stories / Highlights -->
-    <div class="stories-row">
-      <div class="story-item" onclick="switchTab('carico')">
-        <div class="story-ring"><div class="story-inner">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
-        </div></div>
-        <span class="story-label">Carico</span>
+  <!-- HOME -->
+  <section class="page active" id="page-home">
+    <div class="home-grid">
+
+      <div class="hcard hcard-carico" onclick="navTo('carico')">
+        <div class="hcard-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+        </div>
+        <div>
+          <div class="hcard-label">Carico</div>
+          <div class="hcard-sub">Registra entrata</div>
+        </div>
       </div>
-      <div class="story-item" onclick="switchTab('scarico')">
-        <div class="story-ring"><div class="story-inner">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
-        </div></div>
-        <span class="story-label">Scarico</span>
+
+      <div class="hcard hcard-scarico" onclick="navTo('scarico')">
+        <div class="hcard-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>
+        </div>
+        <div>
+          <div class="hcard-label">Scarico</div>
+          <div class="hcard-sub">Registra uscita</div>
+        </div>
       </div>
-      <div class="story-item" onclick="switchTab('giacenze')">
-        <div class="story-ring"><div class="story-inner">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
-        </div></div>
-        <span class="story-label">Giacenze</span>
+
+      <div class="hcard hcard-giacenze" onclick="navTo('giacenze')">
+        <div class="hcard-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+        </div>
+        <div>
+          <div class="hcard-label">Giacenze</div>
+          <div class="hcard-sub">Visualizza scorte</div>
+        </div>
       </div>
-      <div class="story-item" onclick="switchTab('alert')">
-        <div class="story-ring"><div class="story-inner">
-          <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-        </div></div>
-        <span class="story-label" id="story-alert-label">Alert</span>
+
+      <div class="hcard hcard-alert" onclick="navTo('alert')">
+        <div>
+          <div class="hcard-alert-num" id="home-alert-num">0</div>
+          <div class="hcard-alert-lbl">Alert attivi</div>
+        </div>
+        <div class="hcard-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--error)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+        </div>
       </div>
+
     </div>
-    <!-- Feed -->
-    <div class="feed-section" id="home-feed"></div>
+
+    <!-- Feed movimenti recenti -->
+    <div id="home-feed" style="margin-top:20px"></div>
   </section>
 
-  <!-- ── CARICO ── -->
-  <section class="tab-panel form-panel" id="tab-carico">
-    <div class="form-nav">
-      <button class="form-nav-close" onclick="switchTab('home')">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
-      <div class="form-nav-title">Nuovo Carico</div>
-      <button class="form-nav-action" id="btn-pubblica-carico" onclick="submitCarico()">Pubblica</button>
-    </div>
-    <div class="form-body">
-      <div class="ul-group">
-        <label class="ul-label">Prodotto *</label>
-        <select class="ul-select" id="c-prodotto" onchange="onProdottoCarico()">
-          <option value="">Seleziona prodotto</option>
-        </select>
+  <!-- CARICO -->
+  <section class="page" id="page-carico">
+    <div class="pg-title">Registrazione Carico</div>
+    <div class="pg-sub">I campi contrassegnati con * sono obbligatori</div>
+
+    <div class="form-card">
+      <div class="fgroup">
+        <label class="flabel">Prodotto *</label>
+        <div class="fselect-wrap">
+          <select class="fselect" id="c-prodotto" onchange="onProdottoCarico()">
+            <option value="">Seleziona prodotto…</option>
+          </select>
+        </div>
       </div>
-      <div class="ul-group">
-        <label class="ul-label">Fornitore</label>
-        <select class="ul-select" id="c-fornitore">
-          <option value="">Seleziona prima il prodotto</option>
-        </select>
+      <div class="fgroup">
+        <label class="flabel">Fornitore *</label>
+        <div class="fselect-wrap">
+          <select class="fselect" id="c-fornitore">
+            <option value="">Seleziona prima il prodotto</option>
+          </select>
+        </div>
       </div>
-      <div class="ul-group">
-        <label class="ul-label">Unità di misura</label>
-        <div class="ul-display" id="c-unita">—</div>
+      <div class="fgroup">
+        <label class="flabel">Unità di misura</label>
+        <div class="freadonly" id="c-unita">—</div>
       </div>
-      <div class="ul-group">
-        <label class="ul-label">Categoria</label>
-        <div class="ul-display" id="c-categoria">—</div>
-      </div>
-      <button type="button" class="btn-scan" id="btn-scan" onclick="triggerCamera()">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-        Scansiona etichetta
-      </button>
-      <input type="file" id="camera-input" accept="image/*" capture="environment"
-             style="display:none" onchange="onCameraCapture(this)">
-      <div class="ul-group">
-        <label class="ul-label">Numero Lotto *</label>
-        <input class="ul-input" type="text" id="c-lotto" placeholder="es. L2026001"
-               autocomplete="off" autocapitalize="characters">
-      </div>
-      <div class="ul-group">
-        <label class="ul-label">Scadenza</label>
-        <input class="ul-input" type="date" id="c-scadenza">
-      </div>
-      <div class="ul-group">
-        <label class="ul-label">Quantità *</label>
-        <input class="ul-input" type="number" id="c-qty" placeholder="0" min="0.01" step="0.01" inputmode="decimal">
+      <div class="fgroup">
+        <label class="flabel">Categoria</label>
+        <div class="freadonly" id="c-categoria">—</div>
       </div>
     </div>
+
+    <button type="button" class="btn-scan" id="btn-scan" onclick="triggerCamera()">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      Scansiona etichetta
+    </button>
+    <input type="file" id="camera-input" accept="image/*" capture="environment"
+           style="display:none" onchange="onCameraCapture(this)">
+
+    <div class="form-card">
+      <div class="fgroup">
+        <label class="flabel">Numero Lotto *</label>
+        <input class="finput" type="text" id="c-lotto"
+               placeholder="es. L2026001" autocomplete="off" autocapitalize="characters">
+      </div>
+      <div class="fgroup">
+        <label class="flabel">Data di scadenza</label>
+        <input class="finput" type="date" id="c-scadenza">
+      </div>
+      <div class="fgroup">
+        <label class="flabel">Quantità *</label>
+        <input class="finput" type="number" id="c-qty"
+               placeholder="0" min="0.01" step="0.01" inputmode="decimal">
+      </div>
+      <div class="fgroup">
+        <label class="flabel">Note</label>
+        <textarea class="ftextarea" id="c-note" placeholder="Note opzionali…"></textarea>
+      </div>
+    </div>
+
+    <button class="btn-primary" id="btn-carico" onclick="submitCarico()">
+      <span class="spinner"></span>
+      <span class="btn-lbl">Registra Carico</span>
+    </button>
+
+    <div class="eti-box" id="eti-box-inline"></div>
   </section>
 
-  <!-- ── SCARICO ── -->
-  <section class="tab-panel form-panel" id="tab-scarico">
-    <div class="form-nav">
-      <button class="form-nav-close" onclick="switchTab('home')">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
-      <div class="form-nav-title">Nuovo Scarico</div>
-      <button class="form-nav-action" id="btn-pubblica-scarico" onclick="submitScarico()">Salva</button>
-    </div>
-    <div class="form-body">
-      <div class="ul-group">
-        <label class="ul-label">Prodotto *</label>
-        <select class="ul-select" id="s-prodotto" onchange="onProdottoScarico()">
-          <option value="">Seleziona prodotto</option>
-        </select>
+  <!-- SCARICO -->
+  <section class="page" id="page-scarico">
+    <div class="pg-title">Registrazione Scarico</div>
+    <div class="pg-sub">Seleziona il prodotto e il lotto da scaricare</div>
+
+    <div class="form-card">
+      <div class="fgroup">
+        <label class="flabel">Prodotto *</label>
+        <div class="fselect-wrap">
+          <select class="fselect" id="s-prodotto" onchange="onProdottoScarico()">
+            <option value="">Seleziona prodotto…</option>
+          </select>
+        </div>
       </div>
-      <div class="ul-group">
-        <label class="ul-label">Lotto *</label>
-        <select class="ul-select" id="s-lotto" disabled onchange="onLottoScarico()">
-          <option value="">Seleziona prima il prodotto</option>
-        </select>
+      <div class="fgroup">
+        <label class="flabel">Lotto *</label>
+        <div class="fselect-wrap">
+          <select class="fselect" id="s-lotto" disabled onchange="onLottoScarico()">
+            <option value="">Seleziona prima il prodotto</option>
+          </select>
+        </div>
       </div>
       <div class="lot-info-box" id="s-lot-info"></div>
-      <div class="ul-group" id="s-qty-group">
-        <label class="ul-label">Quantità *</label>
-        <input class="ul-input" type="number" id="s-qty" placeholder="0" min="0.01" step="0.01"
-               inputmode="decimal" oninput="validateQtyScarico()">
-        <div class="ul-error" id="s-qty-error"></div>
+      <div class="fgroup">
+        <label class="flabel">Motivo scarico</label>
+        <div class="fselect-wrap">
+          <select class="fselect" id="s-motivo">
+            <option value="Utilizzo cucina">Utilizzo cucina</option>
+            <option value="Scaduto">Scaduto</option>
+            <option value="Danneggiato">Danneggiato</option>
+            <option value="Altro">Altro</option>
+          </select>
+        </div>
+      </div>
+      <div class="fgroup">
+        <label class="flabel">Quantità da scaricare *</label>
+        <input class="finput" type="number" id="s-qty"
+               placeholder="0" min="0.01" step="0.01" inputmode="decimal"
+               oninput="validateQtyScarico()">
+        <div class="ferror" id="s-qty-error"></div>
+      </div>
+    </div>
+
+    <button class="btn-primary" id="btn-scarico" onclick="submitScarico()">
+      <span class="spinner"></span>
+      <span class="btn-lbl">Registra Scarico</span>
+    </button>
+  </section>
+
+  <!-- GIACENZE -->
+  <section class="page" id="page-giacenze">
+    <div class="pg-title">Giacenze</div>
+
+    <div class="search-wrap">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input class="search-input" type="search" id="search-giacenze"
+             placeholder="Cerca prodotto…" oninput="renderGiacenze()">
+    </div>
+
+    <div class="filter-row">
+      <button class="fpill active" data-filter="all"      onclick="setGiacFilter('all', this)">Tutti</button>
+      <button class="fpill"        data-filter="scadenza" onclick="setGiacFilter('scadenza', this)">In scadenza</button>
+      <button class="fpill"        data-filter="scorta"   onclick="setGiacFilter('scorta', this)">Sotto scorta</button>
+      <select class="fselect-pill" id="filter-fornitore"
+              onchange="onFilterSelectChange(this); renderGiacenze()">
+        <option value="">Fornitore</option>
+      </select>
+      <select class="fselect-pill" id="filter-categoria"
+              onchange="onFilterSelectChange(this); renderGiacenze()">
+        <option value="">Categoria</option>
+        <option>Carne</option><option>Pesce</option><option>Verdure</option>
+        <option>Latticini</option><option>Secchi</option>
+        <option>Bevande</option><option>Surgelati</option><option>Spezie</option>
+      </select>
+      <!-- compat: old renderCatFilter targets this div -->
+      <div id="cat-filter" style="display:none"></div>
+    </div>
+
+    <div class="giac-list" id="giacenze-list">
+      <div class="empty-state">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <p>Caricamento…</p>
       </div>
     </div>
   </section>
 
-  <!-- ── GIACENZE ── -->
-  <section class="tab-panel" id="tab-giacenze">
-    <div class="ig-toolbar">
-      <input class="ig-search" type="search" id="search-giacenze"
-             placeholder="Cerca prodotto…" oninput="renderGiacenze()">
-    </div>
-    <div class="cat-filter-row" id="cat-filter" style="display:none"></div>
-    <div id="giacenze-list">
-      <div class="empty-state"><div class="empty-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><div class="empty-label">Caricamento…</div></div>
-    </div>
-  </section>
-
-  <!-- ── ALERT ── -->
-  <section class="tab-panel" id="tab-alert">
+  <!-- ALERT -->
+  <section class="page" id="page-alert">
+    <div class="pg-title">Alert</div>
     <div id="alerts-content">
-      <div class="empty-state"><div class="empty-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div><div class="empty-label">Caricamento…</div></div>
+      <div class="empty-state">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <p>Caricamento…</p>
+      </div>
     </div>
   </section>
 
 </main>
 
-<!-- ── TAB BAR ── -->
-<nav class="tab-bar">
-  <button class="tab-btn active" data-tab="home" onclick="switchTab('home')">
-    <span class="tab-icon-outline"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
-    <span class="tab-icon-filled"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg></span>
-  </button>
-  <button class="tab-btn" data-tab="carico" onclick="switchTab('carico')">
-    <span class="tab-icon-outline"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></span>
-    <span class="tab-icon-filled"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm-6 10h-2v2a1 1 0 0 1-2 0v-2H7a1 1 0 0 1 0-2h2V9a1 1 0 0 1 2 0v2h2a1 1 0 0 1 0 2z"/></svg></span>
-  </button>
-  <button class="tab-btn" data-tab="scarico" onclick="switchTab('scarico')">
-    <span class="tab-icon-outline"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="8" y1="12" x2="16" y2="12"/></svg></span>
-    <span class="tab-icon-filled"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zm-4 10H9a1 1 0 0 1 0-2h6a1 1 0 0 1 0 2z"/></svg></span>
-  </button>
-  <button class="tab-btn" data-tab="giacenze" onclick="switchTab('giacenze')">
-    <span class="tab-icon-outline"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></span>
-    <span class="tab-icon-filled"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M3 3h7v7H3V3zm11 0h7v7h-7V3zM3 14h7v7H3v-7zm11 0h7v7h-7v-7z"/></svg></span>
-  </button>
-  <button class="tab-btn" data-tab="alert" onclick="switchTab('alert')">
-    <span class="tab-icon-outline"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></span>
-    <span class="tab-icon-filled"><svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.9 2 2 2zm6-6V11c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/></svg></span>
-    <span class="tab-badge" id="tab-alert-badge"></span>
-  </button>
-</nav>
-
-<!-- ── MODAL ETICHETTA ── -->
+<!-- ── MODAL ETICHETTA ──────────────────────────────────────────────────── -->
 <div class="modal-backdrop" id="modal-etichetta" onclick="bgClose(event)">
   <div class="modal">
     <div class="modal-handle"></div>
     <div class="modal-title">Etichetta HACCP</div>
-    <div class="etichetta-card" id="eti-content"></div>
+    <div class="modal-body" id="eti-content"></div>
     <div class="modal-actions">
       <button class="btn-print" onclick="window.print()">Stampa</button>
       <button class="btn-close-modal" onclick="closeModal()">Chiudi</button>
@@ -578,8 +1007,9 @@ main {
   </div>
 </div>
 
-<!-- ── LOT DETAIL SHEET ── -->
-<div class="lot-detail-overlay" id="lot-detail-overlay" onclick="if(event.target===this)closeLotDetail()">
+<!-- ── LOT DETAIL SHEET ─────────────────────────────────────────────────── -->
+<div class="lot-detail-overlay" id="lot-detail-overlay"
+     onclick="if(event.target===this) closeLotDetail()">
   <div class="lot-detail-sheet">
     <div class="lot-detail-handle"></div>
     <div class="lot-detail-title" id="lot-detail-title"></div>
@@ -587,10 +1017,11 @@ main {
   </div>
 </div>
 
+<!-- ── TOAST ─────────────────────────────────────────────────────────────── -->
 <div class="toast" id="toast"></div>
 
 <script>
-// ── STATE ──────────────────────────────────────────────────────────────────
+// ── STATE ────────────────────────────────────────────────────────────────
 const S = {
   prodotti:     [],
   lottiScarico: [],
@@ -598,34 +1029,70 @@ const S = {
   alerts:       { scadenze: [], scorte: [], count: 0 },
   feed:         [],
   unitaCarico:  '',
-  activeCat:    '',
+  activePage:   'home',
+  giacFilter:   'all',
 };
 
-// ── INIT ───────────────────────────────────────────────────────────────────
+// ── INIT ─────────────────────────────────────────────────────────────────
 async function init() {
+  setHdrDate();
+  animHomeCards();
   await Promise.all([loadProdottiCarico(), loadGiacenze(), loadAlerts(), loadFeed()]);
   renderScaricoProdotti();
 }
 
-// ── TAB ────────────────────────────────────────────────────────────────────
-function switchTab(tab) {
-  document.querySelectorAll('.tab-btn').forEach(b =>
-    b.classList.toggle('active', b.dataset.tab === tab));
-  document.querySelectorAll('.tab-panel').forEach(p =>
-    p.classList.toggle('active', p.id === `tab-${tab}`));
-  if (tab === 'home')     renderHome();
-  if (tab === 'giacenze') { renderCatFilter(); renderGiacenze(); }
-  if (tab === 'alert')    renderAlerts();
+function setHdrDate() {
+  const el = document.getElementById('hdr-date');
+  if (!el) return;
+  el.textContent = new Date().toLocaleDateString('it-IT', {
+    weekday: 'short', day: 'numeric', month: 'short'
+  });
 }
 
-// ── HOME ───────────────────────────────────────────────────────────────────
-function renderHome() {
-  const count = S.alerts.count || 0;
-  const lbl   = document.getElementById('story-alert-label');
-  if (lbl) lbl.textContent = count > 0 ? `Alert (${count})` : 'Alert';
-  renderFeed();
+// ── DRAWER ───────────────────────────────────────────────────────────────
+function openDrawer() {
+  document.getElementById('drawer').classList.add('open');
+  document.getElementById('drawer-overlay').classList.add('open');
+  document.getElementById('drawer').setAttribute('aria-hidden', 'false');
+  document.getElementById('btn-hamburger').setAttribute('aria-expanded', 'true');
+}
+function closeDrawer() {
+  document.getElementById('drawer').classList.remove('open');
+  document.getElementById('drawer-overlay').classList.remove('open');
+  document.getElementById('drawer').setAttribute('aria-hidden', 'true');
+  document.getElementById('btn-hamburger').setAttribute('aria-expanded', 'false');
 }
 
+// ── NAVIGATION ───────────────────────────────────────────────────────────
+function navTo(page) {
+  closeDrawer();
+  S.activePage = page;
+
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  const pg = document.getElementById(`page-${page}`);
+  if (pg) pg.classList.add('active');
+
+  document.querySelectorAll('.drw-item[data-page]').forEach(b =>
+    b.classList.toggle('active', b.dataset.page === page));
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+
+  if (page === 'home')     { animHomeCards(); renderFeed(); }
+  if (page === 'giacenze') { updateFornitoriFilter(); renderGiacenze(); }
+  if (page === 'alert')    renderAlerts();
+}
+// alias for backward compat
+function switchTab(t) { navTo(t); }
+
+// ── HOME ANIMATION ───────────────────────────────────────────────────────
+function animHomeCards() {
+  document.querySelectorAll('.hcard').forEach((c, i) => {
+    c.classList.remove('visible');
+    setTimeout(() => c.classList.add('visible'), 60 + i * 80);
+  });
+}
+
+// ── FEED ─────────────────────────────────────────────────────────────────
 async function loadFeed() {
   const data = await api('/api/feed');
   S.feed = data.movements || [];
@@ -635,79 +1102,122 @@ async function loadFeed() {
 function renderFeed() {
   const el = document.getElementById('home-feed');
   if (!el) return;
+
   if (!S.feed.length) {
-    el.innerHTML = `<div class="feed-empty">Nessun movimento registrato</div>`;
+    el.innerHTML = '<p class="feed-empty">Nessun movimento registrato</p>';
     return;
   }
 
-  // Group by date
-  const byDate = [];
-  let curDate = null;
-  for (const m of S.feed) {
-    if (m.data !== curDate) { curDate = m.data; byDate.push({ date: m.data, items: [] }); }
-    byDate[byDate.length - 1].items.push(m);
-  }
-
-  el.innerHTML = byDate.map(group => {
-    const dtLabel = group.date ? fmtDate(group.date) : '';
-    const posts = group.items.map(m => {
-      const isCarico = m.carico > 0;
-      const tipo = isCarico ? 'carico' : 'scarico';
-      const qty  = isCarico ? m.carico : m.scarico;
-      const init = (m.operatore || m.prodotto || '?')[0].toUpperCase();
-      const sub  = [m.fornitore, m.reparto].filter(Boolean).join(' · ') || m.prodotto;
-      return `<div class="feed-post">
-        <div class="post-hdr">
-          <div class="post-avatar ${tipo}">${esc(init)}</div>
-          <div class="post-meta">
-            <div class="post-prodotto">${esc(m.prodotto)}</div>
-            <div class="post-sub">${esc(sub)}</div>
-          </div>
-        </div>
-        <div class="post-visual">
-          <span class="post-type-pill ${tipo}">${isCarico ? 'CARICO' : 'SCARICO'}</span>
-          <span class="post-qty">${qty}&nbsp;<span style="font-size:13px;color:var(--muted)">${esc(m.unita||'')}</span></span>
-        </div>
-        ${m.lotto ? `<div class="post-lotto-row">Lotto&nbsp;<strong>${esc(m.lotto)}</strong>${m.scadenza ? `&nbsp;·&nbsp;scade&nbsp;${fmtDate(m.scadenza)}` : ''}</div>` : ''}
-      </div>`;
-    }).join('');
-    return `<div class="feed-date-hdr">${dtLabel}</div>${posts}`;
+  const rows = S.feed.slice(0, 20).map(m => {
+    const isCarico = (m.carico || 0) > 0;
+    const tipo     = isCarico ? 'carico' : 'scarico';
+    const qty      = isCarico ? m.carico : m.scarico;
+    const init     = (m.operatore || m.prodotto || '?')[0].toUpperCase();
+    const sub      = [m.fornitore, m.reparto, m.lotto ? `Lotto ${m.lotto}` : null]
+                       .filter(Boolean).join(' · ');
+    return `<div class="feed-item">
+      <div class="feed-dot ${tipo}">${esc(init)}</div>
+      <div class="feed-info">
+        <div class="feed-prod">${esc(m.prodotto)}</div>
+        <div class="feed-sub">${esc(sub || '—')}</div>
+      </div>
+      <div class="feed-right">
+        <div class="feed-qty">${qty}&nbsp;<span style="font-size:11px;font-weight:400;color:var(--muted)">${esc(m.unita||'')}</span></div>
+        <span class="feed-tipo ${tipo}">${isCarico ? 'CARICO' : 'SCARICO'}</span>
+      </div>
+    </div>`;
   }).join('');
+
+  el.innerHTML = `<div class="feed-section-hdr">Movimenti recenti</div>${rows}`;
 }
 
-// ── CARICO ─────────────────────────────────────────────────────────────────
+// ── GIACENZE FILTERS ─────────────────────────────────────────────────────
+function setGiacFilter(name, btn) {
+  S.giacFilter = name;
+  document.querySelectorAll('.fpill').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  renderGiacenze();
+}
+function onFilterSelectChange(sel) {
+  sel.classList.toggle('active', !!sel.value);
+}
+function updateFornitoriFilter() {
+  const sel = document.getElementById('filter-fornitore');
+  const cur = sel.value;
+  const fornitori = [...new Set(S.giacenze.map(g => g.fornitore).filter(Boolean))].sort();
+  sel.innerHTML = '<option value="">Fornitore</option>' +
+    fornitori.map(f => `<option value="${esc(f)}">${esc(f)}</option>`).join('');
+  if (cur) sel.value = cur;
+  sel.classList.toggle('active', !!sel.value);
+}
+
+// ── CARICO ───────────────────────────────────────────────────────────────
 async function loadProdottiCarico() {
   const data = await api('/api/prodotti');
   S.prodotti = data.prodotti || [];
 
   const selProd = document.getElementById('c-prodotto');
-  selProd.innerHTML = '<option value="">— Seleziona prodotto —</option>' +
+  selProd.innerHTML = '<option value="">Seleziona prodotto…</option>' +
     S.prodotti.map(p =>
-      `<option value="${esc(p.prodotto)}" data-fornitore="${esc(p.fornitore)}" data-unita="${esc(p.unita)}" data-categoria="${esc(p.categoria||'')}">${esc(p.prodotto)}</option>`
+      `<option value="${esc(p.prodotto)}"
+         data-fornitore="${esc(p.fornitore)}"
+         data-unita="${esc(p.unita)}"
+         data-categoria="${esc(p.categoria||'')}"
+       >${esc(p.prodotto)}</option>`
     ).join('');
 
   const fornitori = [...new Set(S.prodotti.map(p => p.fornitore).filter(Boolean))].sort();
-  const selFor = document.getElementById('c-fornitore');
-  selFor.innerHTML = '<option value="">— seleziona prodotto prima —</option>' +
+  document.getElementById('c-fornitore').innerHTML =
+    '<option value="">Seleziona prima il prodotto</option>' +
     fornitori.map(f => `<option value="${esc(f)}">${esc(f)}</option>`).join('');
 }
 
 function onProdottoCarico() {
-  const sel = document.getElementById('c-prodotto');
-  const opt = sel.options[sel.selectedIndex];
-  const fornitore = (opt && opt.dataset.fornitore) ? opt.dataset.fornitore : '';
-  const unita     = (opt && opt.dataset.unita)     ? opt.dataset.unita     : '';
-  const categoria = (opt && opt.dataset.categoria) ? opt.dataset.categoria : '';
-  S.unitaCarico = unita;
+  const sel       = document.getElementById('c-prodotto');
+  const opt       = sel.options[sel.selectedIndex];
+  const fornitore = opt?.dataset.fornitore || '';
+  const unita     = opt?.dataset.unita     || '';
+  const categoria = opt?.dataset.categoria || '';
+  S.unitaCarico   = unita;
   document.getElementById('c-fornitore').value = fornitore;
-  setFieldDisplay('c-unita',     unita     || '—', !!unita);
-  setFieldDisplay('c-categoria', categoria || '—', !!categoria);
+  setRO('c-unita',     unita     || '—', !!unita);
+  setRO('c-categoria', categoria || '—', !!categoria);
+}
+function setRO(id, text, hasVal) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.textContent = text;
+  el.classList.toggle('has-val', hasVal);
 }
 
-function setFieldDisplay(id, text, hasVal) {
-  const el = document.getElementById(id);
-  el.textContent = text;
-  el.classList.toggle('has-value', hasVal);
+function triggerCamera() { document.getElementById('camera-input').click(); }
+
+async function onCameraCapture(input) {
+  const file = input.files[0];
+  if (!file) return;
+  const btn = document.getElementById('btn-scan');
+  btn.disabled = true;
+  const reader = new FileReader();
+  reader.onload = async (e) => {
+    const data = await api('/api/scan-label', {
+      method: 'POST',
+      body: { image: e.target.result, media_type: file.type || 'image/jpeg' },
+    });
+    btn.disabled = false;
+    if (data.success) {
+      if (data.lotto) document.getElementById('c-lotto').value = data.lotto;
+      if (data.scadenza) {
+        const parts = String(data.scadenza).split('/');
+        if (parts.length === 3)
+          document.getElementById('c-scadenza').value =
+            `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+      }
+      const ok = data.lotto || data.scadenza;
+      toast(ok ? 'Etichetta letta' : 'Nessun dato trovato', ok ? 'success' : 'error');
+    } else { toast(data.error || 'Errore lettura', 'error'); }
+    input.value = '';
+  };
+  reader.readAsDataURL(file);
 }
 
 async function submitCarico() {
@@ -717,180 +1227,103 @@ async function submitCarico() {
   const scadenza  = document.getElementById('c-scadenza').value;
   const qty       = parseFloat(document.getElementById('c-qty').value);
 
-  if (!prodotto)          { toast('Seleziona il prodotto', 'error'); return; }
-  if (!fornitore)         { toast('Seleziona il fornitore', 'error'); return; }
-  if (!lotto)             { toast('Inserisci il numero di lotto', 'error'); return; }
-  if (!qty || qty <= 0)   { toast('Inserisci una quantità valida', 'error'); return; }
+  if (!prodotto)        { toast('Seleziona il prodotto', 'error'); return; }
+  if (!fornitore)       { toast('Seleziona il fornitore', 'error'); return; }
+  if (!lotto)           { toast('Inserisci il numero di lotto', 'error'); return; }
+  if (!qty || qty <= 0) { toast('Inserisci una quantità valida', 'error'); return; }
 
-  const btn = document.getElementById('btn-pubblica-carico');
-  btn.disabled = true; btn.textContent = 'Salvataggio…';
+  const btn = document.getElementById('btn-carico');
+  btn.classList.add('loading'); btn.disabled = true;
 
   const data = await api('/api/carico', {
     method: 'POST',
     body: { fornitore, prodotto, lotto, scadenza, qty, unita: S.unitaCarico },
   });
 
-  btn.disabled = false; btn.textContent = 'Pubblica';
+  btn.classList.remove('loading'); btn.disabled = false;
 
   if (data.success) {
     showEtichetta(data);
     resetCarico();
-    switchTab('home');
     await Promise.all([loadGiacenze(), loadAlerts(), loadFeed()]);
     renderScaricoProdotti();
-  } else {
-    toast(data.error || 'Errore durante il carico', 'error');
-  }
+  } else { toast(data.error || 'Errore durante il carico', 'error'); }
 }
 
 function resetCarico() {
-  document.getElementById('c-prodotto').value  = '';
-  document.getElementById('c-fornitore').selectedIndex = 0;
-  setFieldDisplay('c-unita', '—', false);
-  document.getElementById('c-lotto').value     = '';
-  document.getElementById('c-scadenza').value  = '';
-  document.getElementById('c-qty').value       = '';
+  ['c-prodotto','c-fornitore','c-lotto','c-scadenza','c-qty','c-note']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  setRO('c-unita', '—', false);
+  setRO('c-categoria', '—', false);
   S.unitaCarico = '';
 }
 
-// ── CAMERA SCAN ────────────────────────────────────────────────────────────
-function triggerCamera() {
-  document.getElementById('camera-input').click();
-}
-
-async function onCameraCapture(input) {
-  const file = input.files[0];
-  if (!file) return;
-
-  const btn = document.getElementById('btn-scan');
-  btn.disabled = true; btn.textContent = 'Analisi in corso…';
-
-  const reader = new FileReader();
-  reader.onload = async (e) => {
-    const base64    = e.target.result;
-    const mediaType = file.type || 'image/jpeg';
-
-    const data = await api('/api/scan-label', {
-      method: 'POST',
-      body:   { image: base64, media_type: mediaType },
-    });
-
-    btn.disabled = false; btn.textContent = 'Scansiona etichetta';
-
-    if (data.success) {
-      if (data.lotto) {
-        document.getElementById('c-lotto').value = data.lotto;
-      }
-      if (data.scadenza) {
-        // Converte DD/MM/YYYY → YYYY-MM-DD per l'input date
-        const parts = String(data.scadenza).split('/');
-        if (parts.length === 3) {
-          document.getElementById('c-scadenza').value =
-            `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
-        }
-      }
-      if (data.lotto || data.scadenza) {
-        toast('Etichetta letta ✓', 'success');
-      } else {
-        toast('Nessun dato trovato nell\'etichetta', 'error');
-      }
-    } else {
-      toast(data.error || 'Errore lettura etichetta', 'error');
-    }
-    input.value = '';
-  };
-  reader.readAsDataURL(file);
-}
-
-// ── SCARICO ────────────────────────────────────────────────────────────────
+// ── SCARICO ──────────────────────────────────────────────────────────────
 function renderScaricoProdotti() {
   const sel = document.getElementById('s-prodotto');
   const cur = sel.value;
-  sel.innerHTML = '<option value="">— Seleziona prodotto —</option>' +
-    S.giacenze.map(g =>
-      `<option value="${esc(g.prodotto)}">${esc(g.prodotto)}</option>`
-    ).join('');
+  sel.innerHTML = '<option value="">Seleziona prodotto…</option>' +
+    S.giacenze.map(g => `<option value="${esc(g.prodotto)}">${esc(g.prodotto)}</option>`).join('');
   if (cur && S.giacenze.find(g => g.prodotto === cur)) {
     sel.value = cur;
   } else {
-    document.getElementById('s-lotto').innerHTML =
-      '<option value="">— Seleziona prima il prodotto —</option>';
+    document.getElementById('s-lotto').innerHTML = '<option value="">Seleziona prima il prodotto</option>';
     document.getElementById('s-lotto').disabled = true;
-    document.getElementById('s-lot-info').classList.remove('visible');
+    document.getElementById('s-lot-info').classList.remove('show');
   }
 }
 
 async function onProdottoScarico() {
   const prodotto = document.getElementById('s-prodotto').value;
   const lottoSel = document.getElementById('s-lotto');
-  document.getElementById('s-lot-info').classList.remove('visible');
-
+  document.getElementById('s-lot-info').classList.remove('show');
   if (!prodotto) {
-    lottoSel.innerHTML = '<option value="">— Seleziona prima il prodotto —</option>';
-    lottoSel.disabled = true;
-    return;
+    lottoSel.innerHTML = '<option value="">Seleziona prima il prodotto</option>';
+    lottoSel.disabled = true; return;
   }
-
   lottoSel.disabled = true;
   const data = await api(`/api/lotti?prodotto=${encodeURIComponent(prodotto)}`);
   S.lottiScarico = data.lotti || [];
-
-  lottoSel.innerHTML = '<option value="">— Seleziona lotto —</option>' +
+  lottoSel.innerHTML = '<option value="">Seleziona lotto…</option>' +
     S.lottiScarico.map(l => {
-      const scadText = l.scadenza ? ` · scade ${fmtDate(l.scadenza)}` : '';
-      return `<option value="${esc(l.lotto)}">${esc(l.lotto)} — ${l.rimanenza} ${l.unita}${scadText}</option>`;
+      const sc = l.scadenza ? ` · scade ${fmtDate(l.scadenza)}` : '';
+      return `<option value="${esc(l.lotto)}">${esc(l.lotto)} — ${l.rimanenza} ${l.unita}${sc}</option>`;
     }).join('');
   lottoSel.disabled = false;
 }
 
 function onLottoScarico() {
-  const lotto   = document.getElementById('s-lotto').value;
-  const infoBox = document.getElementById('s-lot-info');
-  // Reset errore qty
+  const lotto = document.getElementById('s-lotto').value;
+  const info  = document.getElementById('s-lot-info');
   document.getElementById('s-qty-error').textContent = '';
-  document.getElementById('s-qty-error').classList.remove('visible');
-  document.getElementById('s-qty').classList.remove('input-error-ul');
-  if (!lotto) { infoBox.classList.remove('visible'); return; }
-
+  document.getElementById('s-qty-error').classList.remove('show');
+  document.getElementById('s-qty').classList.remove('error');
+  if (!lotto) { info.classList.remove('show'); return; }
   const l = S.lottiScarico.find(x => x.lotto === lotto);
-  if (!l) { infoBox.classList.remove('visible'); return; }
-
+  if (!l)    { info.classList.remove('show'); return; }
   const giorni  = l.scadenza ? daysTo(l.scadenza) : null;
   const scadTxt = l.scadenza
-    ? `${fmtDate(l.scadenza)}${giorni !== null ? ` (${giorni}gg)` : ''}`
-    : '—';
+    ? `${fmtDate(l.scadenza)}${giorni !== null ? ` (${giorni}gg)` : ''}` : '—';
   const scadCls = giorni === null ? '' : giorni < 0 ? 'c-red' : giorni <= 7 ? 'c-orange' : 'c-green';
-
-  infoBox.innerHTML = `
-    <div class="lot-info-row">
-      <span>Disponibile</span>
-      <strong>${l.rimanenza} ${l.unita}</strong>
-    </div>
-    <div class="lot-info-row">
-      <span>Scadenza</span>
-      <strong class="${scadCls}">${scadTxt}</strong>
-    </div>
+  info.innerHTML = `
+    <div class="lot-info-row"><span>Disponibile</span><strong>${l.rimanenza} ${l.unita}</strong></div>
+    <div class="lot-info-row"><span>Scadenza</span><strong class="${scadCls}">${scadTxt}</strong></div>
     ${l.fornitore ? `<div class="lot-info-row"><span>Fornitore</span><strong>${esc(l.fornitore)}</strong></div>` : ''}
   `;
-  infoBox.classList.add('visible');
+  info.classList.add('show');
 }
 
 function validateQtyScarico() {
-  const lotto  = document.getElementById('s-lotto').value;
-  const qtyEl  = document.getElementById('s-qty');
-  const errEl  = document.getElementById('s-qty-error');
-  const qty    = parseFloat(qtyEl.value);
-  const l      = S.lottiScarico.find(x => x.lotto === lotto);
-
+  const lotto = document.getElementById('s-lotto').value;
+  const qtyEl = document.getElementById('s-qty');
+  const errEl = document.getElementById('s-qty-error');
+  const qty   = parseFloat(qtyEl.value);
+  const l     = S.lottiScarico.find(x => x.lotto === lotto);
   if (l && qty > 0 && qty > l.rimanenza) {
     errEl.textContent = `Non puoi scaricare più di ${l.rimanenza} ${l.unita} disponibili`;
-    errEl.classList.add('visible');
-    qtyEl.classList.add('input-error-ul');
-    return false;
+    errEl.classList.add('show'); qtyEl.classList.add('error'); return false;
   }
-  errEl.textContent = '';
-  errEl.classList.remove('visible');
-  qtyEl.classList.remove('input-error-ul');
+  errEl.textContent = ''; errEl.classList.remove('show'); qtyEl.classList.remove('error');
   return true;
 }
 
@@ -898,102 +1331,106 @@ async function submitScarico() {
   const prodotto = document.getElementById('s-prodotto').value;
   const lotto    = document.getElementById('s-lotto').value;
   const qty      = parseFloat(document.getElementById('s-qty').value);
-
   if (!prodotto)        { toast('Seleziona il prodotto', 'error'); return; }
   if (!lotto)           { toast('Seleziona il lotto', 'error'); return; }
   if (!qty || qty <= 0) { toast('Inserisci una quantità valida', 'error'); return; }
   if (!validateQtyScarico()) return;
 
-  const btn = document.getElementById('btn-pubblica-scarico');
-  btn.disabled = true; btn.textContent = 'Salvataggio…';
+  const btn = document.getElementById('btn-scarico');
+  btn.classList.add('loading'); btn.disabled = true;
 
-  const data = await api('/api/scarico', { method: 'POST', body: { prodotto, lotto, qty } });
+  const motivo = document.getElementById('s-motivo').value;
+  const data = await api('/api/scarico', { method: 'POST', body: { prodotto, lotto, qty, motivo } });
 
-  btn.disabled = false; btn.textContent = 'Salva';
+  btn.classList.remove('loading'); btn.disabled = false;
 
   if (data.success) {
-    toast(`Scarico registrato ✓  (rimanenza: ${data.rimanenza})`, 'success');
+    toast(`Scarico registrato — rimasto: ${data.rimanenza}`, 'success');
     document.getElementById('s-qty').value = '';
-    switchTab('home');
     await Promise.all([loadGiacenze(), loadAlerts(), loadFeed()]);
     renderScaricoProdotti();
     await onProdottoScarico();
-  } else {
-    toast(data.error || 'Errore durante lo scarico', 'error');
-  }
+  } else { toast(data.error || 'Errore durante lo scarico', 'error'); }
 }
 
-// ── GIACENZE ───────────────────────────────────────────────────────────────
+// ── GIACENZE ─────────────────────────────────────────────────────────────
 async function loadGiacenze() {
   const data = await api('/api/giacenze');
   S.giacenze = data.giacenze || [];
-  if (document.querySelector('.tab-btn.active')?.dataset.tab === 'giacenze') {
-    renderCatFilter();
-    renderGiacenze();
-  }
-}
-
-function renderCatFilter() {
-  const cats = [...new Set(S.giacenze.map(g => g.categoria).filter(Boolean))].sort();
-  const el   = document.getElementById('cat-filter');
-  if (!cats.length) { el.style.display = 'none'; return; }
-  el.style.display = 'flex';
-  el.innerHTML = ['Tutti', ...cats].map(c =>
-    `<button class="cat-chip${(S.activeCat === c || (!S.activeCat && c==='Tutti')) ? ' active' : ''}"
-      onclick="S.activeCat=(this.textContent==='Tutti'?'':this.textContent);renderGiacenze();renderCatFilter()"
-    >${esc(c)}</button>`
-  ).join('');
+  if (S.activePage === 'giacenze') { updateFornitoriFilter(); renderGiacenze(); }
 }
 
 function renderGiacenze() {
   const q    = (document.getElementById('search-giacenze').value || '').toLowerCase();
-  let list   = S.giacenze;
-  if (S.activeCat) list = list.filter(g => g.categoria === S.activeCat);
-  if (q)           list = list.filter(g => g.prodotto.toLowerCase().includes(q));
+  const forn = document.getElementById('filter-fornitore').value;
+  const cat  = document.getElementById('filter-categoria').value;
   const el   = document.getElementById('giacenze-list');
+
+  let list = [...S.giacenze];
+  if (q)                           list = list.filter(g => g.prodotto.toLowerCase().includes(q));
+  if (forn)                        list = list.filter(g => g.fornitore === forn);
+  if (cat)                         list = list.filter(g => g.categoria === cat);
+  if (S.giacFilter === 'scadenza') list = list.filter(g => g.prossima_scadenza && daysTo(g.prossima_scadenza) <= 7);
+  if (S.giacFilter === 'scorta')   list = list.filter(g => g.sotto_scorta);
+
+  list.sort((a, b) => {
+    if (!a.prossima_scadenza && !b.prossima_scadenza) return 0;
+    if (!a.prossima_scadenza) return 1;
+    if (!b.prossima_scadenza) return -1;
+    return new Date(a.prossima_scadenza) - new Date(b.prossima_scadenza);
+  });
 
   if (!list.length) {
     el.innerHTML = `<div class="empty-state">
-      <div class="empty-icon"><svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg></div>
-      <div class="empty-label">${q ? 'Nessun prodotto trovato' : 'Nessuna giacenza'}</div>
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+      <p>${q ? 'Nessun prodotto trovato' : 'Nessuna giacenza'}</p>
     </div>`;
     return;
   }
 
-  el.innerHTML = `<div class="ig-grid">${list.map(g => {
-    const nearExp = g.prossima_scadenza ? daysTo(g.prossima_scadenza) : null;
-    const dotCls  = g.sotto_scorta ? 'warn'
-                  : nearExp !== null && nearExp < 0  ? 'danger'
-                  : nearExp !== null && nearExp <= 7  ? 'warn'
-                  : 'ok';
-    const idx = S.giacenze.indexOf(g);
-    return `<div class="ig-cell" onclick="showLotDetail(S.giacenze[${idx}])">
-      <div class="ig-cell-dot ${dotCls}"></div>
-      <div class="ig-cell-name">${esc(g.prodotto)}</div>
-      <div class="ig-cell-qty">${g.totale}</div>
-      <div class="ig-cell-unit">${esc(g.unita)}</div>
+  el.innerHTML = list.map(g => {
+    const idx      = S.giacenze.indexOf(g);
+    const lotsHtml = g.lotti.map(l => {
+      const giorni = l.scadenza ? daysTo(l.scadenza) : null;
+      const cls    = giorni === null ? '' : giorni < 0 ? 'scad-danger' : giorni <= 7 ? 'scad-warn' : 'scad-ok';
+      return `<div class="giac-lot-row">
+        <span class="giac-lot-code">${esc(l.lotto)}</span>
+        ${l.scadenza ? `<span class="scad-badge ${cls}">${fmtDate(l.scadenza)}</span>` : ''}
+        <span class="giac-lot-qty">${l.rimanenza}&nbsp;${esc(g.unita)}</span>
+      </div>`;
+    }).join('');
+    return `<div class="giac-card" onclick="showLotDetail(S.giacenze[${idx}])">
+      <div class="giac-top">
+        <div>
+          <div class="giac-name">${esc(g.prodotto)}</div>
+          <div class="giac-fornitore">${esc(g.fornitore||'—')}${g.categoria?`&nbsp;·&nbsp;<span class="cat-badge">${esc(g.categoria)}</span>`:''}</div>
+        </div>
+        <div>
+          <div class="giac-qty-big">${g.totale}</div>
+          <div class="giac-unit">${esc(g.unita)}</div>
+        </div>
+      </div>
+      <div class="giac-lots">${lotsHtml}</div>
     </div>`;
-  }).join('')}</div>`;
+  }).join('');
 }
 
-// ── ALERT ──────────────────────────────────────────────────────────────────
+// ── ALERTS ───────────────────────────────────────────────────────────────
 async function loadAlerts() {
-  const data = await api('/api/alerts');
-  S.alerts = data;
+  const data  = await api('/api/alerts');
+  S.alerts    = data;
   const count = data.count || 0;
 
-  const badge = document.getElementById('tab-alert-badge');
-  badge.textContent   = count > 0 ? count : '';
-  badge.style.display = count > 0 ? 'flex' : 'none';
+  const badge = document.getElementById('drw-alert-badge');
+  badge.textContent = count > 0 ? count : '';
+  badge.classList.toggle('show', count > 0);
 
-  const dot = document.getElementById('hdr-alert-dot');
-  dot.style.display = count > 0 ? 'block' : 'none';
+  document.getElementById('hdr-alert-dot').style.display = count > 0 ? 'block' : 'none';
 
-  renderHome(); // Aggiorna badge sulla home card
+  const num = document.getElementById('home-alert-num');
+  if (num) num.textContent = count;
 
-  if (document.querySelector('.tab-btn.active')?.dataset.tab === 'alert') {
-    renderAlerts();
-  }
+  if (S.activePage === 'alert') renderAlerts();
 }
 
 function renderAlerts() {
@@ -1002,31 +1439,28 @@ function renderAlerts() {
 
   if (!scadenze.length && !scorte.length) {
     el.innerHTML = `<div class="empty-state">
-      <div class="empty-ok"><svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></div>
-      <div class="empty-label" style="color:var(--success)">Nessun alert — tutto a posto</div>
+      <svg width="44" height="44" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+      <p style="color:var(--success);font-weight:600">Nessun alert — tutto a posto</p>
     </div>`;
     return;
   }
 
   let html = '';
-
   if (scadenze.length) {
-    html += `<div class="alerts-block">
-      <div class="alert-section-title">Scadenze (${scadenze.length})</div>`;
+    html += `<div class="alert-sec-hdr">In scadenza (${scadenze.length})</div>`;
     html += scadenze.map(a => {
       const isScad = a.tipo === 'scaduto';
-      const cls    = isScad ? 'red' : 'orange';
-      const ggTxt  = a.giorni === null ? '' :
-                     a.giorni < 0 ? 'Scaduto' :
-                     a.giorni === 0 ? 'Scade oggi!' : `${a.giorni} giorni`;
-      const ggCls  = isScad ? 'red' : a.giorni !== null && a.giorni <= 3 ? 'red' : 'orange';
+      const cls    = isScad ? 'danger' : 'warning';
+      const ggTxt  = a.giorni===null ? '' : a.giorni<0 ? 'Scaduto' : a.giorni===0 ? 'Scade oggi' : `${a.giorni} giorni`;
+      const ggCls  = isScad ? 'red' : (a.giorni!==null && a.giorni<=3 ? 'red' : 'orange');
       return `<div class="alert-card ${cls}">
-        <div class="alert-indicator"></div>
-        <div class="alert-left">
+        <div class="alert-ico ${cls}">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+        <div class="alert-info">
           <div class="alert-prodotto">${esc(a.prodotto)}</div>
-          <div class="alert-sub">Lotto&nbsp;${esc(a.lotto)}&nbsp;·&nbsp;${a.scadenza ? fmtDate(a.scadenza) : '—'}</div>
-          ${a.fornitore ? `<div class="alert-sub">${esc(a.fornitore)}</div>` : ''}
-          ${a.categoria ? `<span class="cat-badge">${esc(a.categoria)}</span>` : ''}
+          <div class="alert-sub">Lotto ${esc(a.lotto)} · ${a.scadenza?fmtDate(a.scadenza):'—'}${a.fornitore?` · ${esc(a.fornitore)}`:''}</div>
+          ${a.categoria?`<span class="cat-badge">${esc(a.categoria)}</span>`:''}
         </div>
         <div class="alert-right">
           <div class="alert-qty">${a.rimanenza}&nbsp;${esc(a.unita)}</div>
@@ -1034,96 +1468,85 @@ function renderAlerts() {
         </div>
       </div>`;
     }).join('');
-    html += '</div>';
   }
-
   if (scorte.length) {
-    html += `<div class="alerts-block" style="${scadenze.length ? 'margin-top:24px' : ''}">
-      <div class="alert-section-title">Sotto scorta (${scorte.length})</div>`;
-    html += scorte.map(a => `<div class="alert-card yellow">
-      <div class="alert-indicator"></div>
-      <div class="alert-left">
+    html += `<div class="alert-sec-hdr"${scadenze.length?' style="margin-top:24px"':''}>Sotto scorta (${scorte.length})</div>`;
+    html += scorte.map(a => `<div class="alert-card scorta">
+      <div class="alert-ico scorta">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+      </div>
+      <div class="alert-info">
         <div class="alert-prodotto">${esc(a.prodotto)}</div>
-        <div class="alert-sub">${esc(a.fornitore || '—')}</div>
+        <div class="alert-sub">${esc(a.fornitore||'—')}</div>
       </div>
       <div class="alert-right">
         <div class="alert-qty">${a.totale}&nbsp;${esc(a.unita)}</div>
-        <div class="alert-days">min.&nbsp;${a.scorta_min}</div>
+        <div class="alert-days orange">min. ${a.scorta_min}</div>
       </div>
     </div>`).join('');
-    html += '</div>';
   }
-
   el.innerHTML = html;
 }
 
-// ── LOT DETAIL ─────────────────────────────────────────────────────────────
+// ── LOT DETAIL ────────────────────────────────────────────────────────────
 function showLotDetail(g) {
   document.getElementById('lot-detail-title').textContent = g.prodotto;
   const scortaNote = g.scorta_min > 0
-    ? `<div class="lot-detail-row"><span style="font-size:12px;color:var(--muted)">Scorta min.</span><span style="font-size:13px;font-weight:600">${g.scorta_min}&nbsp;${esc(g.unita)}</span></div>`
-    : '';
+    ? `<div class="lot-detail-row"><span style="font-size:12px;color:var(--muted)">Scorta minima</span><span style="font-weight:600">${g.scorta_min}&nbsp;${esc(g.unita)}</span></div>` : '';
   const lotsHtml = g.lotti.map(l => {
     const giorni = l.scadenza ? daysTo(l.scadenza) : null;
-    const cls    = giorni === null ? '' : giorni < 0 ? 'danger' : giorni <= 7 ? 'warn' : 'ok';
-    const scadTxt = l.scadenza ? fmtDate(l.scadenza) : '—';
+    const cls    = giorni===null ? 'scad-ok' : giorni<0 ? 'scad-danger' : giorni<=7 ? 'scad-warn' : 'scad-ok';
     return `<div class="lot-detail-row">
       <div>
         <div class="lot-detail-lotto">${esc(l.lotto)}</div>
         <div class="lot-detail-meta">${l.rimanenza}&nbsp;${esc(g.unita)}</div>
       </div>
-      ${l.scadenza ? `<span class="lot-scad ${cls}">${scadTxt}</span>` : ''}
+      ${l.scadenza ? `<span class="lot-scad-pill ${cls}">${fmtDate(l.scadenza)}</span>` : ''}
     </div>`;
   }).join('');
   document.getElementById('lot-detail-body').innerHTML = scortaNote + lotsHtml;
   document.getElementById('lot-detail-overlay').classList.add('open');
 }
-
 function closeLotDetail() {
   document.getElementById('lot-detail-overlay').classList.remove('open');
 }
 
-// ── ETICHETTA MODAL ────────────────────────────────────────────────────────
+// ── ETICHETTA ─────────────────────────────────────────────────────────────
 function showEtichetta(d) {
   const oggi = new Date().toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric' });
-  document.getElementById('eti-content').innerHTML = `
-    <div class="eti-header">HACCP — Magazzino Cucina</div>
-    <div class="eti-row"><span>Prodotto</span>   <strong>${esc(d.prodotto)}</strong></div>
-    <div class="eti-row"><span>Fornitore</span>  <strong>${esc(d.fornitore || '—')}</strong></div>
-    <div class="eti-row"><span>Lotto</span>      <strong>${esc(d.lotto)}</strong></div>
-    <div class="eti-row"><span>Scadenza</span>   <strong>${d.scadenza ? fmtDate(d.scadenza) : '—'}</strong></div>
-    <div class="eti-row"><span>Quantità</span>   <strong>${d.qty}&nbsp;${esc(d.unita || '')}</strong></div>
+  const content = `
+    <div class="eti-hdr-lbl">HACCP — Magazzino Cucina</div>
+    <div class="eti-row"><span>Prodotto</span><strong>${esc(d.prodotto)}</strong></div>
+    <div class="eti-row"><span>Fornitore</span><strong>${esc(d.fornitore||'—')}</strong></div>
+    <div class="eti-row"><span>Lotto</span><strong>${esc(d.lotto)}</strong></div>
+    <div class="eti-row"><span>Scadenza</span><strong>${d.scadenza?fmtDate(d.scadenza):'—'}</strong></div>
+    <div class="eti-row"><span>Quantità</span><strong>${d.qty}&nbsp;${esc(d.unita||'')}</strong></div>
     <div class="eti-row"><span>Data carico</span><strong>${oggi}</strong></div>
-    <div class="eti-row eti-id"><span>ID Movimento</span><strong>${esc(d.movimento_id)}</strong></div>
+    <div class="eti-row"><span>ID Movimento</span><strong style="font-size:11px;opacity:.65">${esc(d.movimento_id)}</strong></div>
   `;
-  document.getElementById('modal-etichetta').classList.add('open');
-  toast('Carico registrato ✓', 'success');
+  const box = document.getElementById('eti-box-inline');
+  if (box) { box.innerHTML = content; box.classList.add('show'); box.scrollIntoView({ behavior:'smooth', block:'center' }); }
+  document.getElementById('eti-content').innerHTML = content;
+  toast('Carico registrato', 'success');
 }
+function closeModal() { document.getElementById('modal-etichetta').classList.remove('open'); }
+function bgClose(e)   { if (e.target === document.getElementById('modal-etichetta')) closeModal(); }
 
-function closeModal() {
-  document.getElementById('modal-etichetta').classList.remove('open');
-}
-function bgClose(e) {
-  if (e.target === document.getElementById('modal-etichetta')) closeModal();
-}
-
-// ── SYNC ───────────────────────────────────────────────────────────────────
+// ── SYNC ──────────────────────────────────────────────────────────────────
 async function syncAll() {
   const btn = document.getElementById('btn-sync');
   btn.classList.add('spinning');
-  toast('Sincronizzazione in corso…', 'info');
+  toast('Sincronizzazione…', 'info');
   const data = await api('/api/sync', { method: 'POST' });
   btn.classList.remove('spinning');
   if (data.success) {
-    await Promise.all([loadProdottiCarico(), loadGiacenze(), loadAlerts(), loadFeed()]);
+    await Promise.all([loadProdottiCarico(), loadGiacenze(), loadAlerts()]);
     renderScaricoProdotti();
     toast(`Sincronizzato: ${data.listino} prodotti, ${data.registro} movimenti`, 'success');
-  } else {
-    toast(data.error || 'Errore sincronizzazione', 'error');
-  }
+  } else { toast(data.error || 'Errore sincronizzazione', 'error'); }
 }
 
-// ── UTILS ──────────────────────────────────────────────────────────────────
+// ── UTILITIES ────────────────────────────────────────────────────────────
 async function api(url, opts = {}) {
   try {
     const res = await fetch(url, {
@@ -1138,13 +1561,11 @@ async function api(url, opts = {}) {
     return { success: false, error: e.message };
   }
 }
-
 function fmtDate(iso) {
   if (!iso) return '—';
   const [y, m, d] = iso.split('-');
   return `${d}/${m}/${y}`;
 }
-
 function daysTo(iso) {
   if (!iso) return null;
   try {
@@ -1152,14 +1573,12 @@ function daysTo(iso) {
     return Math.round((new Date(iso + 'T00:00:00') - today) / 86400000);
   } catch { return null; }
 }
-
 function esc(s) {
   if (s === null || s === undefined) return '';
   return String(s)
     .replace(/&/g,'&amp;').replace(/</g,'&lt;')
     .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
-
 let _toastT;
 function toast(msg, type = 'info') {
   const el = document.getElementById('toast');
@@ -1170,9 +1589,10 @@ function toast(msg, type = 'info') {
 }
 
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeModal(); closeLotDetail(); }
+  if (e.key === 'Escape') { closeModal(); closeLotDetail(); closeDrawer(); }
 });
 
+// ── BOOT ─────────────────────────────────────────────────────────────────
 init();
 
 if ('serviceWorker' in navigator) {

@@ -270,6 +270,23 @@ main {
 }
 .hcard-alert-lbl { font-size: 12px; color: var(--muted); }
 
+/* ─── BACK BAR ──────────────────────────────────────────────────────────── */
+.back-bar {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 20px; cursor: pointer;
+  width: fit-content;
+}
+.back-bar:active { opacity: .6; }
+.back-arrow {
+  width: 32px; height: 32px; border-radius: 10px;
+  background: rgba(15,31,61,.07);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; color: var(--navy);
+  transition: background .15s;
+}
+.back-bar:hover .back-arrow { background: rgba(15,31,61,.12); }
+.back-label { font-size: 15px; font-weight: 600; color: var(--navy); }
+
 /* ─── PAGE HEADER ───────────────────────────────────────────────────────── */
 .pg-title { font-size: 22px; font-weight: 700; color: var(--navy); margin-bottom: 2px; }
 .pg-sub   { font-size: 13px; color: var(--muted); margin-bottom: 22px; }
@@ -822,14 +839,14 @@ main {
       </div>
 
     </div>
-
-    <!-- Feed movimenti recenti -->
-    <div id="home-feed" style="margin-top:20px"></div>
   </section>
 
   <!-- CARICO -->
   <section class="page" id="page-carico">
-    <div class="pg-title">Registrazione Carico</div>
+    <div class="back-bar" onclick="navTo('home')">
+      <div class="back-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+      <span class="back-label">Carico</span>
+    </div>
     <div class="pg-sub">I campi contrassegnati con * sono obbligatori</div>
 
     <div class="form-card">
@@ -897,7 +914,10 @@ main {
 
   <!-- SCARICO -->
   <section class="page" id="page-scarico">
-    <div class="pg-title">Registrazione Scarico</div>
+    <div class="back-bar" onclick="navTo('home')">
+      <div class="back-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+      <span class="back-label">Scarico</span>
+    </div>
     <div class="pg-sub">Seleziona il prodotto e il lotto da scaricare</div>
 
     <div class="form-card">
@@ -946,7 +966,10 @@ main {
 
   <!-- GIACENZE -->
   <section class="page" id="page-giacenze">
-    <div class="pg-title">Giacenze</div>
+    <div class="back-bar" onclick="navTo('home')">
+      <div class="back-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+      <span class="back-label">Giacenze</span>
+    </div>
 
     <div class="search-wrap">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
@@ -983,7 +1006,10 @@ main {
 
   <!-- ALERT -->
   <section class="page" id="page-alert">
-    <div class="pg-title">Alert</div>
+    <div class="back-bar" onclick="navTo('home')">
+      <div class="back-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+      <span class="back-label">Alert</span>
+    </div>
     <div id="alerts-content">
       <div class="empty-state">
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>

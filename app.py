@@ -3,6 +3,7 @@ import re
 import json
 import random
 import string
+import threading
 from datetime import datetime, timedelta
 from functools import wraps
 
@@ -98,14 +99,17 @@ if not get_user_by_login('admin@admin.com'):
         role='admin',
     )
 
-try:
-    listino  = load_listino()
-    replace_listino(listino)
-    registro = load_registro()
-    replace_registro(registro)
-    print(f"[INIT] Listino: {len(listino)} prodotti | Registro: {len(registro)} movimenti")
-except Exception as e:
-    print(f"[INIT] Sheets non raggiungibile: {e}")
+def _sync_sheets_background():
+    try:
+        listino  = load_listino()
+        replace_listino(listino)
+        registro = load_registro()
+        replace_registro(registro)
+        print(f"[SYNC] Listino: {len(listino)} prodotti | Registro: {len(registro)} movimenti")
+    except Exception as e:
+        print(f"[SYNC] Sheets non raggiungibile: {e}")
+
+threading.Thread(target=_sync_sheets_background, daemon=True).start()
 
 
 # ─── AUTH ─────────────────────────────────────────────────────────────────────

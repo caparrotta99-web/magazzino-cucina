@@ -9,6 +9,16 @@ if DATABASE_URL.startswith('postgres://'):
     DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
 _USE_PG = bool(DATABASE_URL)
 
+# Supabase Transaction Pooler (port 6543) requires SSL and pgbouncer mode.
+# Inject both query params if not already present.
+if _USE_PG:
+    _sep = '&' if '?' in DATABASE_URL else '?'
+    if 'sslmode=' not in DATABASE_URL:
+        DATABASE_URL += _sep + 'sslmode=require'
+        _sep = '&'
+    if 'pgbouncer=' not in DATABASE_URL:
+        DATABASE_URL += _sep + 'pgbouncer=true'
+
 _data_dir = '/data' if os.path.isdir('/data') else os.path.dirname(__file__)
 DB_PATH = os.path.join(_data_dir, 'haccp.db')
 
@@ -39,7 +49,7 @@ class _DBConn:
 
     def __init__(self):
         if _USE_PG:
-            self._conn = psycopg2.connect(DATABASE_URL)
+            self._conn = psycopg2.connect(DATABASE_URL, sslmode='require')
             self._cur  = self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             self._sqlite = False
         else:

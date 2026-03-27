@@ -3,25 +3,30 @@ import re
 import sqlite3
 from datetime import date, timedelta
 from collections import OrderedDict
-from urllib.parse import urlparse, unquote
+from urllib.parse import unquote
 
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 if DATABASE_URL.startswith('postgres://'):
     DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
 _USE_PG = bool(DATABASE_URL)
 
-# Parse DATABASE_URL into individual components so psycopg2 receives them
-# as plain strings — avoids any URI percent-encoding issues with passwords.
-if _USE_PG:
-    _parsed = urlparse(DATABASE_URL)
-    _PG_PARAMS = {
-        'host':     _parsed.hostname,
-        'port':     _parsed.port or 5432,
-        'dbname':   _parsed.path.lstrip('/'),
-        'user':     unquote(_parsed.username or ''),
-        'password': unquote(_parsed.password or ''),
+
+def _parse_db_url(url):
+    m = re.match(r'postgresql://([^:]+):([^@]+)@([^:]+):(\d+)/(.+?)(\?.*)?$', url)
+    if not m:
+        raise ValueError(f"Invalid DATABASE_URL")
+    return {
+        'user':     unquote(m.group(1)),
+        'password': unquote(m.group(2)),
+        'host':     m.group(3),
+        'port':     int(m.group(4)),
+        'dbname':   m.group(5).split('?')[0],
         'sslmode':  'require',
     }
+
+
+if _USE_PG:
+    _PG_PARAMS = _parse_db_url(DATABASE_URL)
     print(f"[DB] host={_PG_PARAMS['host']} port={_PG_PARAMS['port']} "
           f"dbname={_PG_PARAMS['dbname']} user={_PG_PARAMS['user']}", flush=True)
 

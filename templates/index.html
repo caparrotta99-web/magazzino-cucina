@@ -528,6 +528,29 @@ main {
   letter-spacing: .6px; color: var(--muted); margin: 16px 0 10px;
 }
 .alert-sec-hdr:first-child { margin-top: 0; }
+.alert-cat-group { margin-bottom: 24px; }
+.alert-cat-hdr {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 12px; font-weight: 700; text-transform: uppercase;
+  letter-spacing: .5px; color: var(--navy);
+  padding: 0 4px; margin-bottom: 10px;
+}
+.alert-cat-hdr::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.alert-cat-icon {
+  font-size: 14px; line-height: 1; flex-shrink: 0;
+}
+.alert-cat-count {
+  font-size: 10px; font-weight: 600; color: var(--muted);
+  background: #f1f5f9; border-radius: 100px;
+  padding: 1px 7px; flex-shrink: 0;
+}
+.alert-type-tag {
+  font-size: 10px; font-weight: 600; letter-spacing: .4px;
+  padding: 2px 7px; border-radius: 100px; flex-shrink: 0;
+}
+.alert-type-tag.scad  { background: rgba(217,119,6,.1);  color: var(--warning); }
+.alert-type-tag.scad.red { background: rgba(220,38,38,.1); color: var(--error); }
+.alert-type-tag.scorta { background: rgba(245,158,11,.1); color: #b45309; }
 .alert-card {
   background: rgba(255,255,255,.92);
   backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
@@ -1157,6 +1180,11 @@ main {
       <div class="back-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
       <span class="back-label">Alert</span>
     </div>
+
+    <div class="filter-row" id="alert-filter-row" style="margin-bottom:18px">
+      <!-- populated by renderAlertFilters() -->
+    </div>
+
     <div id="alerts-content">
       <div class="empty-state">
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
@@ -1257,6 +1285,8 @@ const S = {
   giacFilter:   'all',
   listaSpesa:      [],
   spesaFornFilter: 'all',
+  alertTypeFilter: 'all',   // 'all' | 'scadenza' | 'scorta'
+  alertCatFilter:  'all',   // 'all' | category name
 };
 
 // ── INIT ─────────────────────────────────────────────────────────────────
@@ -1660,9 +1690,56 @@ async function loadAlerts() {
   if (S.activePage === 'alert') renderAlerts();
 }
 
+const _ALERT_CAT_ICONS = {
+  'Carne':'🥩','Pesce':'🐟','Verdure':'🥬','Latticini':'🧀',
+  'Secchi':'📦','Bevande':'🥤','Surgelati':'❄️','Spezie':'🌶️',
+};
+const _ALERT_CAT_ORDER = ['Carne','Pesce','Verdure','Latticini','Secchi','Bevande','Surgelati','Spezie'];
+
+function setAlertTypeFilter(val) {
+  S.alertTypeFilter = val;
+  renderAlertFilters();
+  renderAlerts();
+}
+function setAlertCatFilter(val) {
+  S.alertCatFilter = S.alertCatFilter === val ? 'all' : val;
+  renderAlertFilters();
+  renderAlerts();
+}
+
+function renderAlertFilters() {
+  const row = document.getElementById('alert-filter-row');
+  if (!row) return;
+  const { scadenze, scorte } = S.alerts;
+  const allItems = [
+    ...scadenze.map(a => ({ ...a, _type: 'scadenza' })),
+    ...scorte.map(a => ({ ...a, _type: 'scorta' })),
+  ];
+  const catsPresent = [...new Set(allItems.map(a => a.categoria).filter(Boolean))];
+  const sortedCats = [
+    ..._ALERT_CAT_ORDER.filter(c => catsPresent.includes(c)),
+    ...catsPresent.filter(c => !_ALERT_CAT_ORDER.includes(c)).sort(),
+  ];
+  const typeFilters = [
+    { val: 'all',     lbl: 'Tutti' },
+    { val: 'scadenza', lbl: 'In scadenza' },
+    { val: 'scorta',   lbl: 'Sotto scorta' },
+  ];
+  row.innerHTML = [
+    ...typeFilters.map(f =>
+      `<button class="fpill ${S.alertTypeFilter === f.val ? 'active' : ''}" onclick="setAlertTypeFilter('${f.val}')">${f.lbl}</button>`
+    ),
+    ...sortedCats.map(c =>
+      `<button class="fpill ${S.alertCatFilter === c ? 'active' : ''}" onclick="setAlertCatFilter('${esc(c)}')">${_ALERT_CAT_ICONS[c] || ''} ${esc(c)}</button>`
+    ),
+  ].join('');
+}
+
 function renderAlerts() {
   const el = document.getElementById('alerts-content');
   const { scadenze, scorte } = S.alerts;
+
+  renderAlertFilters();
 
   if (!scadenze.length && !scorte.length) {
     el.innerHTML = `<div class="empty-state">
@@ -1672,46 +1749,97 @@ function renderAlerts() {
     return;
   }
 
-  let html = '';
-  if (scadenze.length) {
-    html += `<div class="alert-sec-hdr">In scadenza (${scadenze.length})</div>`;
-    html += scadenze.map(a => {
-      const isScad = a.tipo === 'scaduto';
-      const cls    = isScad ? 'danger' : 'warning';
-      const ggTxt  = a.giorni===null ? '' : a.giorni<0 ? 'Scaduto' : a.giorni===0 ? 'Scade oggi' : `${a.giorni} giorni`;
-      const ggCls  = isScad ? 'red' : (a.giorni!==null && a.giorni<=3 ? 'red' : 'orange');
-      return `<div class="alert-card ${cls}">
-        <div class="alert-ico ${cls}">
-          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        </div>
-        <div class="alert-info">
-          <div class="alert-prodotto">${esc(a.prodotto)}</div>
-          <div class="alert-sub">Lotto ${esc(a.lotto)} · ${a.scadenza?fmtDate(a.scadenza):'—'}${a.fornitore?` · ${esc(a.fornitore)}`:''}</div>
-          ${a.categoria?`<span class="cat-badge">${esc(a.categoria)}</span>`:''}
-        </div>
-        <div class="alert-right">
-          <div class="alert-qty">${a.rimanenza}&nbsp;${esc(a.unita)}</div>
-          <div class="alert-days ${ggCls}">${ggTxt}</div>
-        </div>
-      </div>`;
-    }).join('');
+  // Flatten all items with type tag
+  let items = [
+    ...scadenze.map(a => ({ ...a, _type: 'scadenza' })),
+    ...scorte.map(a => ({ ...a, _type: 'scorta' })),
+  ];
+
+  // Apply type filter
+  if (S.alertTypeFilter !== 'all') {
+    items = items.filter(a => a._type === S.alertTypeFilter);
   }
-  if (scorte.length) {
-    html += `<div class="alert-sec-hdr"${scadenze.length?' style="margin-top:24px"':''}>Sotto scorta (${scorte.length})</div>`;
-    html += scorte.map(a => {
-      const inLista = S.listaSpesa.some(i => i.prodotto === a.prodotto && i.fornitore === a.fornitore);
-      const btnCls  = inLista ? 'btn-add-spesa in-lista' : 'btn-add-spesa';
-      const btnEvt  = inLista ? '' : `onclick="addToListaFromAlert(${esc(JSON.stringify(a))})"`;
-      const btnIco  = inLista
-        ? `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`
-        : `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>`;
-      return `<div class="alert-card scorta">
+  // Apply category filter
+  if (S.alertCatFilter !== 'all') {
+    items = items.filter(a => (a.categoria || '') === S.alertCatFilter);
+  }
+
+  if (!items.length) {
+    el.innerHTML = `<div class="empty-state"><p>Nessun alert per questo filtro</p></div>`;
+    return;
+  }
+
+  // Group by categoria
+  const groups = {};
+  for (const item of items) {
+    const cat = (item.categoria || '').trim() || 'Altro';
+    if (!groups[cat]) groups[cat] = [];
+    groups[cat].push(item);
+  }
+  // Sort within groups: scaduti first, then by urgency
+  for (const g of Object.values(groups)) {
+    g.sort((a, b) => {
+      if (a._type !== b._type) return a._type === 'scadenza' ? -1 : 1;
+      if (a._type === 'scadenza') return (a.giorni ?? 999) - (b.giorni ?? 999);
+      return a.prodotto.localeCompare(b.prodotto, 'it');
+    });
+  }
+  const orderedCats = [
+    ..._ALERT_CAT_ORDER.filter(c => groups[c]),
+    ...Object.keys(groups).filter(c => !_ALERT_CAT_ORDER.includes(c)).sort(),
+  ];
+
+  el.innerHTML = orderedCats.map(cat => {
+    const icon  = _ALERT_CAT_ICONS[cat] || '📋';
+    const count = groups[cat].length;
+    const cardsHtml = groups[cat].map(a => _renderAlertCard(a)).join('');
+    return `<div class="alert-cat-group">
+      <div class="alert-cat-hdr">
+        <span class="alert-cat-icon">${icon}</span>
+        ${esc(cat)}
+        <span class="alert-cat-count">${count}</span>
+      </div>
+      ${cardsHtml}
+    </div>`;
+  }).join('');
+}
+
+function _renderAlertCard(a) {
+  if (a._type === 'scadenza') {
+    const isScad = a.tipo === 'scaduto';
+    const cls    = isScad ? 'danger' : 'warning';
+    const ggTxt  = a.giorni === null ? '' : a.giorni < 0 ? 'Scaduto' : a.giorni === 0 ? 'Scade oggi' : `${a.giorni}gg`;
+    const ggCls  = isScad ? 'red' : (a.giorni !== null && a.giorni <= 3 ? 'red' : 'orange');
+    const tagCls = isScad ? 'scad red' : 'scad';
+    return `<div class="alert-card ${cls}">
+      <div class="alert-ico ${cls}">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      </div>
+      <div class="alert-info">
+        <div class="alert-prodotto">${esc(a.prodotto)}</div>
+        <div class="alert-sub">
+          ${a.lotto ? `Lotto <strong>${esc(a.lotto)}</strong> · ` : ''}${a.scadenza ? fmtDate(a.scadenza) : '—'}${a.fornitore ? ` · ${esc(a.fornitore)}` : ''}
+        </div>
+      </div>
+      <div class="alert-right">
+        <div class="alert-qty">${a.rimanenza}&nbsp;${esc(a.unita)}</div>
+        <div class="alert-days ${ggCls}">${ggTxt}</div>
+      </div>
+    </div>`;
+  } else {
+    const inLista = S.listaSpesa.some(i => i.prodotto === a.prodotto && i.fornitore === a.fornitore);
+    const btnCls  = inLista ? 'btn-add-spesa in-lista' : 'btn-add-spesa';
+    const btnEvt  = inLista ? '' : `onclick="addToListaFromAlert(${esc(JSON.stringify(a))})"`;
+    const btnIco  = inLista
+      ? `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>`
+      : `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>`;
+    return `<div class="alert-card scorta">
       <div class="alert-ico scorta">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
       </div>
       <div class="alert-info">
         <div class="alert-prodotto">${esc(a.prodotto)}</div>
-        <div class="alert-sub">${esc(a.fornitore||'—')}</div>
+        <div class="alert-sub">${esc(a.fornitore || '—')}</div>
       </div>
       <div class="alert-right">
         <div class="alert-qty">${a.totale}&nbsp;${esc(a.unita)}</div>
@@ -1719,9 +1847,7 @@ function renderAlerts() {
       </div>
       <button class="${btnCls}" ${btnEvt} title="${inLista ? 'Già in lista' : 'Aggiungi alla lista spesa'}">${btnIco}</button>
     </div>`;
-    }).join('');
   }
-  el.innerHTML = html;
 }
 
 async function addToListaFromAlert(a) {

@@ -46,6 +46,7 @@ class _DBConn:
 
     def __init__(self):
         if _USE_PG:
+            print(f"[DB] Connecting to: {_PG_DSN[:50]}...", flush=True)
             self._conn = psycopg2.connect(_PG_DSN)
             self._cur  = self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             self._sqlite = False

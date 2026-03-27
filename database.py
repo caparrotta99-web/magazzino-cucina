@@ -3,18 +3,27 @@ import re
 import sqlite3
 from datetime import date, timedelta
 from collections import OrderedDict
+from urllib.parse import urlparse, unquote
 
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 if DATABASE_URL.startswith('postgres://'):
     DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
 _USE_PG = bool(DATABASE_URL)
 
-# Build a clean connection URL for psycopg2: strip all query params, then
-# re-add only sslmode=require (required by Supabase; pgbouncer=true is NOT
-# supported by psycopg2 and must not be included).
+# Parse DATABASE_URL into individual components so psycopg2 receives them
+# as plain strings — avoids any URI percent-encoding issues with passwords.
 if _USE_PG:
-    _base_url = DATABASE_URL.split('?')[0]
-    _PG_DSN = _base_url + '?sslmode=require'
+    _parsed = urlparse(DATABASE_URL)
+    _PG_PARAMS = {
+        'host':     _parsed.hostname,
+        'port':     _parsed.port or 5432,
+        'dbname':   _parsed.path.lstrip('/'),
+        'user':     unquote(_parsed.username or ''),
+        'password': unquote(_parsed.password or ''),
+        'sslmode':  'require',
+    }
+    print(f"[DB] host={_PG_PARAMS['host']} port={_PG_PARAMS['port']} "
+          f"dbname={_PG_PARAMS['dbname']} user={_PG_PARAMS['user']}", flush=True)
 
 _data_dir = '/data' if os.path.isdir('/data') else os.path.dirname(__file__)
 DB_PATH = os.path.join(_data_dir, 'haccp.db')
@@ -46,8 +55,7 @@ class _DBConn:
 
     def __init__(self):
         if _USE_PG:
-            print(f"[DB] Connecting to: {_PG_DSN[:50]}...", flush=True)
-            self._conn = psycopg2.connect(_PG_DSN)
+            self._conn = psycopg2.connect(**_PG_PARAMS)
             self._cur  = self._conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
             self._sqlite = False
         else:

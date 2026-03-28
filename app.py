@@ -27,7 +27,7 @@ from database import (
     create_user, get_user_by_login, get_user_by_id,
     get_all_users, update_user_role, delete_user,
     create_reset_token, get_reset_token, use_reset_token, update_user_password,
-    update_user_profile, update_user_reparto, is_contact_taken, get_feed,
+    update_user_profile, update_user_reparto, is_username_taken, get_feed,
     get_lista_spesa, add_lista_spesa_item, update_lista_spesa_completato,
     delete_lista_spesa_item, clear_lista_spesa,
 )
@@ -44,12 +44,11 @@ login_manager.login_view = 'login_page'
 
 class User(UserMixin):
     def __init__(self, data):
-        self.id      = str(data['id'])
-        self.nome    = data['nome']
-        self.email   = data.get('email') or ''
-        self.telefono = data.get('telefono') or ''
-        self.reparto = data.get('reparto') or ''
-        self.role    = data.get('role', 'staff')
+        self.id       = str(data['id'])
+        self.nome     = data['nome']
+        self.username = data.get('username') or ''
+        self.reparto  = data.get('reparto') or ''
+        self.role     = data.get('role', 'staff')
 
 
 @login_manager.user_loader
@@ -90,11 +89,10 @@ def _gen_etichetta(prodotto, lotto, scadenza):
 db_init()
 
 # Crea utente admin di default se non esiste
-if not get_user_by_login('admin@admin.com'):
+if not get_user_by_login('admin'):
     create_user(
         nome='Admin',
-        email='admin@admin.com',
-        telefono=None,
+        username='admin',
         password_hash=generate_password_hash('admin123', method='pbkdf2:sha256'),
         reparto='',
         role='admin',
@@ -121,13 +119,13 @@ def login_page():
         return redirect(url_for('index'))
     error = None
     if request.method == 'POST':
-        identifier = (request.form.get('identifier') or '').strip()
-        password   = request.form.get('password') or ''
-        user_data  = get_user_by_login(identifier)
+        username  = (request.form.get('username') or '').strip()
+        password  = request.form.get('password') or ''
+        user_data = get_user_by_login(username)
         if user_data and check_password_hash(user_data['password'], password):
             login_user(User(user_data), remember=True)
             return redirect(url_for('index'))
-        error = 'Credenziali non corrette'
+        error = 'Username o password non corretti'
     return render_template('login.html', error=error)
 
 
@@ -137,32 +135,30 @@ def register_page():
         return redirect(url_for('index'))
     error = None
     if request.method == 'POST':
-        nome     = (request.form.get('nome') or '').strip()
-        email    = (request.form.get('email') or '').strip() or None
-        telefono = (request.form.get('telefono') or '').strip() or None
-        password = request.form.get('password') or ''
-        reparto  = (request.form.get('reparto') or '').strip()
+        nome     = (request.form.get('nome')     or '').strip()
+        username = (request.form.get('username') or '').strip().lower()
+        password = (request.form.get('password') or '')
+        reparto  = (request.form.get('reparto')  or '').strip()
 
         if not nome:
             error = 'Inserisci il tuo nome'
         elif len(nome) < 2:
             error = 'Nome troppo corto'
-        elif not email and not telefono:
-            error = 'Inserisci email o numero di telefono'
+        elif not username:
+            error = 'Inserisci un username'
+        elif len(username) < 3:
+            error = 'Username troppo corto (minimo 3 caratteri)'
         elif len(password) < 6:
             error = 'Password troppo corta (minimo 6 caratteri)'
         elif not reparto:
             error = 'Seleziona il reparto'
-        elif email and get_user_by_login(email):
-            error = 'Email già registrata'
-        elif telefono and get_user_by_login(telefono):
-            error = 'Numero di telefono già registrato'
+        elif get_user_by_login(username):
+            error = 'Username già in uso'
         else:
             try:
-                create_user(nome, email, telefono,
+                create_user(nome, username,
                             generate_password_hash(password, method='pbkdf2:sha256'), reparto)
-                identifier = email or telefono
-                login_user(User(get_user_by_login(identifier)), remember=True)
+                login_user(User(get_user_by_login(username)), remember=True)
                 return redirect(url_for('index'))
             except Exception:
                 error = 'Errore durante la registrazione'
@@ -241,23 +237,22 @@ def profile():
 
     if request.method == 'POST':
         nome     = (request.form.get('nome')     or '').strip()
-        email    = (request.form.get('email')    or '').strip() or None
-        telefono = (request.form.get('telefono') or '').strip() or None
+        username = (request.form.get('username') or '').strip().lower()
         cur_pw   =  request.form.get('current_password') or ''
         new_pw   =  request.form.get('new_password')     or ''
         new_pw2  =  request.form.get('new_password2')    or ''
 
-        uid       = int(current_user.id)
-        is_admin  = current_user.role == 'admin'
+        uid      = int(current_user.id)
+        is_admin = current_user.role == 'admin'
 
         if not nome:
             error = 'Il nome non può essere vuoto'
-        elif not email and not telefono:
-            error = 'Inserisci almeno email o numero di telefono'
-        elif email    and is_contact_taken(email,    uid):
-            error = 'Email già in uso da un altro account'
-        elif telefono and is_contact_taken(telefono, uid):
-            error = 'Numero di telefono già in uso da un altro account'
+        elif not username:
+            error = 'L\'username non può essere vuoto'
+        elif len(username) < 3:
+            error = 'Username troppo corto (minimo 3 caratteri)'
+        elif is_username_taken(username, uid):
+            error = 'Username già in uso da un altro account'
         elif new_pw:
             if not check_password_hash(user['password'], cur_pw):
                 error = 'Password attuale non corretta'
@@ -266,14 +261,14 @@ def profile():
             elif new_pw != new_pw2:
                 error = 'Le nuove password non coincidono'
             else:
-                update_user_profile(uid, nome, email, telefono)
+                update_user_profile(uid, nome, username)
                 if is_admin:
                     update_user_reparto(uid, (request.form.get('reparto') or '').strip())
                 update_user_password(uid, generate_password_hash(new_pw, method='pbkdf2:sha256'))
                 success = 'Profilo e password aggiornati con successo'
                 user = get_user_by_id(uid)
         else:
-            update_user_profile(uid, nome, email, telefono)
+            update_user_profile(uid, nome, username)
             if is_admin:
                 update_user_reparto(uid, (request.form.get('reparto') or '').strip())
             success = 'Profilo aggiornato con successo'

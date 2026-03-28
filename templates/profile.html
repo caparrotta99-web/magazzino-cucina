@@ -153,29 +153,9 @@ input:disabled { opacity: .5; cursor: not-allowed; }
     </div>
 
     <div class="form-group">
-      <label>Email</label>
-      <input type="email" name="email"
-             value="{{ user.email or '' }}"
-             placeholder="non impostata"
-             autocomplete="email" inputmode="email">
-    </div>
-
-    <div class="form-group">
-      <label>Numero di Telefono</label>
-      <input type="tel" name="telefono"
-             value="{{ user.telefono or '' }}"
-             placeholder="non impostato"
-             autocomplete="tel" inputmode="tel">
-    </div>
-
-    <div class="form-group">
-      <label>Reparto</label>
-      {% if user.role == 'admin' %}
-      <input type="text" name="reparto" value="{{ user.reparto or '' }}" placeholder="es. Cucina, Sala…">
-      {% else %}
-      <input type="text" value="{{ user.reparto or '—' }}" disabled>
-      <span class="hint">Il reparto può essere modificato solo da un amministratore</span>
-      {% endif %}
+      <label>Username</label>
+      <input type="text" name="username" value="{{ user.username or '' }}" required
+             autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false">
     </div>
 
     <!-- ── CAMBIO PASSWORD ── -->

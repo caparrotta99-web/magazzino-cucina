@@ -195,6 +195,7 @@ def db_init():
         ('registro', 'operatore', "TEXT NOT NULL DEFAULT ''"),
         ('registro', 'reparto',   "TEXT NOT NULL DEFAULT ''"),
         ('listino',  'categoria', "TEXT NOT NULL DEFAULT ''"),
+        ('users',    'username',  "TEXT NOT NULL DEFAULT ''"),
     ]
     for table, col, defn in migrations:
         if _USE_PG:
@@ -438,26 +439,37 @@ def replace_registro(rows):
 
 # ─── USERS ───────────────────────────────────────────────────────────────────
 
-def create_user(nome, email, telefono, password_hash, reparto, role='staff'):
+def create_user(nome, username, password_hash, reparto, role='staff'):
     with get_conn() as conn:
         conn.execute(
-            "INSERT INTO users (nome, email, telefono, password, reparto, role) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (nome, email or None, telefono or None, password_hash, reparto, role)
+            "INSERT INTO users (nome, username, password, reparto, role) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (nome, username.strip().lower(), password_hash, reparto, role)
         )
 
 
-def get_user_by_login(identifier):
-    """Find user by email or telefono."""
-    identifier = (identifier or '').strip()
-    if not identifier:
+def get_user_by_login(username):
+    """Find user by username."""
+    username = (username or '').strip().lower()
+    if not username:
         return None
     with get_conn() as conn:
         cur = conn.execute(
-            "SELECT * FROM users WHERE email = ? OR telefono = ? LIMIT 1",
-            (identifier, identifier)
+            "SELECT * FROM users WHERE username = ? LIMIT 1",
+            (username,)
         )
         return _row(cur)
+
+
+def is_username_taken(username, exclude_user_id):
+    """Returns True if username is already used by another user."""
+    username = (username or '').strip().lower()
+    with get_conn() as conn:
+        cur = conn.execute(
+            "SELECT id FROM users WHERE username = ? AND id != ?",
+            (username, exclude_user_id)
+        )
+        return _row(cur) is not None
 
 
 def get_user_by_id(user_id):
@@ -521,11 +533,11 @@ def update_user_password(user_id, password_hash):
         )
 
 
-def update_user_profile(user_id, nome, email, telefono):
+def update_user_profile(user_id, nome, username):
     with get_conn() as conn:
         conn.execute(
-            "UPDATE users SET nome = ?, email = ?, telefono = ? WHERE id = ?",
-            (nome, email or None, telefono or None, user_id)
+            "UPDATE users SET nome = ?, username = ? WHERE id = ?",
+            (nome, username.strip().lower(), user_id)
         )
 
 

@@ -206,9 +206,7 @@ main {
         <div class="user-details">
           <div class="user-nome">{{ u.nome }}</div>
           <div class="user-contact">
-            {% if u.email %}{{ u.email }}{% endif %}
-            {% if u.email and u.telefono %} · {% endif %}
-            {% if u.telefono %}{{ u.telefono }}{% endif %}
+            @{{ u.username or '—' }}
           </div>
           <div class="user-badges">
             <span class="badge {{ u.role }}">{{ u.role }}</span>

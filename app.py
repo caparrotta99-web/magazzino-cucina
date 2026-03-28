@@ -20,6 +20,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from database import (
     db_init,
     replace_listino, replace_registro,
+    insert_listino_row,
     get_fornitori, get_all_prodotti, get_prodotti_by_fornitore,
     get_ultima_rimanenza, insert_movimento,
     get_lotti_attivi, get_giacenze, get_alerts,
@@ -30,7 +31,7 @@ from database import (
     get_lista_spesa, add_lista_spesa_item, update_lista_spesa_completato,
     delete_lista_spesa_item, clear_lista_spesa,
 )
-from sheets import load_listino, load_registro, append_registro
+from sheets import load_listino, load_registro, append_registro, append_listino
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'haccp-brigade-2024')
@@ -345,6 +346,32 @@ def api_prodotti():
     fornitore = request.args.get('fornitore', '').strip()
     prodotti  = get_prodotti_by_fornitore(fornitore) if fornitore else get_all_prodotti()
     return jsonify({'success': True, 'prodotti': prodotti})
+
+
+@app.route('/api/prodotti', methods=['POST'])
+@login_required
+def api_aggiungi_prodotto():
+    d          = request.get_json(force=True)
+    prodotto   = (d.get('prodotto')  or '').strip()
+    fornitore  = (d.get('fornitore') or '').strip()
+    unita      = (d.get('unita')     or 'kg').strip()
+    scorta_min = d.get('scorta_min', 0)
+    categoria  = (d.get('categoria') or '').strip()
+
+    if not prodotto:
+        return jsonify({'success': False, 'error': 'Nome prodotto obbligatorio'}), 400
+    if not fornitore:
+        return jsonify({'success': False, 'error': 'Fornitore obbligatorio'}), 400
+
+    try:
+        append_listino({'prodotto': prodotto, 'fornitore': fornitore,
+                        'unita': unita, 'scorta_min': scorta_min, 'categoria': categoria})
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Errore Google Sheets: {e}'}), 500
+
+    insert_listino_row(prodotto, fornitore, unita, scorta_min, categoria)
+    return jsonify({'success': True, 'prodotto': prodotto, 'fornitore': fornitore,
+                    'unita': unita, 'scorta_min': float(scorta_min or 0), 'categoria': categoria})
 
 
 # ─── API REGISTRO ─────────────────────────────────────────────────────────────

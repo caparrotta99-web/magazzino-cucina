@@ -254,3 +254,25 @@ def append_registro(row_data):
             new_row[idx] = val
 
     ws.append_row(new_row, value_input_option='USER_ENTERED')
+
+
+def append_listino(row_data):
+    """Appende una nuova riga al foglio LISTINO."""
+    gc = _get_client()
+    ws = gc.open_by_key(SPREADSHEET_ID).worksheet(SHEET_LISTINO)
+    headers = [h.strip() for h in ws.row_values(1)]
+    col = {k: _detect(headers, k) for k in ('prodotto', 'fornitore', 'unita', 'scorta_min', 'categoria')}
+    n_cols = len(headers) if headers else 5
+    new_row = [''] * n_cols
+    field_vals = {
+        'prodotto':  row_data.get('prodotto', ''),
+        'fornitore': row_data.get('fornitore', ''),
+        'unita':     row_data.get('unita', 'kg'),
+        'scorta_min': row_data.get('scorta_min', 0),
+        'categoria': row_data.get('categoria', ''),
+    }
+    for key, val in field_vals.items():
+        idx = col.get(key)
+        if idx is not None and idx < n_cols:
+            new_row[idx] = val
+    ws.append_row(new_row, value_input_option='USER_ENTERED')

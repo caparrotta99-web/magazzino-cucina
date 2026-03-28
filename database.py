@@ -223,6 +223,15 @@ def replace_listino(rows):
             )
 
 
+def insert_listino_row(prodotto, fornitore, unita, scorta_min, categoria):
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT OR IGNORE INTO listino (prodotto, fornitore, unita, scorta_min, categoria) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (prodotto, fornitore, unita, float(scorta_min or 0), categoria or '')
+        )
+
+
 def get_fornitori():
     with get_conn() as conn:
         cur = conn.execute(

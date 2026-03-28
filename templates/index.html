@@ -819,6 +819,16 @@ main {
   vertical-align: middle;
 }
 
+/* ─── NUOVO PRODOTTO ────────────────────────────────────────────────────── */
+.btn-nuovo-prodotto {
+  display: flex; align-items: center; gap: 5px;
+  margin-top: 8px; padding: 0; background: none; border: none;
+  font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600;
+  color: var(--accent); cursor: pointer; transition: opacity .15s;
+}
+.btn-nuovo-prodotto:active { opacity: .6; }
+.btn-nuovo-prodotto svg { flex-shrink: 0; }
+
 /* ─── PRINT ─────────────────────────────────────────────────────────────── */
 @media print {
   .blob-layer, header, .drawer-overlay, .drawer,
@@ -1027,6 +1037,10 @@ main {
             <option value="">Seleziona prodotto…</option>
           </select>
         </div>
+        <button type="button" class="btn-nuovo-prodotto" onclick="openNuovoProdotto()">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Nuovo prodotto
+        </button>
       </div>
       <div class="fgroup">
         <label class="flabel">Fornitore *</label>
@@ -1255,6 +1269,70 @@ main {
     <div class="modal-actions">
       <button class="btn-print" onclick="window.print()">Stampa</button>
       <button class="btn-close-modal" onclick="closeModal()">Chiudi</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL NUOVO PRODOTTO ──────────────────────────────────────────────── -->
+<div class="modal-backdrop" id="modal-nuovo-prodotto" onclick="bgCloseNP(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Nuovo prodotto</div>
+    <div class="modal-body">
+
+      <div class="fgroup">
+        <label class="flabel">Nome prodotto *</label>
+        <input class="finput" type="text" id="np-nome" placeholder="es. Pollo intero" autocomplete="off">
+      </div>
+
+      <div class="fgroup">
+        <label class="flabel">Fornitore *</label>
+        <div class="fselect-wrap">
+          <select class="fselect" id="np-fornitore" onchange="onNpFornitore()">
+            <option value="">Seleziona fornitore…</option>
+          </select>
+        </div>
+        <div id="np-fornitore-custom-wrap" style="display:none;margin-top:8px">
+          <input class="finput" type="text" id="np-fornitore-custom" placeholder="Nome nuovo fornitore">
+        </div>
+      </div>
+
+      <div class="fgroup">
+        <label class="flabel">Unità di misura *</label>
+        <div class="fselect-wrap">
+          <select class="fselect" id="np-unita">
+            <option value="kg">kg</option>
+            <option value="g">g</option>
+            <option value="L">L</option>
+            <option value="pz">pz</option>
+            <option value="bt">bt</option>
+            <option value="conf">conf</option>
+            <option value="vasch">vasch</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="fgroup">
+        <label class="flabel">Scorta minima</label>
+        <input class="finput" type="number" id="np-scorta" placeholder="0" min="0" step="0.1" inputmode="decimal">
+      </div>
+
+      <div class="fgroup" style="margin-bottom:0">
+        <label class="flabel">Categoria</label>
+        <div class="fselect-wrap">
+          <select class="fselect" id="np-categoria">
+            <option value="">Nessuna</option>
+            <option>Carne</option><option>Pesce</option><option>Verdure</option>
+            <option>Latticini</option><option>Secchi</option>
+            <option>Bevande</option><option>Surgelati</option><option>Spezie</option>
+          </select>
+        </div>
+      </div>
+
+    </div>
+    <div class="modal-actions">
+      <button class="btn-close-modal" onclick="closeNuovoProdotto()">Annulla</button>
+      <button class="btn-print" id="btn-np-salva" onclick="submitNuovoProdotto()" style="color:var(--navy);font-weight:700">Salva</button>
     </div>
   </div>
 </div>
@@ -2162,6 +2240,75 @@ async function confirmAddProdotto() {
   document.getElementById('spesa-add-panel').classList.remove('open');
   await loadListaSpesa();
   toast(`${prodotto} aggiunto alla lista`, 'success');
+}
+
+// ── NUOVO PRODOTTO ────────────────────────────────────────────────────────
+function openNuovoProdotto() {
+  // Populate fornitore select from already-loaded prodotti
+  const fornitori = [...new Set(S.prodotti.map(p => p.fornitore).filter(Boolean))].sort();
+  const selF = document.getElementById('np-fornitore');
+  selF.innerHTML = '<option value="">Seleziona fornitore…</option>' +
+    fornitori.map(f => `<option value="${esc(f)}">${esc(f)}</option>`).join('') +
+    '<option value="__altro__">+ Altro…</option>';
+
+  // Reset fields
+  document.getElementById('np-nome').value    = '';
+  document.getElementById('np-scorta').value  = '';
+  document.getElementById('np-unita').value   = 'kg';
+  document.getElementById('np-categoria').value = '';
+  document.getElementById('np-fornitore-custom').value = '';
+  document.getElementById('np-fornitore-custom-wrap').style.display = 'none';
+  document.getElementById('btn-np-salva').disabled = false;
+  document.getElementById('modal-nuovo-prodotto').classList.add('open');
+}
+
+function closeNuovoProdotto() {
+  document.getElementById('modal-nuovo-prodotto').classList.remove('open');
+}
+
+function bgCloseNP(e) {
+  if (e.target === document.getElementById('modal-nuovo-prodotto')) closeNuovoProdotto();
+}
+
+function onNpFornitore() {
+  const val = document.getElementById('np-fornitore').value;
+  document.getElementById('np-fornitore-custom-wrap').style.display =
+    val === '__altro__' ? 'block' : 'none';
+}
+
+async function submitNuovoProdotto() {
+  const nome     = document.getElementById('np-nome').value.trim();
+  const fornSel  = document.getElementById('np-fornitore').value;
+  const fornitore = fornSel === '__altro__'
+    ? document.getElementById('np-fornitore-custom').value.trim()
+    : fornSel;
+  const unita     = document.getElementById('np-unita').value;
+  const scorta    = parseFloat(document.getElementById('np-scorta').value) || 0;
+  const categoria = document.getElementById('np-categoria').value;
+
+  if (!nome)      { toast('Inserisci il nome del prodotto', 'error'); return; }
+  if (!fornitore) { toast('Seleziona o inserisci il fornitore', 'error'); return; }
+
+  const btn = document.getElementById('btn-np-salva');
+  btn.disabled = true;
+
+  const data = await api('/api/prodotti', {
+    method: 'POST',
+    body:   { prodotto: nome, fornitore, unita, scorta_min: scorta, categoria },
+  });
+
+  btn.disabled = false;
+  if (!data.success) { toast(data.error || 'Errore', 'error'); return; }
+
+  closeNuovoProdotto();
+  await loadProdottiCarico();
+
+  // Auto-select the new product in the carico form
+  const sel = document.getElementById('c-prodotto');
+  for (let i = 0; i < sel.options.length; i++) {
+    if (sel.options[i].value === nome) { sel.selectedIndex = i; onProdottoCarico(); break; }
+  }
+  toast('Prodotto aggiunto al listino', 'success');
 }
 
 // ── SYNC ──────────────────────────────────────────────────────────────────

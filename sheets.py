@@ -261,25 +261,27 @@ def append_registro(row_data):
 
 
 def append_listino(row_data):
-    """Appende una nuova riga al foglio LISTINO (colonne A B C D G)."""
+    """Appende una nuova riga al foglio LISTINO (A=nome, B=fornitore, C=unità, D=scorta, G=categoria)."""
     gc = _get_client()
     ws = gc.open_by_key(SPREADSHEET_ID).worksheet(SHEET_LISTINO)
-    headers = [h.strip() for h in ws.row_values(1)]
 
-    # Posizioni fisse del foglio: A=0 B=1 C=2 D=3 G=6
-    # _detect() affina la posizione se l'header è presente, altrimenti usa il default.
-    _FIXED = {'prodotto': 0, 'fornitore': 1, 'unita': 2, 'scorta_min': 3, 'categoria': 6}
-    col = {}
-    for k, default in _FIXED.items():
-        detected = _detect(headers, k)
-        col[k] = detected if detected is not None else default
+    prodotto   = row_data.get('prodotto', '')
+    fornitore  = row_data.get('fornitore', '')
+    unita      = row_data.get('unita', 'kg')
+    scorta_min = row_data.get('scorta_min', 0)
+    categoria  = row_data.get('categoria', '')
 
-    n_cols = max(len(headers), max(col.values()) + 1)
-    new_row = [''] * n_cols
-    new_row[col['prodotto']]   = row_data.get('prodotto', '')
-    new_row[col['fornitore']]  = row_data.get('fornitore', '')
-    new_row[col['unita']]      = row_data.get('unita', 'kg')
-    new_row[col['scorta_min']] = row_data.get('scorta_min', 0)
-    new_row[col['categoria']]  = row_data.get('categoria', '')
+    import sys
+    all_values = ws.get_all_values()
+    print(f"[DEBUG] Totale righe: {len(all_values)}", flush=True, file=sys.stderr)
+    for i, row in enumerate(all_values[:5]):
+        print(f"[DEBUG] Riga {i+1}, colonna A: '{row[0] if row else 'VUOTA'}'", flush=True, file=sys.stderr)
+    next_row = 2
+    for i, row in enumerate(all_values):
+        if row and row[0].strip():
+            next_row = i + 2
+            print(f"[DEBUG] Ultima riga trovata: {i+1}, next_row={next_row}", flush=True, file=sys.stderr)
+    print(f"[DEBUG] Scrivo in riga: {next_row}", flush=True, file=sys.stderr)
 
-    ws.append_row(new_row, value_input_option='USER_ENTERED')
+    ws.update(f'A{next_row}:D{next_row}', [[prodotto, fornitore, unita, scorta_min]])
+    ws.update(f'G{next_row}', [[categoria]])

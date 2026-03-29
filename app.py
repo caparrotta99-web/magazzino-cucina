@@ -29,7 +29,7 @@ from database import (
     create_reset_token, get_reset_token, use_reset_token, update_user_password,
     update_user_profile, update_user_reparto, is_username_taken, get_feed,
     get_lista_spesa, add_lista_spesa_item, update_lista_spesa_completato,
-    delete_lista_spesa_item, clear_lista_spesa,
+    update_lista_spesa_fornitore, delete_lista_spesa_item, clear_lista_spesa,
 )
 from sheets import load_listino, load_registro, append_registro, append_listino
 
@@ -421,7 +421,10 @@ def api_lista_spesa_add():
 @login_required
 def api_lista_spesa_patch(item_id):
     data = request.get_json() or {}
-    update_lista_spesa_completato(item_id, bool(data.get('completato', False)))
+    if 'completato' in data:
+        update_lista_spesa_completato(item_id, bool(data['completato']))
+    if 'fornitore' in data:
+        update_lista_spesa_fornitore(item_id, data['fornitore'] or '')
     return jsonify({'success': True})
 
 

@@ -606,6 +606,14 @@ def update_lista_spesa_completato(item_id, completato):
         )
 
 
+def update_lista_spesa_fornitore(item_id, fornitore):
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE lista_spesa SET fornitore = ? WHERE id = ?",
+            (fornitore.strip(), item_id)
+        )
+
+
 def delete_lista_spesa_item(item_id):
     with get_conn() as conn:
         conn.execute("DELETE FROM lista_spesa WHERE id = ?", (item_id,))

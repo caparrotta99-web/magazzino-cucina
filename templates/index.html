@@ -812,9 +812,27 @@ main {
   border-radius: 14px; padding: 14px 16px;
   box-shadow: var(--shadow); border: 1px solid rgba(255,255,255,.1);
   display: flex; align-items: center; gap: 12px; margin-bottom: 8px;
-  transition: opacity .2s;
+  position: relative; overflow: hidden;
+  transition: opacity .2s, max-height .35s .1s ease, margin .35s .1s ease,
+              padding .35s .1s ease, transform .25s ease;
 }
-.spesa-item.checked { opacity: .4; }
+.spesa-item.checked { opacity: .55; }
+.spesa-item.removing {
+  opacity: 0 !important;
+  transform: translateX(32px);
+  max-height: 0 !important;
+  margin-bottom: 0 !important;
+  padding-top: 0 !important; padding-bottom: 0 !important;
+  pointer-events: none;
+}
+.spesa-countdown-bar {
+  position: absolute; bottom: 0; left: 0;
+  height: 3px; width: 0%;
+  background: linear-gradient(90deg, #34d399, #60a5fa);
+  border-radius: 0 3px 0 0;
+  transition: width .1s linear;
+  pointer-events: none;
+}
 .spesa-check {
   width: 22px; height: 22px; border-radius: 6px; flex-shrink: 0;
   border: 2px solid rgba(255,255,255,.25); background: transparent; cursor: pointer;
@@ -1428,6 +1446,7 @@ const S = {
   activePage:   'home',
   giacFilter:   'all',
   listaSpesa:      [],
+  spesaTimers:     {},   // id → { timeout, interval, startTime }
   spesaFornFilter: 'all',
   alertTypeFilter: 'all',   // 'all' | 'scadenza' | 'scorta'
   alertCatFilter:  'all',   // 'all' | category name
@@ -2177,7 +2196,8 @@ const _CAT_DISPLAY = {
 function _spesaItem(item) {
   const sottoScorta = item.scorta_min > 0 && item.qtaAttuale < item.scorta_min;
   return `
-    <div class="spesa-item ${item.checked ? 'checked' : ''}">
+    <div class="spesa-item ${item.checked ? 'checked' : ''}" data-spesa-id="${item.id}">
+      <div class="spesa-countdown-bar" id="spesa-bar-${item.id}"></div>
       <div class="spesa-check" onclick="toggleSpesaCheck(${item.id})">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
       </div>
@@ -2282,18 +2302,85 @@ function renderListaSpesa() {
         ${items.map(item => _spesaItem(item)).join('')}
       </div>`;
   }).join('');
+
+  // Riallinea le barre dei countdown attivi dopo il re-render DOM
+  _restoreCountdownBars();
+}
+
+// ── LISTA SPESA — COUNTDOWN ───────────────────────────────────────────────
+const _SPESA_COUNTDOWN_MS = 20000;
+
+function _startSpesaCountdown(id) {
+  _cancelSpesaCountdown(id); // evita doppi timer
+  const startTime = Date.now();
+
+  const interval = setInterval(() => {
+    const bar = document.getElementById(`spesa-bar-${id}`);
+    if (!bar) return;
+    const elapsed  = Date.now() - startTime;
+    const progress = Math.min(elapsed / _SPESA_COUNTDOWN_MS * 100, 100);
+    bar.style.width = progress + '%';
+  }, 50);
+
+  const timeout = setTimeout(async () => {
+    clearInterval(interval);
+    delete S.spesaTimers[id];
+
+    // Leggi l'altezza attuale prima di iniziare l'animazione di rimozione
+    const el = document.querySelector(`[data-spesa-id="${id}"]`);
+    if (el) {
+      el.style.maxHeight = el.offsetHeight + 'px';
+      // Lascia un frame per applicare max-height, poi aggiungi .removing
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => { el.classList.add('removing'); });
+      });
+      await new Promise(r => setTimeout(r, 450));
+    }
+
+    S.listaSpesa = S.listaSpesa.filter(i => i.id !== id);
+    _updateSpesaBadge();
+    renderListaSpesa();
+    api(`/api/lista-spesa/${id}`, { method: 'DELETE' });
+  }, _SPESA_COUNTDOWN_MS);
+
+  S.spesaTimers[id] = { timeout, interval, startTime };
+}
+
+function _cancelSpesaCountdown(id) {
+  const t = S.spesaTimers[id];
+  if (!t) return;
+  clearTimeout(t.timeout);
+  clearInterval(t.interval);
+  delete S.spesaTimers[id];
+}
+
+function _restoreCountdownBars() {
+  const now = Date.now();
+  for (const [idStr, timer] of Object.entries(S.spesaTimers)) {
+    const bar = document.getElementById(`spesa-bar-${idStr}`);
+    if (!bar) continue;
+    const elapsed  = now - timer.startTime;
+    const progress = Math.min(elapsed / _SPESA_COUNTDOWN_MS * 100, 100);
+    bar.style.width = progress + '%';
+  }
 }
 
 async function toggleSpesaCheck(id) {
   const item = S.listaSpesa.find(i => i.id === id);
   if (!item) return;
   const newVal = !item.completato;
-  // Optimistic update
   item.completato = newVal;
   item.checked    = newVal;
+
+  if (newVal) {
+    _startSpesaCountdown(id);
+  } else {
+    _cancelSpesaCountdown(id);
+  }
+
   _updateSpesaBadge();
-  renderListaSpesa();
-  await api(`/api/lista-spesa/${id}`, { method: 'PATCH', body: { completato: newVal } });
+  renderListaSpesa(); // chiama _restoreCountdownBars() internamente
+  api(`/api/lista-spesa/${id}`, { method: 'PATCH', body: { completato: newVal } });
 }
 
 async function removeSpesaItem(id) {

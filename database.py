@@ -210,6 +210,34 @@ def db_init():
             except Exception:
                 pass  # Column already exists
 
+    # ── Step 3: post-migration indexes ────────────────────────────────────────
+    # idx_users_username deve venire DOPO la migration che aggiunge la colonna.
+    # Prima deduplicare eventuali righe duplicate (es. da deploy precedenti),
+    # poi creare l'indice UNIQUE in modo sicuro.
+    if _USE_PG:
+        with get_conn() as conn:
+            # Rimuove duplicati mantenendo l'utente con id più alto per ogni username
+            conn.execute(
+                "DELETE FROM users WHERE id NOT IN "
+                "(SELECT MAX(id) FROM users GROUP BY username)"
+            )
+            conn.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username)"
+            )
+    else:
+        with get_conn() as conn:
+            conn.execute(
+                "DELETE FROM users WHERE id NOT IN "
+                "(SELECT MAX(id) FROM users GROUP BY username)"
+            )
+        try:
+            with get_conn() as conn:
+                conn.execute(
+                    "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_username ON users(username)"
+                )
+        except Exception:
+            pass  # Index already exists
+
 
 # ─── LISTINO ─────────────────────────────────────────────────────────────────
 
@@ -440,12 +468,20 @@ def replace_registro(rows):
 # ─── USERS ───────────────────────────────────────────────────────────────────
 
 def create_user(nome, username, password_hash, reparto, role='staff'):
+    params = (nome, username.strip().lower(), password_hash, reparto, role)
     with get_conn() as conn:
-        conn.execute(
-            "INSERT INTO users (nome, username, password, reparto, role) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (nome, username.strip().lower(), password_hash, reparto, role)
-        )
+        if _USE_PG:
+            conn.execute(
+                "INSERT INTO users (nome, username, password, reparto, role) "
+                "VALUES (?, ?, ?, ?, ?) ON CONFLICT (username) DO NOTHING",
+                params
+            )
+        else:
+            conn.execute(
+                "INSERT OR IGNORE INTO users (nome, username, password, reparto, role) "
+                "VALUES (?, ?, ?, ?, ?)",
+                params
+            )
 
 
 def get_user_by_login(username):

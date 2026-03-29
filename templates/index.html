@@ -1267,9 +1267,6 @@ main {
       <select class="fselect-pill" id="filter-categoria"
               onchange="onFilterSelectChange(this); renderGiacenze()">
         <option value="">Categoria</option>
-        <option>Carne</option><option>Pesce</option><option>Verdure</option>
-        <option>Latticini</option><option>Secchi</option>
-        <option>Bevande</option><option>Surgelati</option><option>Spezie</option>
       </select>
       <!-- compat: old renderCatFilter targets this div -->
       <div id="cat-filter" style="display:none"></div>
@@ -1417,9 +1414,6 @@ main {
         <div class="fselect-wrap">
           <select class="fselect" id="np-categoria">
             <option value="">Nessuna</option>
-            <option>Carne</option><option>Pesce</option><option>Verdure</option>
-            <option>Latticini</option><option>Secchi</option>
-            <option>Bevande</option><option>Surgelati</option><option>Spezie</option>
           </select>
         </div>
       </div>
@@ -1449,12 +1443,13 @@ main {
 // ── REPARTO COSTANTE (iniettata dal server) ───────────────────────────────
 const USER_REPARTO = "{{ current_user.reparto|lower if current_user.is_authenticated else 'cucina' }}";
 
-// Categorie Sala: Bevande + Surgelati + Dolci
-const SALA_CATS = ['bevande', 'surgelati', 'dolci'];
+// Categorie Sala: Bevande + Dolci
+const SALA_CATS = ['bevande', 'dolci'];
 
 // ── STATE ────────────────────────────────────────────────────────────────
 const S = {
   prodotti:     [],
+  categorie:    [],
   lottiScarico: [],
   giacenze:     [],
   alerts:       { scadenze: [], scorte: [], count: 0 },
@@ -1508,12 +1503,38 @@ function initRepartoTabs() {
   document.getElementById('stab-sala').classList.toggle('active', S.scaricoTab === 'sala');
 }
 
+// ── CATEGORIE ────────────────────────────────────────────────────────────
+async function loadCategorie() {
+  const data = await api('/api/categorie');
+  S.categorie = data.categorie || [];
+  _updateCategorieUI();
+}
+
+function _updateCategorieUI() {
+  // Aggiorna select np-categoria nel modal Nuovo Prodotto
+  const sel = document.getElementById('np-categoria');
+  if (sel) {
+    const cur = sel.value;
+    sel.innerHTML = '<option value="">Nessuna</option>' +
+      S.categorie.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+    if (cur) sel.value = cur;
+  }
+  // Aggiorna select filter-categoria nelle Giacenze
+  const fsel = document.getElementById('filter-categoria');
+  if (fsel) {
+    const cur = fsel.value;
+    fsel.innerHTML = '<option value="">Categoria</option>' +
+      S.categorie.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
+    if (cur) fsel.value = cur;
+  }
+}
+
 // ── INIT ─────────────────────────────────────────────────────────────────
 async function init() {
   setHdrDate();
   animHomeCards();
   initRepartoTabs();
-  await Promise.all([loadProdottiCarico(), loadGiacenze(), loadAlerts(), loadFeed(), loadListaSpesa()]);
+  await Promise.all([loadCategorie(), loadProdottiCarico(), loadGiacenze(), loadAlerts(), loadFeed(), loadListaSpesa()]);
   renderScaricoProdotti();
 }
 
@@ -1925,8 +1946,6 @@ const _ALERT_CAT_ICONS = {
   'Carne':'🥩','Pesce':'🐟','Verdure':'🥬','Latticini':'🧀',
   'Secchi':'📦','Bevande':'🥤','Surgelati':'❄️','Spezie':'🌶️',
 };
-const _ALERT_CAT_ORDER = ['Carne','Pesce','Verdure','Latticini','Secchi','Bevande','Surgelati','Spezie'];
-
 function setAlertTypeFilter(val) {
   S.alertTypeFilter = val;
   renderAlertFilters();
@@ -1948,8 +1967,8 @@ function renderAlertFilters() {
   ];
   const catsPresent = [...new Set(allItems.map(a => a.categoria).filter(Boolean))];
   const sortedCats = [
-    ..._ALERT_CAT_ORDER.filter(c => catsPresent.includes(c)),
-    ...catsPresent.filter(c => !_ALERT_CAT_ORDER.includes(c)).sort(),
+    ...S.categorie.filter(c => catsPresent.includes(c)),
+    ...catsPresent.filter(c => !S.categorie.includes(c)).sort(),
   ];
   const typeFilters = [
     { val: 'all',     lbl: 'Tutti' },
@@ -2016,8 +2035,8 @@ function renderAlerts() {
     });
   }
   const orderedCats = [
-    ..._ALERT_CAT_ORDER.filter(c => groups[c]),
-    ...Object.keys(groups).filter(c => !_ALERT_CAT_ORDER.includes(c)).sort(),
+    ...S.categorie.filter(c => groups[c]),
+    ...Object.keys(groups).filter(c => !S.categorie.includes(c)).sort(),
   ];
 
   el.innerHTML = orderedCats.map(cat => {
@@ -2198,17 +2217,6 @@ function onSpesaFornitore() {
   selP.disabled = false;
 }
 
-const _CAT_ORDER = ['Carne','Pesce','Verdure','Latticini','Secchi','Bevande','Surgelati','Spezie'];
-const _CAT_DISPLAY = {
-  'Carne':     'Carne',
-  'Pesce':     'Pesce',
-  'Verdure':   'Verdure / Frutta',
-  'Latticini': 'Latticini',
-  'Secchi':    'Secchi / Dispensa',
-  'Bevande':   'Bevande',
-  'Surgelati': 'Surgelati',
-  'Spezie':    'Spezie / Condimenti',
-};
 
 function _spesaItem(item) {
   const sottoScorta = item.scorta_min > 0 && item.qtaAttuale < item.scorta_min;
@@ -2314,12 +2322,12 @@ function renderListaSpesa() {
 
   // Build ordered category keys
   const orderedCats = [
-    ..._CAT_ORDER.filter(c => groups[c]),
-    ...Object.keys(groups).filter(c => !_CAT_ORDER.includes(c)).sort(),
+    ...S.categorie.filter(c => groups[c]),
+    ...Object.keys(groups).filter(c => !S.categorie.includes(c)).sort(),
   ];
 
   container.innerHTML = orderedCats.map(cat => {
-    const label = _CAT_DISPLAY[cat] || cat;
+    const label = cat;
     const items = groups[cat];
     const count = items.length;
     return `

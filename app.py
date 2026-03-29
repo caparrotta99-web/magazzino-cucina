@@ -21,7 +21,7 @@ from database import (
     db_init,
     replace_listino, replace_registro,
     insert_listino_row,
-    get_fornitori, get_all_prodotti, get_prodotti_by_fornitore,
+    get_fornitori, get_categorie, get_all_prodotti, get_prodotti_by_fornitore,
     get_ultima_rimanenza, insert_movimento,
     get_lotti_attivi, get_giacenze, get_alerts,
     create_user, get_user_by_login, get_user_by_id,
@@ -333,6 +333,12 @@ def service_worker():
 @login_required
 def api_fornitori():
     return jsonify({'success': True, 'fornitori': get_fornitori()})
+
+
+@app.route('/api/categorie')
+@login_required
+def api_categorie():
+    return jsonify({'success': True, 'categorie': get_categorie()})
 
 
 @app.route('/api/prodotti')

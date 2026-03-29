@@ -269,6 +269,14 @@ def get_fornitori():
         return [r['fornitore'] for r in cur.fetchall()]
 
 
+def get_categorie():
+    with get_conn() as conn:
+        cur = conn.execute(
+            "SELECT DISTINCT categoria FROM listino WHERE categoria != '' ORDER BY categoria"
+        )
+        return [r['categoria'] for r in cur.fetchall()]
+
+
 def get_all_prodotti():
     with get_conn() as conn:
         cur = conn.execute(

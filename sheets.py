@@ -133,11 +133,15 @@ def load_listino():
     if len(all_rows) < 2:
         return []
 
-    headers = [h.strip() for h in all_rows[0]]
-    col = {k: _detect(headers, k) for k in ('prodotto', 'fornitore', 'unita', 'scorta_min', 'categoria')}
+    # Indici fissi reali del foglio: A=0, B=1, C=2, D=3, G=6
+    _FIXED = {'prodotto': 0, 'fornitore': 1, 'unita': 2, 'scorta_min': 3, 'categoria': 6}
 
-    if col['prodotto'] is None:
-        raise ValueError(f"Colonna 'prodotto' non trovata nel LISTINO. Header: {headers}")
+    headers = [h.strip() for h in all_rows[0]]
+    # _detect affina l'indice se l'header è riconosciuto, altrimenti usa il fisso
+    col = {}
+    for k in ('prodotto', 'fornitore', 'unita', 'scorta_min', 'categoria'):
+        detected = _detect(headers, k)
+        col[k] = detected if detected is not None else _FIXED[k]
 
     result = []
     for row in all_rows[1:]:

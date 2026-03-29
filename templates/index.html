@@ -850,6 +850,23 @@ main {
   vertical-align: middle;
 }
 
+/* ─── REPARTO TABS ──────────────────────────────────────────────────────── */
+.reparto-tabs {
+  display: flex; gap: 8px; margin-bottom: 20px;
+}
+.reparto-tab {
+  flex: 1; height: 44px; border-radius: 14px;
+  border: 1.5px solid rgba(255,255,255,.15);
+  background: rgba(255,255,255,.06); color: rgba(255,255,255,.55);
+  font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600;
+  cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 7px;
+  transition: background .18s, color .18s, border-color .18s;
+}
+.reparto-tab.active {
+  background: rgba(255,255,255,.18); border-color: rgba(255,255,255,.35); color: #fff;
+}
+.reparto-tab:active { opacity: .75; }
+
 /* ─── NUOVO PRODOTTO ────────────────────────────────────────────────────── */
 .btn-nuovo-prodotto {
   display: flex; align-items: center; gap: 5px;
@@ -1058,6 +1075,12 @@ main {
       <div class="back-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
       <span class="back-label">Carico</span>
     </div>
+
+    <div class="reparto-tabs">
+      <button class="reparto-tab" id="ctab-cucina" onclick="setRepartoTab('carico','cucina')">🍳 Cucina</button>
+      <button class="reparto-tab" id="ctab-sala"   onclick="setRepartoTab('carico','sala')">🍷 Sala</button>
+    </div>
+
     <div class="pg-sub">I campi contrassegnati con * sono obbligatori</div>
 
     <div class="form-card">
@@ -1133,6 +1156,12 @@ main {
       <div class="back-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
       <span class="back-label">Scarico</span>
     </div>
+
+    <div class="reparto-tabs">
+      <button class="reparto-tab" id="stab-cucina" onclick="setRepartoTab('scarico','cucina')">🍳 Cucina</button>
+      <button class="reparto-tab" id="stab-sala"   onclick="setRepartoTab('scarico','sala')">🍷 Sala</button>
+    </div>
+
     <div class="pg-sub">Seleziona il prodotto e il lotto da scaricare</div>
 
     <div class="form-card">
@@ -1382,6 +1411,12 @@ main {
 <div class="toast" id="toast"></div>
 
 <script>
+// ── REPARTO COSTANTE (iniettata dal server) ───────────────────────────────
+const USER_REPARTO = "{{ current_user.reparto|lower if current_user.is_authenticated else 'cucina' }}";
+
+// Categorie Sala: Bevande + Surgelati + Dolci
+const SALA_CATS = ['bevande', 'surgelati', 'dolci'];
+
 // ── STATE ────────────────────────────────────────────────────────────────
 const S = {
   prodotti:     [],
@@ -1396,12 +1431,52 @@ const S = {
   spesaFornFilter: 'all',
   alertTypeFilter: 'all',   // 'all' | 'scadenza' | 'scorta'
   alertCatFilter:  'all',   // 'all' | category name
+  caricoTab:  USER_REPARTO === 'sala' ? 'sala' : 'cucina',
+  scaricoTab: USER_REPARTO === 'sala' ? 'sala' : 'cucina',
 };
+
+// ── REPARTO TABS ──────────────────────────────────────────────────────────
+// Filtra array di prodotti/giacenze in base al tab attivo
+function filterProdottiByTab(items, tab) {
+  return items.filter(p => {
+    const cat = (p.categoria || '').toLowerCase().trim();
+    const isSala = SALA_CATS.includes(cat);
+    return tab === 'sala' ? isSala : !isSala;
+  });
+}
+
+function setRepartoTab(form, tab) {
+  if (form === 'carico') {
+    S.caricoTab = tab;
+    document.getElementById('ctab-cucina').classList.toggle('active', tab === 'cucina');
+    document.getElementById('ctab-sala').classList.toggle('active', tab === 'sala');
+    populateCaricoSelect();
+  } else {
+    S.scaricoTab = tab;
+    document.getElementById('stab-cucina').classList.toggle('active', tab === 'cucina');
+    document.getElementById('stab-sala').classList.toggle('active', tab === 'sala');
+    renderScaricoProdotti();
+    // reset lotto / lot info
+    const lottoSel = document.getElementById('s-lotto');
+    lottoSel.innerHTML = '<option value="">Seleziona prima il prodotto</option>';
+    lottoSel.disabled = true;
+    document.getElementById('s-lot-info').classList.remove('show');
+  }
+}
+
+function initRepartoTabs() {
+  // Attiva tab di default su entrambi i form
+  document.getElementById('ctab-cucina').classList.toggle('active', S.caricoTab === 'cucina');
+  document.getElementById('ctab-sala').classList.toggle('active', S.caricoTab === 'sala');
+  document.getElementById('stab-cucina').classList.toggle('active', S.scaricoTab === 'cucina');
+  document.getElementById('stab-sala').classList.toggle('active', S.scaricoTab === 'sala');
+}
 
 // ── INIT ─────────────────────────────────────────────────────────────────
 async function init() {
   setHdrDate();
   animHomeCards();
+  initRepartoTabs();
   await Promise.all([loadProdottiCarico(), loadGiacenze(), loadAlerts(), loadFeed(), loadListaSpesa()]);
   renderScaricoProdotti();
 }
@@ -1521,10 +1596,15 @@ function updateFornitoriFilter() {
 async function loadProdottiCarico() {
   const data = await api('/api/prodotti');
   S.prodotti = data.prodotti || [];
+  populateCaricoSelect();
+}
+
+function populateCaricoSelect() {
+  const filtered = filterProdottiByTab(S.prodotti, S.caricoTab);
 
   const selProd = document.getElementById('c-prodotto');
   selProd.innerHTML = '<option value="">Seleziona prodotto…</option>' +
-    S.prodotti.map(p =>
+    filtered.map(p =>
       `<option value="${esc(p.prodotto)}"
          data-fornitore="${esc(p.fornitore)}"
          data-unita="${esc(p.unita)}"
@@ -1532,10 +1612,15 @@ async function loadProdottiCarico() {
        >${esc(p.prodotto)}</option>`
     ).join('');
 
-  const fornitori = [...new Set(S.prodotti.map(p => p.fornitore).filter(Boolean))].sort();
+  const fornitori = [...new Set(filtered.map(p => p.fornitore).filter(Boolean))].sort();
   document.getElementById('c-fornitore').innerHTML =
     '<option value="">Seleziona prima il prodotto</option>' +
     fornitori.map(f => `<option value="${esc(f)}">${esc(f)}</option>`).join('');
+
+  // reset readonly fields when tab changes
+  setRO('c-unita', '—', false);
+  setRO('c-categoria', '—', false);
+  S.unitaCarico = '';
 }
 
 function onProdottoCarico() {
@@ -1628,9 +1713,10 @@ function resetCarico() {
 function renderScaricoProdotti() {
   const sel = document.getElementById('s-prodotto');
   const cur = sel.value;
+  const filtered = filterProdottiByTab(S.giacenze, S.scaricoTab);
   sel.innerHTML = '<option value="">Seleziona prodotto…</option>' +
-    S.giacenze.map(g => `<option value="${esc(g.prodotto)}">${esc(g.prodotto)}</option>`).join('');
-  if (cur && S.giacenze.find(g => g.prodotto === cur)) {
+    filtered.map(g => `<option value="${esc(g.prodotto)}">${esc(g.prodotto)}</option>`).join('');
+  if (cur && filtered.find(g => g.prodotto === cur)) {
     sel.value = cur;
   } else {
     document.getElementById('s-lotto').innerHTML = '<option value="">Seleziona prima il prodotto</option>';

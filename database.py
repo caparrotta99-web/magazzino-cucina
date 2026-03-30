@@ -505,6 +505,19 @@ def get_user_by_login(username):
         return _row(cur)
 
 
+def get_user_by_nome(nome):
+    """Find user by full name (case-insensitive)."""
+    nome = (nome or '').strip()
+    if not nome:
+        return None
+    with get_conn() as conn:
+        cur = conn.execute(
+            "SELECT * FROM users WHERE LOWER(nome) = LOWER(?) LIMIT 1",
+            (nome,)
+        )
+        return _row(cur)
+
+
 def is_username_taken(username, exclude_user_id):
     """Returns True if username is already used by another user."""
     username = (username or '').strip().lower()

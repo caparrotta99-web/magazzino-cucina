@@ -24,7 +24,7 @@ from database import (
     get_fornitori, get_categorie, get_all_prodotti, get_prodotti_by_fornitore,
     get_ultima_rimanenza, insert_movimento,
     get_lotti_attivi, get_giacenze, get_alerts,
-    create_user, get_user_by_login, get_user_by_id,
+    create_user, get_user_by_login, get_user_by_nome, get_user_by_id,
     get_all_users, update_user_role, delete_user,
     create_reset_token, get_reset_token, use_reset_token, update_user_password,
     update_user_profile, update_user_reparto, is_username_taken, get_feed,
@@ -119,13 +119,13 @@ def login_page():
         return redirect(url_for('index'))
     error = None
     if request.method == 'POST':
-        username  = (request.form.get('username') or '').strip()
+        nome      = (request.form.get('nome') or '').strip()
         password  = request.form.get('password') or ''
-        user_data = get_user_by_login(username)
+        user_data = get_user_by_nome(nome)
         if user_data and check_password_hash(user_data['password'], password):
             login_user(User(user_data), remember=True)
             return redirect(url_for('index'))
-        error = 'Username o password non corretti'
+        error = 'Credenziali non valide'
     return render_template('login.html', error=error)
 
 

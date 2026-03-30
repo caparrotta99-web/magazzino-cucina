@@ -420,6 +420,53 @@ main {
 }
 .btn-scan:active    { background: rgba(96,165,250,.16); }
 .btn-scan:disabled  { opacity: .5; cursor: not-allowed; }
+.btn-scan.scanning  {
+  background: rgba(96,165,250,.12); border-color: rgba(96,165,250,.7);
+  color: rgba(96,165,250,.7); pointer-events: none;
+}
+.btn-scan-spinner {
+  width: 16px; height: 16px; border-radius: 50%;
+  border: 2px solid rgba(96,165,250,.25);
+  border-top-color: #60a5fa;
+  animation: spin .7s linear infinite; flex-shrink: 0;
+}
+
+/* ─── AI BANNER ─────────────────────────────────────────────────────────── */
+.scan-banner {
+  display: none; align-items: center; gap: 12px;
+  background: rgba(96,165,250,.1);
+  border: 1px solid rgba(96,165,250,.25);
+  border-radius: 14px; padding: 14px 16px; margin-bottom: 14px;
+  overflow: hidden; position: relative;
+}
+.scan-banner.active {
+  display: flex;
+  animation: bannerIn .25s cubic-bezier(.34,1.56,.64,1);
+}
+.scan-banner.hiding {
+  display: flex;
+  animation: bannerOut .25s ease forwards;
+}
+@keyframes bannerIn  { from { opacity:0; transform:translateY(-8px) scale(.97); } to { opacity:1; transform:none; } }
+@keyframes bannerOut { from { opacity:1; transform:none; } to { opacity:0; transform:translateY(-6px) scale(.97); } }
+
+.scan-banner-icon { font-size: 18px; flex-shrink: 0; }
+.scan-banner-text { flex: 1; }
+.scan-banner-title { font-size: 13px; font-weight: 600; color: #93c5fd; }
+.scan-banner-bar-wrap {
+  height: 3px; background: rgba(96,165,250,.15);
+  border-radius: 2px; margin-top: 6px; overflow: hidden;
+}
+.scan-banner-bar {
+  height: 100%; width: 30%; border-radius: 2px;
+  background: linear-gradient(90deg, #60a5fa, #93c5fd);
+  animation: barPulse 1.4s ease-in-out infinite;
+}
+@keyframes barPulse {
+  0%   { width: 15%; margin-left: 0;   }
+  50%  { width: 45%; margin-left: 30%; }
+  100% { width: 15%; margin-left: 80%; }
+}
 
 /* ─── PRIMARY BUTTON ────────────────────────────────────────────────────── */
 .btn-primary {
@@ -1185,6 +1232,14 @@ main {
       </div>
     </div>
 
+    <div class="scan-banner" id="scan-banner">
+      <div class="scan-banner-icon">🔍</div>
+      <div class="scan-banner-text">
+        <div class="scan-banner-title">Lettura etichetta con AI...</div>
+        <div class="scan-banner-bar-wrap"><div class="scan-banner-bar"></div></div>
+      </div>
+    </div>
+
     <button type="button" class="btn-scan" id="btn-scan" onclick="triggerCamera()">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
       Scansiona etichetta
@@ -1736,29 +1791,63 @@ function setRO(id, text, hasVal) {
 
 function triggerCamera() { document.getElementById('camera-input').click(); }
 
+function _typeIntoField(el, value) {
+  // Effetto "scrittura" progressiva: popola il campo carattere per carattere
+  el.value = '';
+  const chars = String(value).split('');
+  chars.forEach((ch, i) => setTimeout(() => { el.value += ch; }, i * 35));
+}
+
 async function onCameraCapture(input) {
   const file = input.files[0];
   if (!file) return;
-  const btn = document.getElementById('btn-scan');
+
+  const btn    = document.getElementById('btn-scan');
+  const banner = document.getElementById('scan-banner');
+
+  // — Stato loading —
   btn.disabled = true;
+  btn.classList.add('scanning');
+  btn.innerHTML = '<div class="btn-scan-spinner"></div> Analisi in corso...';
+  banner.classList.remove('hiding');
+  banner.classList.add('active');
+
   const reader = new FileReader();
   reader.onload = async (e) => {
     const data = await api('/api/scan-label', {
       method: 'POST',
       body: { image: e.target.result, media_type: file.type || 'image/jpeg' },
     });
+
+    // — Nascondi banner con animazione —
+    banner.classList.remove('active');
+    banner.classList.add('hiding');
+    setTimeout(() => { banner.classList.remove('hiding'); }, 260);
+
+    // — Ripristina bottone —
     btn.disabled = false;
+    btn.classList.remove('scanning');
+    btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> Scansiona etichetta';
+
     if (data.success) {
-      if (data.lotto) document.getElementById('c-lotto').value = data.lotto;
+      let filled = false;
+      if (data.lotto) {
+        _typeIntoField(document.getElementById('c-lotto'), data.lotto);
+        filled = true;
+      }
       if (data.scadenza) {
         const parts = String(data.scadenza).split('/');
-        if (parts.length === 3)
-          document.getElementById('c-scadenza').value =
-            `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+        if (parts.length === 3) {
+          const iso = `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+          setTimeout(() => { document.getElementById('c-scadenza').value = iso; },
+            data.lotto ? String(data.lotto).length * 35 + 80 : 0);
+          filled = true;
+        }
       }
-      const ok = data.lotto || data.scadenza;
-      toast(ok ? 'Etichetta letta' : 'Nessun dato trovato', ok ? 'success' : 'error');
-    } else { toast(data.error || 'Errore lettura', 'error'); }
+      toast(filled ? '✓ Etichetta letta' : 'Nessun dato trovato', filled ? 'success' : 'error');
+    } else {
+      toast('Non riesco a leggere l\'etichetta, inserisci manualmente', 'error');
+    }
     input.value = '';
   };
   reader.readAsDataURL(file);
@@ -2381,7 +2470,7 @@ function renderListaSpesa() {
 }
 
 // ── LISTA SPESA — COUNTDOWN ───────────────────────────────────────────────
-const _SPESA_COUNTDOWN_MS = 20000;
+const _SPESA_COUNTDOWN_MS = 5000;
 
 function _startSpesaCountdown(id) {
   _cancelSpesaCountdown(id); // evita doppi timer

@@ -114,13 +114,13 @@ body::before {
 /* ─── HEADER ────────────────────────────────────────────────────────────── */
 header {
   position: fixed; top: 0; left: 0; right: 0; z-index: 100;
-  height: var(--hdr-h);
+  height: calc(var(--hdr-h) + max(16px, env(safe-area-inset-top)));
   background: rgba(10,15,30,.72);
   backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
   border-bottom: 1px solid rgba(255,255,255,.1);
   box-shadow: 0 1px 24px rgba(0,0,0,.3);
   display: flex; align-items: center;
-  padding: 0 14px 0 20px; gap: 12px;
+  padding: max(16px, env(safe-area-inset-top)) 14px 0 20px; gap: 12px;
 }
 .hdr-logo-block { flex: 1; min-width: 0; }
 .logo {
@@ -156,8 +156,8 @@ header {
 /* ─── MAIN CONTENT ──────────────────────────────────────────────────────── */
 main {
   position: relative; z-index: 1;
-  margin-top: var(--hdr-h);
-  min-height: calc(100dvh - var(--hdr-h));
+  margin-top: calc(var(--hdr-h) + max(16px, env(safe-area-inset-top)));
+  min-height: calc(100dvh - var(--hdr-h) - max(16px, env(safe-area-inset-top)));
 }
 .page {
   display: none;
@@ -780,7 +780,7 @@ main {
 
 /* ─── TOAST (top-right) ─────────────────────────────────────────────────── */
 .toast {
-  position: fixed; top: calc(var(--hdr-h) + 10px); right: 16px; z-index: 400;
+  position: fixed; top: calc(var(--hdr-h) + max(16px, env(safe-area-inset-top)) + 10px); right: 16px; z-index: 400;
   background: rgba(20,30,60,.95); color: #fff;
   backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
   border: 1px solid rgba(255,255,255,.15);

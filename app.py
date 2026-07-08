@@ -24,6 +24,7 @@ from database import (
     get_fornitori, get_categorie, get_all_prodotti, get_prodotti_by_fornitore,
     get_ultima_rimanenza, insert_movimento,
     get_lotti_attivi, get_giacenze, get_alerts,
+    get_in_uso_attivi, finalizza_in_uso,
     create_user, get_user_by_login, get_user_by_nome, get_user_by_id,
     get_all_users, update_user_role, delete_user,
     create_reset_token, get_reset_token, use_reset_token, update_user_password,
@@ -516,9 +517,16 @@ def api_carico():
     })
 
 
-@app.route('/api/scarico', methods=['POST'])
+@app.route('/api/in-uso', methods=['GET'])
 @login_required
-def api_scarico():
+def api_in_uso_list():
+    prodotto = request.args.get('prodotto', '').strip()
+    return jsonify({'success': True, 'in_uso': get_in_uso_attivi(prodotto or None)})
+
+
+@app.route('/api/in-uso', methods=['POST'])
+@login_required
+def api_in_uso_crea():
     d        = request.get_json(force=True)
     prodotto = (d.get('prodotto') or '').strip()
     lotto    = (d.get('lotto')    or '').strip()
@@ -534,7 +542,7 @@ def api_scarico():
     if qty > rimanenza_prec:
         return jsonify({
             'success': False,
-            'error':   f'Non puoi scaricare più di {rimanenza_prec} disponibili',
+            'error':   f'Non puoi prelevare più di {rimanenza_prec} disponibili',
         }), 400
 
     lotti_info = get_lotti_attivi(prodotto)
@@ -558,6 +566,7 @@ def api_scarico():
         'rimanenza':    nuova_rimanenza,
         'operatore':    current_user.nome,
         'reparto':      current_user.reparto,
+        'tipo':         'IN_USO',
     }
 
     try:
@@ -565,12 +574,47 @@ def api_scarico():
     except Exception as e:
         return jsonify({'success': False, 'error': f'Errore Google Sheets: {e}'}), 500
 
-    insert_movimento(row)
+    row_id = insert_movimento(row)
 
     return jsonify({
         'success':      True,
+        'id':           row_id,
         'movimento_id': movimento_id,
         'rimanenza':    nuova_rimanenza,
+        'prodotto':     prodotto,
+        'lotto':        lotto,
+        'qty':          qty,
+        'unita':        row['unita'],
+    })
+
+
+@app.route('/api/scarico', methods=['POST'])
+@login_required
+def api_scarico():
+    """Finalizza una riga IN_USO esistente: la marca come SCARICO con la data
+    odierna. Non crea una nuova riga nel registro."""
+    d = request.get_json(force=True)
+    try:
+        row_id = int(d.get('id', 0))
+    except (TypeError, ValueError):
+        row_id = 0
+
+    if not row_id:
+        return jsonify({'success': False, 'error': 'Seleziona un elemento da scaricare'}), 400
+
+    oggi = datetime.now().strftime('%Y-%m-%d')
+    row  = finalizza_in_uso(row_id, oggi)
+
+    if not row:
+        return jsonify({'success': False, 'error': 'Elemento non trovato o già scaricato'}), 400
+
+    return jsonify({
+        'success':      True,
+        'prodotto':     row['prodotto'],
+        'lotto':        row['lotto'],
+        'qty':          row['scarico'],
+        'unita':        row['unita'],
+        'data_scarico': row['data_scarico'],
     })
 
 

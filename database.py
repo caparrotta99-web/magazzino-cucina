@@ -152,7 +152,9 @@ def db_init():
                 movimento_id TEXT NOT NULL DEFAULT '',
                 rimanenza    REAL NOT NULL DEFAULT 0,
                 operatore    TEXT NOT NULL DEFAULT '',
-                reparto      TEXT NOT NULL DEFAULT ''
+                reparto      TEXT NOT NULL DEFAULT '',
+                tipo         TEXT NOT NULL DEFAULT 'CARICO',
+                data_scarico TEXT NOT NULL DEFAULT ''
             )""",
             f"""CREATE TABLE IF NOT EXISTS users (
                 id       {pk},
@@ -192,10 +194,12 @@ def db_init():
     # ADD COLUMN IF NOT EXISTS (PG 9.6+) which never fails.
     # On SQLite we keep the try/except approach.
     migrations = [
-        ('registro', 'operatore', "TEXT NOT NULL DEFAULT ''"),
-        ('registro', 'reparto',   "TEXT NOT NULL DEFAULT ''"),
-        ('listino',  'categoria', "TEXT NOT NULL DEFAULT ''"),
-        ('users',    'username',  "TEXT NOT NULL DEFAULT ''"),
+        ('registro', 'operatore',    "TEXT NOT NULL DEFAULT ''"),
+        ('registro', 'reparto',      "TEXT NOT NULL DEFAULT ''"),
+        ('registro', 'tipo',         "TEXT NOT NULL DEFAULT 'CARICO'"),
+        ('registro', 'data_scarico', "TEXT NOT NULL DEFAULT ''"),
+        ('listino',  'categoria',    "TEXT NOT NULL DEFAULT ''"),
+        ('users',    'username',     "TEXT NOT NULL DEFAULT ''"),
     ]
     for table, col, defn in migrations:
         if _USE_PG:
@@ -209,6 +213,14 @@ def db_init():
                     conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {defn}")
             except Exception:
                 pass  # Column already exists
+
+    # Backfill: le righe storiche (pre-esistenti alla colonna 'tipo') hanno
+    # 'CARICO' come default; quelle con scarico > 0 sono in realtà SCARICO.
+    # Idempotente: dopo il primo run, la WHERE non trova più righe da correggere.
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE registro SET tipo = 'SCARICO' WHERE tipo = 'CARICO' AND scarico > 0"
+        )
 
     # ── Step 3: post-migration indexes ────────────────────────────────────────
     # idx_users_username deve venire DOPO la migration che aggiunge la colonna.
@@ -314,15 +326,57 @@ def insert_movimento(row):
             """INSERT INTO registro
                (gs_row, data, fornitore, prodotto, lotto, scadenza,
                 carico, scarico, unita, etichetta, movimento_id, rimanenza,
-                operatore, reparto)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                operatore, reparto, tipo, data_scarico)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 row.get('gs_row'), row['data'], row['fornitore'], row['prodotto'],
                 row['lotto'], row['scadenza'], row['carico'], row['scarico'],
                 row['unita'], row['etichetta'], row['movimento_id'], row['rimanenza'],
                 row.get('operatore', ''), row.get('reparto', ''),
+                row.get('tipo', 'CARICO'), row.get('data_scarico', ''),
             )
         )
+
+
+def get_movimento_by_id(row_id):
+    with get_conn() as conn:
+        cur = conn.execute("SELECT * FROM registro WHERE id = ?", (row_id,))
+        return _row(cur)
+
+
+def finalizza_in_uso(row_id, data_scarico):
+    """Aggiorna una riga IN_USO esistente a SCARICO (nessuna nuova riga creata)."""
+    with get_conn() as conn:
+        cur = conn.execute(
+            "UPDATE registro SET tipo = 'SCARICO', data_scarico = ? "
+            "WHERE id = ? AND tipo = 'IN_USO'",
+            (data_scarico, row_id)
+        )
+        if cur.rowcount == 0:
+            return None
+    return get_movimento_by_id(row_id)
+
+
+def get_in_uso_attivi(prodotto=None):
+    """Righe IN_USO non ancora finalizzate (scaricate)."""
+    with get_conn() as conn:
+        base_sql = (
+            """SELECT r.id, r.prodotto, r.fornitore, r.lotto, r.scadenza,
+                      r.scarico AS qty, r.unita, r.data, r.reparto, r.operatore,
+                      COALESCE(l.categoria, '') AS categoria
+               FROM registro r
+               LEFT JOIN listino l
+                   ON l.prodotto = r.prodotto AND l.fornitore = r.fornitore
+               WHERE r.tipo = 'IN_USO'"""
+        )
+        if prodotto:
+            cur = conn.execute(
+                base_sql + " AND r.prodotto = ? ORDER BY r.data ASC, r.id ASC",
+                (prodotto,)
+            )
+        else:
+            cur = conn.execute(base_sql + " ORDER BY r.data ASC, r.id ASC")
+        return _rows(cur)
 
 
 def get_lotti_attivi(prodotto):
@@ -363,6 +417,14 @@ def get_giacenze():
         )
         rows = _rows(cur)
 
+        in_uso_rows = _rows(conn.execute(
+            """SELECT prodotto, SUM(scarico) AS tot_in_uso,
+                      MAX(unita) AS unita, MAX(fornitore) AS fornitore
+               FROM registro
+               WHERE tipo = 'IN_USO'
+               GROUP BY prodotto"""
+        ))
+
     grouped = OrderedDict()
     for r in rows:
         p = r['prodotto']
@@ -374,6 +436,7 @@ def get_giacenze():
                 'scorta_min':        float(r['scorta_min'] or 0),
                 'categoria':         r['categoria'] or '',
                 'totale':            0.0,
+                'in_uso':            0.0,
                 'prossima_scadenza': None,
                 'lotti':             [],
             }
@@ -388,6 +451,27 @@ def get_giacenze():
             'rimanenza': r['rimanenza'],
             'etichetta': r['etichetta'],
         })
+
+    for r in in_uso_rows:
+        qty = float(r['tot_in_uso'] or 0)
+        if qty <= 0:
+            continue
+        p = r['prodotto']
+        if p not in grouped:
+            # Prodotto interamente "in uso": nessun lotto rimasto in magazzino,
+            # ma va comunque mostrato in Giacenze con la quantità in uso.
+            grouped[p] = {
+                'prodotto':          p,
+                'fornitore':         r['fornitore'] or '',
+                'unita':             r['unita'] or '',
+                'scorta_min':        0.0,
+                'categoria':         '',
+                'totale':            0.0,
+                'in_uso':            0.0,
+                'prossima_scadenza': None,
+                'lotti':             [],
+            }
+        grouped[p]['in_uso'] = round(grouped[p]['in_uso'] + qty, 4)
 
     result = list(grouped.values())
     for g in result:
@@ -463,12 +547,15 @@ def replace_registro(rows):
                 """INSERT INTO registro
                    (gs_row, data, fornitore, prodotto, lotto, scadenza,
                     carico, scarico, unita, etichetta, movimento_id, rimanenza,
-                    operatore, reparto)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                    operatore, reparto, tipo)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                # Google Sheets non distingue IN_USO: le righe importate sono
+                # sempre CARICO o SCARICO in base al segno del movimento.
                 [(r.get('gs_row'), r['data'], r['fornitore'], r['prodotto'],
                   r['lotto'], r['scadenza'], r['carico'], r['scarico'],
                   r['unita'], r['etichetta'], r['movimento_id'], r['rimanenza'],
-                  r.get('operatore', ''), r.get('reparto', ''))
+                  r.get('operatore', ''), r.get('reparto', ''),
+                  'SCARICO' if (r.get('scarico') or 0) else 'CARICO')
                  for r in rows]
             )
 
@@ -667,9 +754,12 @@ def get_feed(limit=40):
     with get_conn() as conn:
         cur = conn.execute(
             """SELECT id, data, fornitore, prodotto, lotto, scadenza,
-                      carico, scarico, unita, operatore, reparto, movimento_id
+                      carico, scarico, unita, operatore, reparto, movimento_id,
+                      tipo, data_scarico
                FROM registro
-               ORDER BY id DESC
+               ORDER BY
+                 CASE WHEN data_scarico != '' THEN data_scarico ELSE data END DESC,
+                 id DESC
                LIMIT ?""",
             (limit,)
         )

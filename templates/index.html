@@ -210,6 +210,7 @@ main {
 }
 .hcard-carico   .hcard-icon { background: var(--green); }
 .hcard-scarico  .hcard-icon { background: var(--red); }
+.hcard-in-uso   .hcard-icon { background: var(--orange); }
 .hcard-giacenze .hcard-icon { background: var(--blue); }
 .hcard-alert    .hcard-icon { background: var(--orange); }
 .hcard-spesa {
@@ -502,6 +503,7 @@ main {
 .giac-fornitore { font-size: 12px; color: var(--muted); margin-top: 2px; }
 .giac-qty-big  { font-size: 28px; font-weight: 700; color: #111827; line-height: 1; text-align: right; }
 .giac-unit     { font-size: 12px; color: var(--muted); text-align: right; }
+.giac-in-uso   { font-size: 11px; font-weight: 600; color: var(--orange); text-align: right; margin-top: 2px; white-space: nowrap; }
 .giac-lots { border-top: 1px solid var(--border); padding-top: 10px; display: flex; flex-direction: column; gap: 6px; }
 .giac-lot-row  { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .giac-lot-code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12px; }
@@ -708,6 +710,7 @@ main {
   font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0;
 }
 .feed-dot.carico  { background: var(--green); color: #fff; }
+.feed-dot.in-uso  { background: var(--orange); color: #fff; }
 .feed-dot.scarico { background: var(--red); color: #fff; }
 .feed-info  { flex: 1; min-width: 0; }
 .feed-prod  { font-size: 13px; font-weight: 600; color: #111827; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -719,6 +722,7 @@ main {
   padding: 2px 8px; border-radius: 100px; margin-top: 2px; display: inline-block;
 }
 .feed-tipo.carico  { background: rgba(34,197,94,.12);  color: var(--green); }
+.feed-tipo.in-uso  { background: rgba(249,115,22,.12); color: var(--orange); }
 .feed-tipo.scarico { background: rgba(239,68,68,.12); color: var(--red); }
 .feed-empty { font-size: 13px; color: var(--muted); text-align: center; padding: 20px 0; }
 
@@ -964,6 +968,11 @@ main {
       <span class="lbl">Scarico</span>
     </button>
 
+    <button class="drw-item" data-page="in-uso" onclick="navTo('in-uso')">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+      <span class="lbl">In uso</span>
+    </button>
+
     <button class="drw-item" data-page="giacenze" onclick="navTo('giacenze')">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
       <span class="lbl">Giacenze</span>
@@ -1026,6 +1035,14 @@ main {
         <div>
           <div class="hcard-label">Scarico</div>
           <div class="hcard-sub">Registra uscita</div>
+        </div>
+      </div>
+
+      <div class="hcard hcard-in-uso" onclick="navTo('in-uso')">
+        <div class="hcard-icon" style="font-size:22px;line-height:1">🔄</div>
+        <div>
+          <div class="hcard-label">In uso</div>
+          <div class="hcard-sub">Preleva dal magazzino</div>
         </div>
       </div>
 
@@ -1157,6 +1174,53 @@ main {
     <div class="eti-box" id="eti-box-inline"></div>
   </section>
 
+  <!-- IN USO -->
+  <section class="page" id="page-in-uso">
+    <div class="back-bar" onclick="navTo('home')">
+      <div class="back-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+      <span class="back-label">In uso</span>
+    </div>
+
+    <div class="reparto-tabs">
+      <button class="reparto-tab" id="utab-cucina" onclick="setRepartoTab('in-uso','cucina')">🍳 Cucina</button>
+      <button class="reparto-tab" id="utab-sala"   onclick="setRepartoTab('in-uso','sala')">🍷 Sala</button>
+    </div>
+
+    <div class="pg-sub">Seleziona il prodotto e il lotto da prelevare per l'uso</div>
+
+    <div class="form-card">
+      <div class="fgroup">
+        <label class="flabel">Prodotto *</label>
+        <div class="fselect-wrap">
+          <select class="fselect" id="u-prodotto" onchange="onProdottoInUso()">
+            <option value="">Seleziona prodotto…</option>
+          </select>
+        </div>
+      </div>
+      <div class="fgroup">
+        <label class="flabel">Lotto *</label>
+        <div class="fselect-wrap">
+          <select class="fselect" id="u-lotto" disabled onchange="onLottoInUso()">
+            <option value="">Seleziona prima il prodotto</option>
+          </select>
+        </div>
+      </div>
+      <div class="lot-info-box" id="u-lot-info"></div>
+      <div class="fgroup">
+        <label class="flabel">Quantità da prelevare *</label>
+        <input class="finput" type="number" id="u-qty"
+               placeholder="0" min="0.01" step="0.01" inputmode="decimal"
+               oninput="validateQtyInUso()">
+        <div class="ferror" id="u-qty-error"></div>
+      </div>
+    </div>
+
+    <button class="btn-primary" id="btn-in-uso" onclick="submitInUso()">
+      <span class="spinner"></span>
+      <span class="btn-lbl">Metti in uso</span>
+    </button>
+  </section>
+
   <!-- SCARICO -->
   <section class="page" id="page-scarico">
     <div class="back-bar" onclick="navTo('home')">
@@ -1169,7 +1233,7 @@ main {
       <button class="reparto-tab" id="stab-sala"   onclick="setRepartoTab('scarico','sala')">🍷 Sala</button>
     </div>
 
-    <div class="pg-sub">Seleziona il prodotto e il lotto da scaricare</div>
+    <div class="pg-sub">Seleziona il prodotto in uso da segnare come terminato</div>
 
     <div class="form-card">
       <div class="fgroup">
@@ -1181,7 +1245,7 @@ main {
         </div>
       </div>
       <div class="fgroup">
-        <label class="flabel">Lotto *</label>
+        <label class="flabel">In uso *</label>
         <div class="fselect-wrap">
           <select class="fselect" id="s-lotto" disabled onchange="onLottoScarico()">
             <option value="">Seleziona prima il prodotto</option>
@@ -1189,29 +1253,11 @@ main {
         </div>
       </div>
       <div class="lot-info-box" id="s-lot-info"></div>
-      <div class="fgroup">
-        <label class="flabel">Motivo scarico</label>
-        <div class="fselect-wrap">
-          <select class="fselect" id="s-motivo">
-            <option value="Utilizzo cucina">Utilizzo cucina</option>
-            <option value="Scaduto">Scaduto</option>
-            <option value="Danneggiato">Danneggiato</option>
-            <option value="Altro">Altro</option>
-          </select>
-        </div>
-      </div>
-      <div class="fgroup">
-        <label class="flabel">Quantità da scaricare *</label>
-        <input class="finput" type="number" id="s-qty"
-               placeholder="0" min="0.01" step="0.01" inputmode="decimal"
-               oninput="validateQtyScarico()">
-        <div class="ferror" id="s-qty-error"></div>
-      </div>
     </div>
 
     <button class="btn-primary" id="btn-scarico" onclick="submitScarico()">
       <span class="spinner"></span>
-      <span class="btn-lbl">Registra Scarico</span>
+      <span class="btn-lbl">Conferma Scarico</span>
     </button>
   </section>
 
@@ -1423,6 +1469,8 @@ const S = {
   prodotti:     [],
   categorie:    [],
   lottiScarico: [],
+  lottiInUso:   [],
+  inUso:        [],
   giacenze:     [],
   alerts:       { scadenze: [], scorte: [], count: 0 },
   feed:         [],
@@ -1435,6 +1483,7 @@ const S = {
   alertTypeFilter: 'all',   // 'all' | 'scadenza' | 'scorta'
   alertCatFilter:  'all',   // 'all' | category name
   caricoTab:  USER_REPARTO === 'sala' ? 'sala' : 'cucina',
+  inUsoTab:   USER_REPARTO === 'sala' ? 'sala' : 'cucina',
   scaricoTab: USER_REPARTO === 'sala' ? 'sala' : 'cucina',
 };
 
@@ -1454,6 +1503,15 @@ function setRepartoTab(form, tab) {
     document.getElementById('ctab-cucina').classList.toggle('active', tab === 'cucina');
     document.getElementById('ctab-sala').classList.toggle('active', tab === 'sala');
     populateCaricoSelect();
+  } else if (form === 'in-uso') {
+    S.inUsoTab = tab;
+    document.getElementById('utab-cucina').classList.toggle('active', tab === 'cucina');
+    document.getElementById('utab-sala').classList.toggle('active', tab === 'sala');
+    renderInUsoProdotti();
+    const lottoSel = document.getElementById('u-lotto');
+    lottoSel.innerHTML = '<option value="">Seleziona prima il prodotto</option>';
+    lottoSel.disabled = true;
+    document.getElementById('u-lot-info').classList.remove('show');
   } else {
     S.scaricoTab = tab;
     document.getElementById('stab-cucina').classList.toggle('active', tab === 'cucina');
@@ -1468,9 +1526,11 @@ function setRepartoTab(form, tab) {
 }
 
 function initRepartoTabs() {
-  // Attiva tab di default su entrambi i form
+  // Attiva tab di default su tutti i form
   document.getElementById('ctab-cucina').classList.toggle('active', S.caricoTab === 'cucina');
   document.getElementById('ctab-sala').classList.toggle('active', S.caricoTab === 'sala');
+  document.getElementById('utab-cucina').classList.toggle('active', S.inUsoTab === 'cucina');
+  document.getElementById('utab-sala').classList.toggle('active', S.inUsoTab === 'sala');
   document.getElementById('stab-cucina').classList.toggle('active', S.scaricoTab === 'cucina');
   document.getElementById('stab-sala').classList.toggle('active', S.scaricoTab === 'sala');
 }
@@ -1506,7 +1566,8 @@ async function init() {
   setHdrDate();
   animHomeCards();
   initRepartoTabs();
-  await Promise.all([loadCategorie(), loadProdottiCarico(), loadGiacenze(), loadAlerts(), loadFeed(), loadListaSpesa()]);
+  await Promise.all([loadCategorie(), loadProdottiCarico(), loadGiacenze(), loadAlerts(), loadFeed(), loadListaSpesa(), loadInUso()]);
+  renderInUsoProdotti();
   renderScaricoProdotti();
 }
 
@@ -1578,22 +1639,25 @@ function renderFeed() {
     return;
   }
 
+  const TIPO_CLASS = { CARICO: 'carico', IN_USO: 'in-uso', SCARICO: 'scarico' };
+  const TIPO_LABEL = { CARICO: 'CARICO', IN_USO: 'IN USO', SCARICO: 'SCARICO' };
+
   const rows = S.feed.slice(0, 20).map(m => {
-    const isCarico = (m.carico || 0) > 0;
-    const tipo     = isCarico ? 'carico' : 'scarico';
-    const qty      = isCarico ? m.carico : m.scarico;
-    const init     = (m.operatore || m.prodotto || '?')[0].toUpperCase();
-    const sub      = [m.fornitore, m.reparto, m.lotto ? `Lotto ${m.lotto}` : null]
-                       .filter(Boolean).join(' · ');
+    const tipoKey = m.tipo || ((m.carico || 0) > 0 ? 'CARICO' : 'SCARICO');
+    const cls     = TIPO_CLASS[tipoKey] || 'scarico';
+    const qty     = tipoKey === 'CARICO' ? m.carico : m.scarico;
+    const init    = (m.operatore || m.prodotto || '?')[0].toUpperCase();
+    const sub     = [m.fornitore, m.reparto, m.lotto ? `Lotto ${m.lotto}` : null]
+                      .filter(Boolean).join(' · ');
     return `<div class="feed-item">
-      <div class="feed-dot ${tipo}">${esc(init)}</div>
+      <div class="feed-dot ${cls}">${esc(init)}</div>
       <div class="feed-info">
         <div class="feed-prod">${esc(m.prodotto)}</div>
         <div class="feed-sub">${esc(sub || '—')}</div>
       </div>
       <div class="feed-right">
         <div class="feed-qty">${qty}&nbsp;<span style="font-size:11px;font-weight:400;color:var(--muted)">${esc(m.unita||'')}</span></div>
-        <span class="feed-tipo ${tipo}">${isCarico ? 'CARICO' : 'SCARICO'}</span>
+        <span class="feed-tipo ${cls}">${TIPO_LABEL[tipoKey] || tipoKey}</span>
       </div>
     </div>`;
   }).join('');
@@ -1807,49 +1871,49 @@ function resetCarico() {
   S.unitaCarico = '';
 }
 
-// ── SCARICO ──────────────────────────────────────────────────────────────
-function renderScaricoProdotti() {
-  const sel = document.getElementById('s-prodotto');
+// ── IN USO ───────────────────────────────────────────────────────────────
+function renderInUsoProdotti() {
+  const sel = document.getElementById('u-prodotto');
   const cur = sel.value;
-  const filtered = filterProdottiByTab(S.giacenze, S.scaricoTab);
+  const filtered = filterProdottiByTab(S.giacenze, S.inUsoTab);
   sel.innerHTML = '<option value="">Seleziona prodotto…</option>' +
     filtered.map(g => `<option value="${esc(g.prodotto)}">${esc(g.prodotto)}</option>`).join('');
   if (cur && filtered.find(g => g.prodotto === cur)) {
     sel.value = cur;
   } else {
-    document.getElementById('s-lotto').innerHTML = '<option value="">Seleziona prima il prodotto</option>';
-    document.getElementById('s-lotto').disabled = true;
-    document.getElementById('s-lot-info').classList.remove('show');
+    document.getElementById('u-lotto').innerHTML = '<option value="">Seleziona prima il prodotto</option>';
+    document.getElementById('u-lotto').disabled = true;
+    document.getElementById('u-lot-info').classList.remove('show');
   }
 }
 
-async function onProdottoScarico() {
-  const prodotto = document.getElementById('s-prodotto').value;
-  const lottoSel = document.getElementById('s-lotto');
-  document.getElementById('s-lot-info').classList.remove('show');
+async function onProdottoInUso() {
+  const prodotto = document.getElementById('u-prodotto').value;
+  const lottoSel = document.getElementById('u-lotto');
+  document.getElementById('u-lot-info').classList.remove('show');
   if (!prodotto) {
     lottoSel.innerHTML = '<option value="">Seleziona prima il prodotto</option>';
     lottoSel.disabled = true; return;
   }
   lottoSel.disabled = true;
   const data = await api(`/api/lotti?prodotto=${encodeURIComponent(prodotto)}`);
-  S.lottiScarico = data.lotti || [];
+  S.lottiInUso = data.lotti || [];
   lottoSel.innerHTML = '<option value="">Seleziona lotto…</option>' +
-    S.lottiScarico.map(l => {
+    S.lottiInUso.map(l => {
       const sc = l.scadenza ? ` · scade ${fmtDate(l.scadenza)}` : '';
       return `<option value="${esc(l.lotto)}">${esc(l.lotto)} — ${l.rimanenza} ${l.unita}${sc}</option>`;
     }).join('');
   lottoSel.disabled = false;
 }
 
-function onLottoScarico() {
-  const lotto = document.getElementById('s-lotto').value;
-  const info  = document.getElementById('s-lot-info');
-  document.getElementById('s-qty-error').textContent = '';
-  document.getElementById('s-qty-error').classList.remove('show');
-  document.getElementById('s-qty').classList.remove('error');
+function onLottoInUso() {
+  const lotto = document.getElementById('u-lotto').value;
+  const info  = document.getElementById('u-lot-info');
+  document.getElementById('u-qty-error').textContent = '';
+  document.getElementById('u-qty-error').classList.remove('show');
+  document.getElementById('u-qty').classList.remove('error');
   if (!lotto) { info.classList.remove('show'); return; }
-  const l = S.lottiScarico.find(x => x.lotto === lotto);
+  const l = S.lottiInUso.find(x => x.lotto === lotto);
   if (!l)    { info.classList.remove('show'); return; }
   const giorni  = l.scadenza ? daysTo(l.scadenza) : null;
   const scadTxt = l.scadenza
@@ -1863,43 +1927,120 @@ function onLottoScarico() {
   info.classList.add('show');
 }
 
-function validateQtyScarico() {
-  const lotto = document.getElementById('s-lotto').value;
-  const qtyEl = document.getElementById('s-qty');
-  const errEl = document.getElementById('s-qty-error');
+function validateQtyInUso() {
+  const lotto = document.getElementById('u-lotto').value;
+  const qtyEl = document.getElementById('u-qty');
+  const errEl = document.getElementById('u-qty-error');
   const qty   = parseFloat(qtyEl.value);
-  const l     = S.lottiScarico.find(x => x.lotto === lotto);
+  const l     = S.lottiInUso.find(x => x.lotto === lotto);
   if (l && qty > 0 && qty > l.rimanenza) {
-    errEl.textContent = `Non puoi scaricare più di ${l.rimanenza} ${l.unita} disponibili`;
+    errEl.textContent = `Non puoi prelevare più di ${l.rimanenza} ${l.unita} disponibili`;
     errEl.classList.add('show'); qtyEl.classList.add('error'); return false;
   }
   errEl.textContent = ''; errEl.classList.remove('show'); qtyEl.classList.remove('error');
   return true;
 }
 
-async function submitScarico() {
-  const prodotto = document.getElementById('s-prodotto').value;
-  const lotto    = document.getElementById('s-lotto').value;
-  const qty      = parseFloat(document.getElementById('s-qty').value);
+async function submitInUso() {
+  const prodotto = document.getElementById('u-prodotto').value;
+  const lotto    = document.getElementById('u-lotto').value;
+  const qty      = parseFloat(document.getElementById('u-qty').value);
   if (!prodotto)        { toast('Seleziona il prodotto', 'error'); return; }
   if (!lotto)           { toast('Seleziona il lotto', 'error'); return; }
   if (!qty || qty <= 0) { toast('Inserisci una quantità valida', 'error'); return; }
-  if (!validateQtyScarico()) return;
+  if (!validateQtyInUso()) return;
 
-  const btn = document.getElementById('btn-scarico');
+  const btn = document.getElementById('btn-in-uso');
   btn.classList.add('loading'); btn.disabled = true;
 
-  const motivo = document.getElementById('s-motivo').value;
-  const data = await api('/api/scarico', { method: 'POST', body: { prodotto, lotto, qty, motivo } });
+  const data = await api('/api/in-uso', { method: 'POST', body: { prodotto, lotto, qty } });
 
   btn.classList.remove('loading'); btn.disabled = false;
 
   if (data.success) {
-    toast(`Scarico registrato — rimasto: ${data.rimanenza}`, 'success');
-    document.getElementById('s-qty').value = '';
-    await Promise.all([loadGiacenze(), loadAlerts(), loadFeed()]);
+    toast(`Messo in uso — rimasto in magazzino: ${data.rimanenza}`, 'success');
+    document.getElementById('u-qty').value = '';
+    await Promise.all([loadGiacenze(), loadAlerts(), loadFeed(), loadInUso()]);
+    renderInUsoProdotti();
     renderScaricoProdotti();
-    await onProdottoScarico();
+    await onProdottoInUso();
+  } else { toast(data.error || 'Errore durante il prelievo', 'error'); }
+}
+
+// ── SCARICO (finalizza un elemento IN USO) ────────────────────────────────
+async function loadInUso() {
+  const data = await api('/api/in-uso');
+  S.inUso = data.in_uso || [];
+  if (S.activePage === 'scarico') renderScaricoProdotti();
+}
+
+function renderScaricoProdotti() {
+  const sel = document.getElementById('s-prodotto');
+  const cur = sel.value;
+  const filtered     = filterProdottiByTab(S.inUso, S.scaricoTab);
+  const prodottiUnici = [...new Set(filtered.map(r => r.prodotto))];
+  sel.innerHTML = '<option value="">Seleziona prodotto…</option>' +
+    prodottiUnici.map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join('');
+  if (cur && prodottiUnici.includes(cur)) {
+    sel.value = cur;
+    onProdottoScarico();
+  } else {
+    document.getElementById('s-lotto').innerHTML = '<option value="">Seleziona prima il prodotto</option>';
+    document.getElementById('s-lotto').disabled = true;
+    document.getElementById('s-lot-info').classList.remove('show');
+  }
+}
+
+function onProdottoScarico() {
+  const prodotto = document.getElementById('s-prodotto').value;
+  const lottoSel = document.getElementById('s-lotto');
+  document.getElementById('s-lot-info').classList.remove('show');
+  if (!prodotto) {
+    lottoSel.innerHTML = '<option value="">Seleziona prima il prodotto</option>';
+    lottoSel.disabled = true; return;
+  }
+  const entries = S.inUso.filter(r => r.prodotto === prodotto);
+  lottoSel.innerHTML = '<option value="">Seleziona…</option>' +
+    entries.map(r => {
+      const sub = [r.lotto ? `Lotto ${r.lotto}` : null, fmtDate(r.data)].filter(Boolean).join(' · ');
+      return `<option value="${r.id}">${r.qty}&nbsp;${esc(r.unita)} — ${esc(sub)}</option>`;
+    }).join('');
+  lottoSel.disabled = false;
+}
+
+function onLottoScarico() {
+  const id   = document.getElementById('s-lotto').value;
+  const info = document.getElementById('s-lot-info');
+  if (!id) { info.classList.remove('show'); return; }
+  const r = S.inUso.find(x => String(x.id) === String(id));
+  if (!r)  { info.classList.remove('show'); return; }
+  info.innerHTML = `
+    <div class="lot-info-row"><span>Quantità</span><strong>${r.qty} ${esc(r.unita)}</strong></div>
+    <div class="lot-info-row"><span>In uso dal</span><strong>${fmtDate(r.data)}</strong></div>
+    ${r.lotto     ? `<div class="lot-info-row"><span>Lotto</span><strong>${esc(r.lotto)}</strong></div>`     : ''}
+    ${r.fornitore ? `<div class="lot-info-row"><span>Fornitore</span><strong>${esc(r.fornitore)}</strong></div>` : ''}
+  `;
+  info.classList.add('show');
+}
+
+async function submitScarico() {
+  const prodotto = document.getElementById('s-prodotto').value;
+  const id       = document.getElementById('s-lotto').value;
+  if (!prodotto) { toast('Seleziona il prodotto', 'error'); return; }
+  if (!id)       { toast('Seleziona l\'elemento da scaricare', 'error'); return; }
+
+  const btn = document.getElementById('btn-scarico');
+  btn.classList.add('loading'); btn.disabled = true;
+
+  const data = await api('/api/scarico', { method: 'POST', body: { id: Number(id) } });
+
+  btn.classList.remove('loading'); btn.disabled = false;
+
+  if (data.success) {
+    toast(`Scarico registrato — ${data.prodotto}`, 'success');
+    await Promise.all([loadInUso(), loadGiacenze(), loadAlerts(), loadFeed()]);
+    renderScaricoProdotti();
+    renderInUsoProdotti();
   } else { toast(data.error || 'Errore durante lo scarico', 'error'); }
 }
 
@@ -1958,6 +2099,7 @@ function renderGiacenze() {
         <div>
           <div class="giac-qty-big">${g.totale}</div>
           <div class="giac-unit">${esc(g.unita)}</div>
+          ${g.in_uso > 0 ? `<div class="giac-in-uso">🔄 ${g.in_uso} in uso</div>` : ''}
         </div>
       </div>
       <div class="giac-lots">${lotsHtml}</div>

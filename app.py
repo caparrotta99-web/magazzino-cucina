@@ -593,6 +593,21 @@ def api_sync():
 
 # ─── SCAN ETICHETTA (Claude Vision) ──────────────────────────────────────────
 
+def _extract_json_object(text):
+    """Estrae un oggetto JSON dalla risposta del modello, tollerando eventuale
+    testo introduttivo o code fence markdown (```json ... ```) attorno al JSON."""
+    cleaned = re.sub(r'^```(?:json)?\s*|\s*```$', '', text.strip(), flags=re.IGNORECASE)
+    try:
+        return json.loads(cleaned)
+    except json.JSONDecodeError:
+        pass
+    start = cleaned.find('{')
+    end   = cleaned.rfind('}')
+    if start == -1 or end == -1 or end <= start:
+        return None
+    return json.loads(cleaned[start:end + 1])
+
+
 @app.route('/api/scan-label', methods=['POST'])
 @login_required
 def api_scan_label():
@@ -615,7 +630,7 @@ def api_scan_label():
         import anthropic as _anthropic
         client = _anthropic.Anthropic(api_key=api_key)
         resp = client.messages.create(
-            model='claude-sonnet-4-20250514',
+            model='claude-sonnet-4-6',
             max_tokens=500,
             messages=[{
                 'role': 'user',
@@ -640,16 +655,16 @@ def api_scan_label():
                 ],
             }],
         )
-        text  = resp.content[0].text
-        match = re.search(r'\{.*?\}', text, re.DOTALL)
-        if not match:
+        text = resp.content[0].text
+        try:
+            result = _extract_json_object(text)
+        except json.JSONDecodeError:
+            result = None
+        if not result:
             return jsonify({'success': False, 'error': 'Nessun dato trovato nell\'etichetta'})
-        result = json.loads(match.group())
         return jsonify({'success': True,
                         'lotto':   result.get('lotto'),
                         'scadenza': result.get('scadenza')})
-    except json.JSONDecodeError:
-        return jsonify({'success': False, 'error': 'Risposta non valida'})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

@@ -549,13 +549,13 @@ def replace_registro(rows):
                     carico, scarico, unita, etichetta, movimento_id, rimanenza,
                     operatore, reparto, tipo)
                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-                # Google Sheets non distingue IN_USO: le righe importate sono
-                # sempre CARICO o SCARICO in base al segno del movimento.
+                # 'tipo' arriva già determinato da sheets.load_registro() (colonna
+                # 'Tipo movimento'); se assente, deduci dal segno del movimento.
                 [(r.get('gs_row'), r['data'], r['fornitore'], r['prodotto'],
                   r['lotto'], r['scadenza'], r['carico'], r['scarico'],
                   r['unita'], r['etichetta'], r['movimento_id'], r['rimanenza'],
                   r.get('operatore', ''), r.get('reparto', ''),
-                  'SCARICO' if (r.get('scarico') or 0) else 'CARICO')
+                  r.get('tipo') or ('SCARICO' if (r.get('scarico') or 0) else 'CARICO'))
                  for r in rows]
             )
 

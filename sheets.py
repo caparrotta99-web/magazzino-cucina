@@ -14,8 +14,24 @@ SHEET_REGISTRO = 'REGISTRO'
 REGISTRO_COLS = [
     'data', 'fornitore', 'prodotto', 'lotto', 'scadenza',
     'carico', 'scarico', 'unita', 'etichetta', 'movimento_id', 'rimanenza',
-    'operatore', 'reparto', 'ddt'
+    'operatore', 'reparto', 'tipo_movimento', 'ddt'
 ]
+
+# Valore da scrivere nella colonna "Tipo movimento" per ciascun tipo interno
+_TIPO_DISPLAY = {'CARICO': 'CARICO', 'IN_USO': 'IN USO', 'SCARICO': 'SCARICO'}
+
+
+def _normalizza_tipo(raw):
+    """Converte il testo della colonna 'Tipo movimento' nel codice interno
+    usato dall'app ('CARICO' | 'IN_USO' | 'SCARICO'). None se non riconosciuto."""
+    t = (raw or '').strip().upper()
+    if t in ('IN USO', 'IN_USO', 'INUSO'):
+        return 'IN_USO'
+    if t == 'SCARICO':
+        return 'SCARICO'
+    if t == 'CARICO':
+        return 'CARICO'
+    return None
 
 # Sinonimi per il rilevamento automatico delle colonne
 _SYNS = {
@@ -36,6 +52,7 @@ _SYNS = {
     'rimanenza':   ['rimanenza', 'saldo', 'balance', 'stock', 'residuo'],
     'operatore':   ['operatore', 'operator', 'utente', 'user'],
     'reparto':     ['reparto', 'department', 'dept', 'settore'],
+    'tipo_movimento': ['tipo movimento'],
     'ddt':         ['ddt', 'bolla', 'documento', 'doc', 'ddt/bolla'],
 }
 
@@ -175,7 +192,7 @@ def load_registro():
         k: _detect(headers, k)
         for k in ('data', 'fornitore', 'prodotto', 'lotto', 'scadenza',
                   'carico', 'scarico', 'unita', 'etichetta', 'movimento_id', 'rimanenza',
-                  'operatore', 'reparto')
+                  'operatore', 'reparto', 'tipo_movimento')
     }
 
     if col['prodotto'] is None:
@@ -190,6 +207,12 @@ def load_registro():
         prodotto = v('prodotto')
         if not prodotto:
             continue
+        scarico_val = _to_float(v('scarico'))
+        tipo = _normalizza_tipo(v('tipo_movimento'))
+        if tipo is None:
+            # Righe storiche senza colonna 'Tipo movimento' valorizzata:
+            # deduci dal segno del movimento (nessuna distinzione IN USO possibile).
+            tipo = 'SCARICO' if scarico_val else 'CARICO'
         result.append({
             'gs_row':      i,
             'data':        normalize_date(v('data')),
@@ -198,13 +221,14 @@ def load_registro():
             'lotto':       v('lotto'),
             'scadenza':    normalize_date(v('scadenza')),
             'carico':      _to_float(v('carico')),
-            'scarico':     _to_float(v('scarico')),
+            'scarico':     scarico_val,
             'unita':       v('unita') or 'kg',
             'etichetta':   v('etichetta'),
             'movimento_id':v('movimento_id'),
             'rimanenza':   _to_float(v('rimanenza')),
             'operatore':   v('operatore'),
             'reparto':     v('reparto'),
+            'tipo':        tipo,
         })
     return result
 
@@ -249,6 +273,7 @@ def append_registro(row_data):
         'rimanenza':    row_data.get('rimanenza', 0),
         'operatore':    row_data.get('operatore', ''),
         'reparto':      row_data.get('reparto', ''),
+        'tipo_movimento': _TIPO_DISPLAY.get(row_data.get('tipo', 'CARICO'), 'CARICO'),
         'ddt':          row_data.get('ddt', ''),
     }
 
@@ -258,6 +283,34 @@ def append_registro(row_data):
             new_row[idx] = val
 
     ws.append_row(new_row, value_input_option='USER_ENTERED')
+
+
+def aggiorna_tipo_movimento(movimento_id, nuovo_tipo):
+    """
+    Trova la riga del REGISTRO con questo movimento_id (colonna 'ID') e
+    aggiorna la colonna 'Tipo movimento' — es. da 'IN USO' a 'SCARICO'
+    quando un prelievo in uso viene finalizzato. Non crea nuove righe.
+    Ritorna True se una riga è stata trovata e aggiornata, False altrimenti.
+    """
+    gc = _get_client()
+    ws = gc.open_by_key(SPREADSHEET_ID).worksheet(SHEET_REGISTRO)
+
+    all_values = ws.get_all_values()
+    if len(all_values) < 2:
+        return False
+
+    headers  = [h.strip() for h in all_values[0]]
+    col_id   = _detect(headers, 'movimento_id')
+    col_tipo = _detect(headers, 'tipo_movimento')
+    if col_id is None or col_tipo is None:
+        raise ValueError(f"Colonna 'ID' o 'Tipo movimento' non trovata nel REGISTRO. Header: {headers}")
+
+    for i, row in enumerate(all_values[1:], start=2):
+        val = row[col_id].strip() if col_id < len(row) else ''
+        if val == movimento_id:
+            ws.update_cell(i, col_tipo + 1, _TIPO_DISPLAY.get(nuovo_tipo, nuovo_tipo))
+            return True
+    return False
 
 
 def append_listino(row_data):

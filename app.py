@@ -24,7 +24,7 @@ from database import (
     get_fornitori, get_categorie, get_all_prodotti, get_prodotti_by_fornitore,
     get_ultima_rimanenza, insert_movimento,
     get_lotti_attivi, get_giacenze, get_alerts,
-    get_in_uso_attivi, finalizza_in_uso,
+    get_in_uso_attivi, finalizza_in_uso, get_movimento_by_id,
     create_user, get_user_by_login, get_user_by_nome, get_user_by_id,
     get_all_users, update_user_role, delete_user,
     create_reset_token, get_reset_token, use_reset_token, update_user_password,
@@ -32,7 +32,7 @@ from database import (
     get_lista_spesa, add_lista_spesa_item, update_lista_spesa_completato,
     update_lista_spesa_fornitore, delete_lista_spesa_item, clear_lista_spesa,
 )
-from sheets import load_listino, load_registro, append_registro, append_listino
+from sheets import load_listino, load_registro, append_registro, append_listino, aggiorna_tipo_movimento
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'haccp-brigade-2024')
@@ -592,7 +592,7 @@ def api_in_uso_crea():
 @login_required
 def api_scarico():
     """Finalizza una riga IN_USO esistente: la marca come SCARICO con la data
-    odierna. Non crea una nuova riga nel registro."""
+    odierna. Non crea una nuova riga nel registro (né localmente né su Sheets)."""
     d = request.get_json(force=True)
     try:
         row_id = int(d.get('id', 0))
@@ -602,19 +602,28 @@ def api_scarico():
     if not row_id:
         return jsonify({'success': False, 'error': 'Seleziona un elemento da scaricare'}), 400
 
-    oggi = datetime.now().strftime('%Y-%m-%d')
-    row  = finalizza_in_uso(row_id, oggi)
+    row = get_movimento_by_id(row_id)
+    if not row or row.get('tipo') != 'IN_USO':
+        return jsonify({'success': False, 'error': 'Elemento non trovato o già scaricato'}), 400
 
-    if not row:
+    try:
+        aggiorna_tipo_movimento(row['movimento_id'], 'SCARICO')
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Errore Google Sheets: {e}'}), 500
+
+    oggi     = datetime.now().strftime('%Y-%m-%d')
+    finalized = finalizza_in_uso(row_id, oggi)
+
+    if not finalized:
         return jsonify({'success': False, 'error': 'Elemento non trovato o già scaricato'}), 400
 
     return jsonify({
         'success':      True,
-        'prodotto':     row['prodotto'],
-        'lotto':        row['lotto'],
-        'qty':          row['scarico'],
-        'unita':        row['unita'],
-        'data_scarico': row['data_scarico'],
+        'prodotto':     finalized['prodotto'],
+        'lotto':        finalized['lotto'],
+        'qty':          finalized['scarico'],
+        'unita':        finalized['unita'],
+        'data_scarico': finalized['data_scarico'],
     })
 
 

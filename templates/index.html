@@ -1095,6 +1095,7 @@ main {
     <div class="reparto-tabs">
       <button class="reparto-tab" id="ctab-cucina" onclick="setRepartoTab('carico','cucina')">🍳 Cucina</button>
       <button class="reparto-tab" id="ctab-sala"   onclick="setRepartoTab('carico','sala')">🍷 Sala</button>
+      <button class="reparto-tab" id="ctab-pizzeria" onclick="setRepartoTab('carico','pizzeria')">🍕 Pizzeria</button>
     </div>
 
     <div class="pg-sub">I campi contrassegnati con * sono obbligatori</div>
@@ -1184,6 +1185,7 @@ main {
     <div class="reparto-tabs">
       <button class="reparto-tab" id="utab-cucina" onclick="setRepartoTab('in-uso','cucina')">🍳 Cucina</button>
       <button class="reparto-tab" id="utab-sala"   onclick="setRepartoTab('in-uso','sala')">🍷 Sala</button>
+      <button class="reparto-tab" id="utab-pizzeria" onclick="setRepartoTab('in-uso','pizzeria')">🍕 Pizzeria</button>
     </div>
 
     <div class="pg-sub">Seleziona il prodotto e il lotto da prelevare per l'uso</div>
@@ -1231,6 +1233,7 @@ main {
     <div class="reparto-tabs">
       <button class="reparto-tab" id="stab-cucina" onclick="setRepartoTab('scarico','cucina')">🍳 Cucina</button>
       <button class="reparto-tab" id="stab-sala"   onclick="setRepartoTab('scarico','sala')">🍷 Sala</button>
+      <button class="reparto-tab" id="stab-pizzeria" onclick="setRepartoTab('scarico','pizzeria')">🍕 Pizzeria</button>
     </div>
 
     <div class="pg-sub">Seleziona il prodotto in uso da segnare come terminato</div>
@@ -1285,6 +1288,13 @@ main {
       <select class="fselect-pill" id="filter-categoria"
               onchange="onFilterSelectChange(this); renderGiacenze()">
         <option value="">Categoria</option>
+      </select>
+      <select class="fselect-pill" id="filter-reparto"
+              onchange="onFilterSelectChange(this); renderGiacenze()">
+        <option value="">Reparto</option>
+        <option value="Cucina">Cucina</option>
+        <option value="Sala">Sala</option>
+        <option value="Pizzeria">Pizzeria</option>
       </select>
       <!-- compat: old renderCatFilter targets this div -->
       <div id="cat-filter" style="display:none"></div>
@@ -1427,6 +1437,18 @@ main {
         <input class="finput" type="number" id="np-scorta" placeholder="0" min="0" step="0.1" inputmode="decimal">
       </div>
 
+      <div class="fgroup">
+        <label class="flabel">Reparto *</label>
+        <div class="fselect-wrap">
+          <select class="fselect" id="np-reparto">
+            <option value="" disabled selected>Seleziona reparto…</option>
+            <option value="Cucina">Cucina</option>
+            <option value="Sala">Sala</option>
+            <option value="Pizzeria">Pizzeria</option>
+          </select>
+        </div>
+      </div>
+
       <div class="fgroup" style="margin-bottom:0">
         <label class="flabel">Categoria</label>
         <div class="fselect-wrap">
@@ -1460,9 +1482,8 @@ main {
 <script>
 // ── REPARTO COSTANTE (iniettata dal server) ───────────────────────────────
 const USER_REPARTO = "{{ current_user.reparto|lower if current_user.is_authenticated else 'cucina' }}";
-
-// Categorie Sala: Bevande + Dolci
-const SALA_CATS = ['bevande', 'dolci'];
+const REPARTI = ['cucina', 'sala', 'pizzeria'];
+const _defaultTab = REPARTI.includes(USER_REPARTO) ? USER_REPARTO : 'cucina';
 
 // ── STATE ────────────────────────────────────────────────────────────────
 const S = {
@@ -1477,36 +1498,40 @@ const S = {
   unitaCarico:  '',
   activePage:   'home',
   giacFilter:   'all',
+  giacRepartoFilter:  '',      // '' | 'cucina' | 'sala' | 'pizzeria'
   listaSpesa:      [],
   spesaTimers:     {},   // id → { timeout, interval, startTime }
   spesaFornFilter: 'all',
+  spesaRepartoFilter: 'all',   // 'all' | 'cucina' | 'sala' | 'pizzeria'
   alertTypeFilter: 'all',   // 'all' | 'scadenza' | 'scorta'
   alertCatFilter:  'all',   // 'all' | category name
-  caricoTab:  USER_REPARTO === 'sala' ? 'sala' : 'cucina',
-  inUsoTab:   USER_REPARTO === 'sala' ? 'sala' : 'cucina',
-  scaricoTab: USER_REPARTO === 'sala' ? 'sala' : 'cucina',
+  alertRepartoFilter: 'all',   // 'all' | 'cucina' | 'sala' | 'pizzeria'
+  caricoTab:  _defaultTab,
+  inUsoTab:   _defaultTab,
+  scaricoTab: _defaultTab,
 };
 
 // ── REPARTO TABS ──────────────────────────────────────────────────────────
-// Filtra array di prodotti/giacenze in base al tab attivo
+// Filtra array di prodotti/giacenze in base al reparto del prodotto
 function filterProdottiByTab(items, tab) {
-  return items.filter(p => {
-    const cat = (p.categoria || '').toLowerCase().trim();
-    const isSala = SALA_CATS.includes(cat);
-    return tab === 'sala' ? isSala : !isSala;
+  return items.filter(p => (p.reparto || 'Cucina').toLowerCase().trim() === tab);
+}
+
+function _setRepartoTabButtons(prefix, tab) {
+  REPARTI.forEach(r => {
+    const btn = document.getElementById(`${prefix}-${r}`);
+    if (btn) btn.classList.toggle('active', tab === r);
   });
 }
 
 function setRepartoTab(form, tab) {
   if (form === 'carico') {
     S.caricoTab = tab;
-    document.getElementById('ctab-cucina').classList.toggle('active', tab === 'cucina');
-    document.getElementById('ctab-sala').classList.toggle('active', tab === 'sala');
+    _setRepartoTabButtons('ctab', tab);
     populateCaricoSelect();
   } else if (form === 'in-uso') {
     S.inUsoTab = tab;
-    document.getElementById('utab-cucina').classList.toggle('active', tab === 'cucina');
-    document.getElementById('utab-sala').classList.toggle('active', tab === 'sala');
+    _setRepartoTabButtons('utab', tab);
     renderInUsoProdotti();
     const lottoSel = document.getElementById('u-lotto');
     lottoSel.innerHTML = '<option value="">Seleziona prima il prodotto</option>';
@@ -1514,8 +1539,7 @@ function setRepartoTab(form, tab) {
     document.getElementById('u-lot-info').classList.remove('show');
   } else {
     S.scaricoTab = tab;
-    document.getElementById('stab-cucina').classList.toggle('active', tab === 'cucina');
-    document.getElementById('stab-sala').classList.toggle('active', tab === 'sala');
+    _setRepartoTabButtons('stab', tab);
     renderScaricoProdotti();
     // reset lotto / lot info
     const lottoSel = document.getElementById('s-lotto');
@@ -1527,12 +1551,9 @@ function setRepartoTab(form, tab) {
 
 function initRepartoTabs() {
   // Attiva tab di default su tutti i form
-  document.getElementById('ctab-cucina').classList.toggle('active', S.caricoTab === 'cucina');
-  document.getElementById('ctab-sala').classList.toggle('active', S.caricoTab === 'sala');
-  document.getElementById('utab-cucina').classList.toggle('active', S.inUsoTab === 'cucina');
-  document.getElementById('utab-sala').classList.toggle('active', S.inUsoTab === 'sala');
-  document.getElementById('stab-cucina').classList.toggle('active', S.scaricoTab === 'cucina');
-  document.getElementById('stab-sala').classList.toggle('active', S.scaricoTab === 'sala');
+  _setRepartoTabButtons('ctab', S.caricoTab);
+  _setRepartoTabButtons('utab', S.inUsoTab);
+  _setRepartoTabButtons('stab', S.scaricoTab);
 }
 
 // ── CATEGORIE ────────────────────────────────────────────────────────────
@@ -1860,6 +1881,7 @@ async function submitCarico() {
     resetCarico();
     await Promise.all([loadGiacenze(), loadAlerts(), loadFeed()]);
     renderScaricoProdotti();
+    renderInUsoProdotti();
   } else { toast(data.error || 'Errore durante il carico', 'error'); }
 }
 
@@ -2052,15 +2074,17 @@ async function loadGiacenze() {
 }
 
 function renderGiacenze() {
-  const q    = (document.getElementById('search-giacenze').value || '').toLowerCase();
-  const forn = document.getElementById('filter-fornitore').value;
-  const cat  = document.getElementById('filter-categoria').value;
-  const el   = document.getElementById('giacenze-list');
+  const q       = (document.getElementById('search-giacenze').value || '').toLowerCase();
+  const forn    = document.getElementById('filter-fornitore').value;
+  const cat     = document.getElementById('filter-categoria').value;
+  const reparto = document.getElementById('filter-reparto').value;
+  const el      = document.getElementById('giacenze-list');
 
   let list = [...S.giacenze];
   if (q)                           list = list.filter(g => g.prodotto.toLowerCase().includes(q));
   if (forn)                        list = list.filter(g => g.fornitore === forn);
   if (cat)                         list = list.filter(g => g.categoria === cat);
+  if (reparto)                     list = list.filter(g => (g.reparto || 'Cucina') === reparto);
   if (S.giacFilter === 'scadenza') list = list.filter(g => g.prossima_scadenza && daysTo(g.prossima_scadenza) <= 7);
   if (S.giacFilter === 'scorta')   list = list.filter(g => g.sotto_scorta);
 
@@ -2139,6 +2163,13 @@ function setAlertCatFilter(val) {
   renderAlertFilters();
   renderAlerts();
 }
+function setAlertRepartoFilter(val) {
+  S.alertRepartoFilter = S.alertRepartoFilter === val ? 'all' : val;
+  renderAlertFilters();
+  renderAlerts();
+}
+
+const _REPARTO_ICONS = { cucina: '🍳', sala: '🍷', pizzeria: '🍕' };
 
 function renderAlertFilters() {
   const row = document.getElementById('alert-filter-row');
@@ -2161,6 +2192,9 @@ function renderAlertFilters() {
   row.innerHTML = [
     ...typeFilters.map(f =>
       `<button class="fpill ${S.alertTypeFilter === f.val ? 'active' : ''}" onclick="setAlertTypeFilter('${f.val}')">${f.lbl}</button>`
+    ),
+    ...REPARTI.map(r =>
+      `<button class="fpill ${S.alertRepartoFilter === r ? 'active' : ''}" onclick="setAlertRepartoFilter('${r}')">${_REPARTO_ICONS[r]} ${r.charAt(0).toUpperCase()+r.slice(1)}</button>`
     ),
     ...sortedCats.map(c =>
       `<button class="fpill ${S.alertCatFilter === c ? 'active' : ''}" onclick="setAlertCatFilter('${esc(c)}')">${_ALERT_CAT_ICONS[c] || ''} ${esc(c)}</button>`
@@ -2195,6 +2229,10 @@ function renderAlerts() {
   // Apply category filter
   if (S.alertCatFilter !== 'all') {
     items = items.filter(a => (a.categoria || '') === S.alertCatFilter);
+  }
+  // Apply reparto filter
+  if (S.alertRepartoFilter !== 'all') {
+    items = items.filter(a => (a.reparto || 'Cucina').toLowerCase() === S.alertRepartoFilter);
   }
 
   if (!items.length) {
@@ -2294,6 +2332,7 @@ async function addToListaFromAlert(a) {
       prodotto:  a.prodotto,
       fornitore: a.fornitore || '',
       categoria: a.categoria || '',
+      reparto:   a.reparto || '',
       quantita,
       unita:     a.unita || '',
     },
@@ -2447,16 +2486,22 @@ function renderSpesaFilterPills() {
   if (!row) return;
   const fornitori = [...new Set(S.listaSpesa.map(i => i.fornitore).filter(Boolean))].sort();
   row.innerHTML =
-    `<button class="fpill ${S.spesaFornFilter === 'all' ? 'active' : ''}" onclick="setSpesaFilter('all', this)">Tutti</button>` +
+    `<button class="fpill ${S.spesaFornFilter === 'all' ? 'active' : ''}" onclick="setSpesaFilter('all')">Tutti</button>` +
     fornitori.map(f =>
-      `<button class="fpill ${S.spesaFornFilter === f ? 'active' : ''}" onclick="setSpesaFilter('${esc(f)}', this)">${esc(f)}</button>`
+      `<button class="fpill ${S.spesaFornFilter === f ? 'active' : ''}" onclick="setSpesaFilter('${esc(f)}')">${esc(f)}</button>`
+    ).join('') +
+    REPARTI.map(r =>
+      `<button class="fpill ${S.spesaRepartoFilter === r ? 'active' : ''}" onclick="setSpesaRepartoFilter('${r}')">${_REPARTO_ICONS[r]} ${r.charAt(0).toUpperCase()+r.slice(1)}</button>`
     ).join('');
 }
 
-function setSpesaFilter(forn, btn) {
+function setSpesaFilter(forn) {
   S.spesaFornFilter = forn;
-  document.querySelectorAll('#spesa-filter-pills .fpill').forEach(b => b.classList.remove('active'));
-  if (btn) btn.classList.add('active');
+  renderListaSpesa();
+}
+
+function setSpesaRepartoFilter(val) {
+  S.spesaRepartoFilter = S.spesaRepartoFilter === val ? 'all' : val;
   renderListaSpesa();
 }
 
@@ -2481,12 +2526,16 @@ function renderListaSpesa() {
   }
 
   // Apply fornitore filter
-  const visible = S.spesaFornFilter === 'all'
+  let visible = S.spesaFornFilter === 'all'
     ? S.listaSpesa
     : S.listaSpesa.filter(i => i.fornitore === S.spesaFornFilter);
+  // Apply reparto filter
+  if (S.spesaRepartoFilter !== 'all') {
+    visible = visible.filter(i => (i.reparto || 'Cucina').toLowerCase() === S.spesaRepartoFilter);
+  }
 
   if (!visible.length) {
-    container.innerHTML = `<div class="empty-state"><p>Nessun prodotto per questo fornitore</p></div>`;
+    container.innerHTML = `<div class="empty-state"><p>Nessun prodotto per questo filtro</p></div>`;
     return;
   }
 
@@ -2660,6 +2709,7 @@ async function confirmAddProdotto() {
       prodotto,
       fornitore,
       categoria: prod?.categoria || '',
+      reparto:   prod?.reparto || '',
       quantita:  qty,
       unita:     unita || '',
     },
@@ -2689,6 +2739,9 @@ function openNuovoProdotto() {
   document.getElementById('np-scorta').value  = '';
   document.getElementById('np-unita').value   = 'kg';
   document.getElementById('np-categoria').value = '';
+  // Pre-seleziona il reparto in base al tab attivo nella pagina Carico
+  const repartoCap = S.caricoTab.charAt(0).toUpperCase() + S.caricoTab.slice(1);
+  document.getElementById('np-reparto').value = REPARTI.includes(S.caricoTab) ? repartoCap : '';
   document.getElementById('np-fornitore-custom').value = '';
   document.getElementById('np-fornitore-custom-wrap').style.display = 'none';
   document.getElementById('btn-np-salva').disabled = false;
@@ -2718,16 +2771,18 @@ async function submitNuovoProdotto() {
   const unita     = document.getElementById('np-unita').value;
   const scorta    = parseFloat(document.getElementById('np-scorta').value) || 0;
   const categoria = document.getElementById('np-categoria').value;
+  const reparto   = document.getElementById('np-reparto').value;
 
   if (!nome)      { toast('Inserisci il nome del prodotto', 'error'); return; }
   if (!fornitore) { toast('Seleziona o inserisci il fornitore', 'error'); return; }
+  if (!reparto)   { toast('Seleziona il reparto', 'error'); return; }
 
   const btn = document.getElementById('btn-np-salva');
   btn.disabled = true;
 
   const data = await api('/api/prodotti', {
     method: 'POST',
-    body:   { prodotto: nome, fornitore, unita, scorta_min: scorta, categoria },
+    body:   { prodotto: nome, fornitore, unita, scorta_min: scorta, categoria, reparto },
   });
 
   btn.disabled = false;

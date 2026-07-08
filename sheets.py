@@ -40,7 +40,8 @@ _SYNS = {
     'fornitore':   ['fornitore', 'supplier', 'vendor'],
     'unita':       ['unità', 'unita', 'um', 'unit', 'kg/lt', 'misura'],
     'scorta_min':  ['scorta', 'minimo', 'min', 'scorta min', 'minimum'],
-    'categoria':   ['categoria', 'category', 'cat', 'tipo', 'reparto'],
+    'categoria':   ['categoria', 'category', 'cat'],
+    'reparto_prodotto': ['reparto'],
     # REGISTRO
     'data':        ['data', 'date', 'giorno'],
     'lotto':       ['lotto', 'lot', 'batch', 'n. lotto', 'n.lotto'],
@@ -150,13 +151,14 @@ def load_listino():
     if len(all_rows) < 2:
         return []
 
-    # Indici fissi reali del foglio: A=0, B=1, C=2, D=3, G=6
-    _FIXED = {'prodotto': 0, 'fornitore': 1, 'unita': 2, 'scorta_min': 3, 'categoria': 6}
+    # Indici fissi reali del foglio: A=0, B=1, C=2, D=3, E=4 (Reparto), G=6
+    _FIXED = {'prodotto': 0, 'fornitore': 1, 'unita': 2, 'scorta_min': 3,
+              'reparto_prodotto': 4, 'categoria': 6}
 
     headers = [h.strip() for h in all_rows[0]]
     # _detect affina l'indice se l'header è riconosciuto, altrimenti usa il fisso
     col = {}
-    for k in ('prodotto', 'fornitore', 'unita', 'scorta_min', 'categoria'):
+    for k in ('prodotto', 'fornitore', 'unita', 'scorta_min', 'categoria', 'reparto_prodotto'):
         detected = _detect(headers, k)
         col[k] = detected if detected is not None else _FIXED[k]
 
@@ -175,6 +177,7 @@ def load_listino():
             'unita':      v('unita') or 'kg',
             'scorta_min': _to_float(v('scorta_min')),
             'categoria':  v('categoria'),
+            'reparto':    v('reparto_prodotto') or 'Cucina',
         })
     return result
 
@@ -314,7 +317,7 @@ def aggiorna_tipo_movimento(movimento_id, nuovo_tipo):
 
 
 def append_listino(row_data):
-    """Appende una nuova riga al foglio LISTINO (A=nome, B=fornitore, C=unità, D=scorta, G=categoria)."""
+    """Appende una nuova riga al foglio LISTINO (A=nome, B=fornitore, C=unità, D=scorta, E=reparto, G=categoria)."""
     gc = _get_client()
     ws = gc.open_by_key(SPREADSHEET_ID).worksheet(SHEET_LISTINO)
 
@@ -323,6 +326,7 @@ def append_listino(row_data):
     unita      = row_data.get('unita', 'kg')
     scorta_min = row_data.get('scorta_min', 0)
     categoria  = row_data.get('categoria', '')
+    reparto    = row_data.get('reparto') or 'Cucina'
 
     import sys
     all_values = ws.get_all_values()
@@ -337,4 +341,5 @@ def append_listino(row_data):
     print(f"[DEBUG] Scrivo in riga: {next_row}", flush=True, file=sys.stderr)
 
     ws.update(f'A{next_row}:D{next_row}', [[prodotto, fornitore, unita, scorta_min]])
+    ws.update(f'E{next_row}', [[reparto]])
     ws.update(f'G{next_row}', [[categoria]])

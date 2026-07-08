@@ -21,7 +21,7 @@ from database import (
     db_init,
     replace_listino, replace_registro,
     insert_listino_row,
-    get_fornitori, get_categorie, get_all_prodotti, get_prodotti_by_fornitore,
+    get_fornitori, get_categorie, get_all_prodotti, get_prodotti_by_fornitore, get_reparto_prodotto,
     get_ultima_rimanenza, insert_movimento,
     get_lotti_attivi, get_giacenze, get_alerts,
     get_in_uso_attivi, finalizza_in_uso, get_movimento_by_id,
@@ -359,21 +359,25 @@ def api_aggiungi_prodotto():
     unita      = (d.get('unita')     or 'kg').strip()
     scorta_min = d.get('scorta_min', 0)
     categoria  = (d.get('categoria') or '').strip()
+    reparto    = (d.get('reparto')   or '').strip()
 
     if not prodotto:
         return jsonify({'success': False, 'error': 'Nome prodotto obbligatorio'}), 400
     if not fornitore:
         return jsonify({'success': False, 'error': 'Fornitore obbligatorio'}), 400
+    if reparto not in ('Cucina', 'Sala', 'Pizzeria'):
+        return jsonify({'success': False, 'error': 'Seleziona il reparto'}), 400
 
     try:
-        append_listino({'prodotto': prodotto, 'fornitore': fornitore,
-                        'unita': unita, 'scorta_min': scorta_min, 'categoria': categoria})
+        append_listino({'prodotto': prodotto, 'fornitore': fornitore, 'unita': unita,
+                        'scorta_min': scorta_min, 'categoria': categoria, 'reparto': reparto})
     except Exception as e:
         return jsonify({'success': False, 'error': f'Errore Google Sheets: {e}'}), 500
 
-    insert_listino_row(prodotto, fornitore, unita, scorta_min, categoria)
+    insert_listino_row(prodotto, fornitore, unita, scorta_min, categoria, reparto)
     return jsonify({'success': True, 'prodotto': prodotto, 'fornitore': fornitore,
-                    'unita': unita, 'scorta_min': float(scorta_min or 0), 'categoria': categoria})
+                    'unita': unita, 'scorta_min': float(scorta_min or 0),
+                    'categoria': categoria, 'reparto': reparto})
 
 
 # ─── API REGISTRO ─────────────────────────────────────────────────────────────
@@ -420,6 +424,7 @@ def api_lista_spesa_add():
         (data.get('categoria')  or '').strip(),
         data.get('quantita', 0),
         (data.get('unita') or '').strip(),
+        (data.get('reparto') or '').strip(),
     )
     return jsonify({'id': new_id, 'success': True})
 
@@ -493,7 +498,7 @@ def api_carico():
         'movimento_id': movimento_id,
         'rimanenza':    nuova_rimanenza,
         'operatore':    current_user.nome,
-        'reparto':      current_user.reparto,
+        'reparto':      get_reparto_prodotto(prodotto, fornitore),
     }
 
     try:
@@ -565,7 +570,7 @@ def api_in_uso_crea():
         'movimento_id': movimento_id,
         'rimanenza':    nuova_rimanenza,
         'operatore':    current_user.nome,
-        'reparto':      current_user.reparto,
+        'reparto':      info.get('reparto', 'Cucina'),
         'tipo':         'IN_USO',
     }
 

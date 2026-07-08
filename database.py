@@ -135,6 +135,7 @@ def db_init():
                 unita      TEXT NOT NULL DEFAULT 'kg',
                 scorta_min REAL NOT NULL DEFAULT 0,
                 categoria  TEXT NOT NULL DEFAULT '',
+                reparto    TEXT NOT NULL DEFAULT 'Cucina',
                 UNIQUE(prodotto, fornitore)
             )""",
             f"""CREATE TABLE IF NOT EXISTS registro (
@@ -177,6 +178,7 @@ def db_init():
                 prodotto   TEXT NOT NULL,
                 fornitore  TEXT NOT NULL DEFAULT '',
                 categoria  TEXT NOT NULL DEFAULT '',
+                reparto    TEXT NOT NULL DEFAULT '',
                 quantita   REAL NOT NULL DEFAULT 0,
                 unita      TEXT NOT NULL DEFAULT '',
                 completato INTEGER NOT NULL DEFAULT 0,
@@ -199,6 +201,8 @@ def db_init():
         ('registro', 'tipo',         "TEXT NOT NULL DEFAULT 'CARICO'"),
         ('registro', 'data_scarico', "TEXT NOT NULL DEFAULT ''"),
         ('listino',  'categoria',    "TEXT NOT NULL DEFAULT ''"),
+        ('listino',  'reparto',      "TEXT NOT NULL DEFAULT 'Cucina'"),
+        ('lista_spesa', 'reparto',   "TEXT NOT NULL DEFAULT ''"),
         ('users',    'username',     "TEXT NOT NULL DEFAULT ''"),
     ]
     for table, col, defn in migrations:
@@ -220,6 +224,16 @@ def db_init():
     with get_conn() as conn:
         conn.execute(
             "UPDATE registro SET tipo = 'SCARICO' WHERE tipo = 'CARICO' AND scarico > 0"
+        )
+
+    # Backfill: i prodotti storici (pre-esistenti alla colonna 'reparto') hanno
+    # 'Cucina' come default; quelli con categoria Bevande/Dolci erano già
+    # classificati "Sala" tramite l'euristica SALA_CATS lato frontend.
+    # Idempotente: dopo il primo run, la WHERE non trova più righe da correggere.
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE listino SET reparto = 'Sala' "
+            "WHERE reparto = 'Cucina' AND LOWER(categoria) IN ('bevande', 'dolci')"
         )
 
     # ── Step 3: post-migration indexes ────────────────────────────────────────
@@ -258,18 +272,19 @@ def replace_listino(rows):
         conn.execute("DELETE FROM listino")
         if rows:
             conn.executemany(
-                "INSERT OR IGNORE INTO listino (prodotto, fornitore, unita, scorta_min, categoria) "
-                "VALUES (?, ?, ?, ?, ?)",
-                [(r['prodotto'], r['fornitore'], r['unita'], r['scorta_min'], r.get('categoria', '')) for r in rows]
+                "INSERT OR IGNORE INTO listino (prodotto, fornitore, unita, scorta_min, categoria, reparto) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                [(r['prodotto'], r['fornitore'], r['unita'], r['scorta_min'],
+                  r.get('categoria', ''), r.get('reparto') or 'Cucina') for r in rows]
             )
 
 
-def insert_listino_row(prodotto, fornitore, unita, scorta_min, categoria):
+def insert_listino_row(prodotto, fornitore, unita, scorta_min, categoria, reparto='Cucina'):
     with get_conn() as conn:
         conn.execute(
-            "INSERT OR IGNORE INTO listino (prodotto, fornitore, unita, scorta_min, categoria) "
-            "VALUES (?, ?, ?, ?, ?)",
-            (prodotto, fornitore, unita, float(scorta_min or 0), categoria or '')
+            "INSERT OR IGNORE INTO listino (prodotto, fornitore, unita, scorta_min, categoria, reparto) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (prodotto, fornitore, unita, float(scorta_min or 0), categoria or '', reparto or 'Cucina')
         )
 
 
@@ -292,7 +307,7 @@ def get_categorie():
 def get_all_prodotti():
     with get_conn() as conn:
         cur = conn.execute(
-            "SELECT prodotto, fornitore, unita, scorta_min, categoria FROM listino ORDER BY prodotto"
+            "SELECT prodotto, fornitore, unita, scorta_min, categoria, reparto FROM listino ORDER BY prodotto"
         )
         return _rows(cur)
 
@@ -300,11 +315,23 @@ def get_all_prodotti():
 def get_prodotti_by_fornitore(fornitore):
     with get_conn() as conn:
         cur = conn.execute(
-            "SELECT prodotto, fornitore, unita, scorta_min, categoria FROM listino "
+            "SELECT prodotto, fornitore, unita, scorta_min, categoria, reparto FROM listino "
             "WHERE fornitore = ? ORDER BY prodotto",
             (fornitore,)
         )
         return _rows(cur)
+
+
+def get_reparto_prodotto(prodotto, fornitore):
+    """Reparto (Cucina/Sala/Pizzeria) del prodotto, per attribuire correttamente
+    il movimento nel REGISTRO. Fallback 'Cucina' se non trovato in LISTINO."""
+    with get_conn() as conn:
+        cur = conn.execute(
+            "SELECT reparto FROM listino WHERE prodotto = ? AND fornitore = ?",
+            (prodotto, fornitore)
+        )
+        row = _row(cur)
+        return (row['reparto'] if row and row.get('reparto') else 'Cucina')
 
 
 # ─── REGISTRO ────────────────────────────────────────────────────────────────
@@ -382,8 +409,11 @@ def get_in_uso_attivi(prodotto=None):
 def get_lotti_attivi(prodotto):
     with get_conn() as conn:
         cur = conn.execute(
-            """SELECT r.lotto, r.scadenza, r.rimanenza, r.unita, r.fornitore, r.etichetta
+            """SELECT r.lotto, r.scadenza, r.rimanenza, r.unita, r.fornitore, r.etichetta,
+                      COALESCE(l.reparto, 'Cucina') AS reparto
                FROM registro r
+               LEFT JOIN listino l
+                   ON l.prodotto = r.prodotto AND l.fornitore = r.fornitore
                WHERE r.prodotto = ?
                  AND r.id = (
                      SELECT MAX(r2.id) FROM registro r2
@@ -403,7 +433,7 @@ def get_giacenze():
         cur = conn.execute(
             """SELECT r.prodotto, r.fornitore, r.lotto, r.scadenza,
                       r.rimanenza, r.unita, r.etichetta,
-                      l.scorta_min, l.categoria
+                      l.scorta_min, l.categoria, l.reparto
                FROM registro r
                LEFT JOIN listino l
                    ON l.prodotto = r.prodotto AND l.fornitore = r.fornitore
@@ -418,11 +448,14 @@ def get_giacenze():
         rows = _rows(cur)
 
         in_uso_rows = _rows(conn.execute(
-            """SELECT prodotto, SUM(scarico) AS tot_in_uso,
-                      MAX(unita) AS unita, MAX(fornitore) AS fornitore
-               FROM registro
-               WHERE tipo = 'IN_USO'
-               GROUP BY prodotto"""
+            """SELECT r.prodotto, SUM(r.scarico) AS tot_in_uso,
+                      MAX(r.unita) AS unita, MAX(r.fornitore) AS fornitore,
+                      MAX(l.reparto) AS reparto
+               FROM registro r
+               LEFT JOIN listino l
+                   ON l.prodotto = r.prodotto AND l.fornitore = r.fornitore
+               WHERE r.tipo = 'IN_USO'
+               GROUP BY r.prodotto"""
         ))
 
     grouped = OrderedDict()
@@ -435,6 +468,7 @@ def get_giacenze():
                 'unita':             r['unita'],
                 'scorta_min':        float(r['scorta_min'] or 0),
                 'categoria':         r['categoria'] or '',
+                'reparto':           r['reparto'] or 'Cucina',
                 'totale':            0.0,
                 'in_uso':            0.0,
                 'prossima_scadenza': None,
@@ -466,6 +500,7 @@ def get_giacenze():
                 'unita':             r['unita'] or '',
                 'scorta_min':        0.0,
                 'categoria':         '',
+                'reparto':           r['reparto'] or 'Cucina',
                 'totale':            0.0,
                 'in_uso':            0.0,
                 'prossima_scadenza': None,
@@ -486,7 +521,8 @@ def get_alerts():
     with get_conn() as conn:
         scad_rows = _rows(conn.execute(
             """SELECT r.prodotto, r.lotto, r.scadenza, r.rimanenza, r.unita, r.fornitore,
-                      COALESCE(l.categoria, '') AS categoria
+                      COALESCE(l.categoria, '') AS categoria,
+                      COALESCE(l.reparto, 'Cucina') AS reparto
                FROM registro r
                LEFT JOIN listino l ON l.prodotto = r.prodotto AND l.fornitore = r.fornitore
                WHERE r.id = (
@@ -513,6 +549,7 @@ def get_alerts():
                    SELECT prodotto, SUM(rimanenza) AS totale FROM latest GROUP BY prodotto
                )
                SELECT l.prodotto, l.fornitore, l.unita, l.scorta_min, l.categoria,
+                      COALESCE(l.reparto, 'Cucina') AS reparto,
                       COALESCE(t.totale, 0) AS totale
                FROM listino l
                LEFT JOIN totali t ON t.prodotto = l.prodotto
@@ -695,13 +732,13 @@ def get_lista_spesa():
         return _rows(cur)
 
 
-def add_lista_spesa_item(prodotto, fornitore, categoria, quantita, unita):
+def add_lista_spesa_item(prodotto, fornitore, categoria, quantita, unita, reparto=''):
     from datetime import datetime
     with get_conn() as conn:
         return conn.execute_insert(
-            "INSERT INTO lista_spesa (prodotto, fornitore, categoria, quantita, unita, completato, created_at) "
-            "VALUES (?, ?, ?, ?, ?, 0, ?)",
-            (prodotto, fornitore or '', categoria or '', float(quantita or 0),
+            "INSERT INTO lista_spesa (prodotto, fornitore, categoria, reparto, quantita, unita, completato, created_at) "
+            "VALUES (?, ?, ?, ?, ?, ?, 0, ?)",
+            (prodotto, fornitore or '', categoria or '', reparto or '', float(quantita or 0),
              unita or '', datetime.now().isoformat())
         )
 

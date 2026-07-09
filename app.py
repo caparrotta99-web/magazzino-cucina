@@ -267,9 +267,6 @@ def profile():
         cur_pw   =  request.form.get('current_password') or ''
         new_pw   =  request.form.get('new_password')     or ''
         new_pw2  =  request.form.get('new_password2')    or ''
-        tema     = (request.form.get('tema') or '').strip()
-        if tema not in ('chiaro', 'scuro'):
-            tema = 'chiaro'
 
         uid      = int(current_user.id)
         is_admin = current_user.role == 'admin'
@@ -291,7 +288,6 @@ def profile():
                 error = 'Le nuove password non coincidono'
             else:
                 update_user_profile(uid, nome, username)
-                update_user_tema(uid, tema)
                 if is_admin:
                     update_user_reparto(uid, (request.form.get('reparto') or '').strip())
                 update_user_password(uid, generate_password_hash(new_pw, method='pbkdf2:sha256'))
@@ -299,7 +295,6 @@ def profile():
                 user = get_user_by_id(uid)
         else:
             update_user_profile(uid, nome, username)
-            update_user_tema(uid, tema)
             if is_admin:
                 update_user_reparto(uid, (request.form.get('reparto') or '').strip())
             success = 'Profilo aggiornato con successo'
@@ -382,6 +377,16 @@ def api_fornitori():
 @login_required
 def api_categorie():
     return jsonify({'success': True, 'categorie': get_categorie()})
+
+
+@app.route('/api/tema', methods=['POST'])
+@login_required
+def api_tema():
+    tema = (request.get_json(force=True).get('tema') or '').strip()
+    if tema not in ('chiaro', 'scuro'):
+        return jsonify({'success': False, 'error': 'Tema non valido'}), 400
+    update_user_tema(int(current_user.id), tema)
+    return jsonify({'success': True, 'tema': tema})
 
 
 @app.route('/api/prodotti')

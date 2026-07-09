@@ -1094,6 +1094,20 @@ body.help-mode { background: #0f1f3d; }
 
 <!-- ── HEADER ──────────────────────────────────────────────────────────── -->
 <header>
+  <button class="btn-icon" id="btn-theme-toggle" onclick="toggleTema()" aria-label="Cambia tema" title="Cambia tema">
+    <svg id="theme-icon-on" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+         style="display:{{ 'none' if (current_user.is_authenticated and current_user.tema == 'scuro') else 'block' }}">
+      <path d="M9 18h6"/>
+      <path d="M10 22h4"/>
+      <path fill="currentColor" fill-opacity=".35" d="M12 2a7 7 0 0 0-4 12.75c.6.45 1 1.2 1 2.05v1.2h6v-1.2c0-.85.4-1.6 1-2.05A7 7 0 0 0 12 2Z"/>
+    </svg>
+    <svg id="theme-icon-off" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+         style="display:{{ 'block' if (current_user.is_authenticated and current_user.tema == 'scuro') else 'none' }}">
+      <path d="M9 18h6"/>
+      <path d="M10 22h4"/>
+      <path d="M12 2a7 7 0 0 0-4 12.75c.6.45 1 1.2 1 2.05v1.2h6v-1.2c0-.85.4-1.6 1-2.05A7 7 0 0 0 12 2Z"/>
+    </svg>
+  </button>
   <div class="hdr-logo-block">
     <div class="logo">Brigade</div>
     <div class="hdr-sub">
@@ -2089,6 +2103,22 @@ function setHdrDate() {
   el.textContent = new Date().toLocaleDateString('it-IT', {
     weekday: 'short', day: 'numeric', month: 'short'
   });
+}
+
+// ── TEMA ─────────────────────────────────────────────────────────────────
+async function toggleTema() {
+  const html   = document.documentElement;
+  const scuro  = html.getAttribute('data-theme') === 'dark';
+  const nuovo  = scuro ? 'light' : 'dark';
+  html.setAttribute('data-theme', nuovo);
+
+  document.getElementById('theme-icon-on').style.display  = nuovo === 'dark' ? 'none'  : 'block';
+  document.getElementById('theme-icon-off').style.display = nuovo === 'dark' ? 'block' : 'none';
+
+  const metaTheme = document.querySelector('meta[name="theme-color"]');
+  if (metaTheme) metaTheme.setAttribute('content', nuovo === 'dark' ? '#0a0a0a' : '#ffffff');
+
+  await api('/api/tema', { method: 'POST', body: { tema: nuovo === 'dark' ? 'scuro' : 'chiaro' } });
 }
 
 // ── DRAWER ───────────────────────────────────────────────────────────────

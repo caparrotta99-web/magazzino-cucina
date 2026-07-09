@@ -307,7 +307,7 @@ def get_categorie():
 def get_all_prodotti():
     with get_conn() as conn:
         cur = conn.execute(
-            "SELECT prodotto, fornitore, unita, scorta_min, categoria, reparto FROM listino ORDER BY prodotto"
+            "SELECT prodotto, fornitore, unita, scorta_min, categoria, reparto FROM listino ORDER BY LOWER(prodotto)"
         )
         return _rows(cur)
 
@@ -316,7 +316,7 @@ def get_prodotti_by_fornitore(fornitore):
     with get_conn() as conn:
         cur = conn.execute(
             "SELECT prodotto, fornitore, unita, scorta_min, categoria, reparto FROM listino "
-            "WHERE fornitore = ? ORDER BY prodotto",
+            "WHERE fornitore = ? ORDER BY LOWER(prodotto)",
             (fornitore,)
         )
         return _rows(cur)
@@ -441,7 +441,7 @@ def get_giacenze():
                    SELECT MAX(r2.id) FROM registro r2
                    WHERE r2.prodotto = r.prodotto AND r2.lotto = r.lotto
                ) AND r.rimanenza > 0
-               ORDER BY r.prodotto,
+               ORDER BY LOWER(r.prodotto),
                  CASE WHEN r.scadenza = '' OR r.scadenza IS NULL THEN 1 ELSE 0 END,
                  r.scadenza ASC"""
         )
@@ -554,7 +554,7 @@ def get_alerts():
                FROM listino l
                LEFT JOIN totali t ON t.prodotto = l.prodotto
                WHERE l.scorta_min > 0 AND COALESCE(t.totale, 0) < l.scorta_min
-               ORDER BY l.prodotto"""
+               ORDER BY LOWER(l.prodotto)"""
         ))
 
     scadenze = []

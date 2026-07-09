@@ -14,7 +14,7 @@ SHEET_REGISTRO = 'REGISTRO'
 REGISTRO_COLS = [
     'data', 'fornitore', 'prodotto', 'lotto', 'scadenza',
     'carico', 'scarico', 'unita', 'etichetta', 'movimento_id', 'rimanenza',
-    'operatore', 'reparto', 'tipo_movimento', 'ddt'
+    'operatore', 'reparto', 'tipo_movimento'
 ]
 
 # Valore da scrivere nella colonna "Tipo movimento" per ciascun tipo interno
@@ -54,7 +54,6 @@ _SYNS = {
     'operatore':   ['operatore', 'operator', 'utente', 'user'],
     'reparto':     ['reparto', 'department', 'dept', 'settore'],
     'tipo_movimento': ['tipo movimento'],
-    'ddt':         ['ddt', 'bolla', 'documento', 'doc', 'ddt/bolla'],
 }
 
 
@@ -141,6 +140,19 @@ def normalize_date(raw):
     return raw
 
 
+def _to_sheet_date(raw):
+    """Converte una data ISO yyyy-mm-dd interna nel formato italiano
+    dd/mm/yyyy usato dal foglio REGISTRO. Usata solo in scrittura verso
+    Sheets: non tocca il formato ISO usato internamente da app.py/database.py."""
+    if not raw:
+        return ''
+    raw = str(raw).strip()
+    m = re.match(r'^(\d{4})-(\d{2})-(\d{2})$', raw)
+    if m:
+        return f"{m.group(3)}/{m.group(2)}/{m.group(1)}"
+    return raw
+
+
 # ─── LETTURA ─────────────────────────────────────────────────────────────────
 
 def load_listino():
@@ -151,9 +163,9 @@ def load_listino():
     if len(all_rows) < 2:
         return []
 
-    # Indici fissi reali del foglio: A=0, B=1, C=2, D=3, E=4 (Reparto), G=6
+    # Indici fissi di fallback: A=0, B=1, C=2, D=3, G=6 (Categoria), I=8 (Reparto)
     _FIXED = {'prodotto': 0, 'fornitore': 1, 'unita': 2, 'scorta_min': 3,
-              'reparto_prodotto': 4, 'categoria': 6}
+              'reparto_prodotto': 8, 'categoria': 6}
 
     headers = [h.strip() for h in all_rows[0]]
     # _detect affina l'indice se l'header è riconosciuto, altrimenti usa il fisso
@@ -179,6 +191,7 @@ def load_listino():
             'categoria':  v('categoria'),
             'reparto':    v('reparto_prodotto') or 'Cucina',
         })
+    result.sort(key=lambda r: r['prodotto'].lower())
     return result
 
 
@@ -263,11 +276,11 @@ def append_registro(row_data):
         carico_val  = ''   # riga di scarico → carico vuoto
 
     field_vals = {
-        'data':         row_data.get('data', ''),
+        'data':         _to_sheet_date(row_data.get('data', '')),
         'fornitore':    row_data.get('fornitore', ''),
         'prodotto':     row_data.get('prodotto', ''),
         'lotto':        row_data.get('lotto', ''),
-        'scadenza':     row_data.get('scadenza', ''),
+        'scadenza':     _to_sheet_date(row_data.get('scadenza', '')),
         'carico':       carico_val,
         'scarico':      scarico_val,
         'unita':        row_data.get('unita', ''),
@@ -277,7 +290,6 @@ def append_registro(row_data):
         'operatore':    row_data.get('operatore', ''),
         'reparto':      row_data.get('reparto', ''),
         'tipo_movimento': _TIPO_DISPLAY.get(row_data.get('tipo', 'CARICO'), 'CARICO'),
-        'ddt':          row_data.get('ddt', ''),
     }
 
     for key, val in field_vals.items():
@@ -317,7 +329,9 @@ def aggiorna_tipo_movimento(movimento_id, nuovo_tipo):
 
 
 def append_listino(row_data):
-    """Appende una nuova riga al foglio LISTINO (A=nome, B=fornitore, C=unità, D=scorta, E=reparto, G=categoria)."""
+    """Appende una nuova riga al foglio LISTINO, rilevando dinamicamente le
+    colonne dall'header (nessun indice fisso). La colonna 'nome' (SORT/FILTER
+    su A) non viene mai scritta: si aggiorna da sola."""
     gc = _get_client()
     ws = gc.open_by_key(SPREADSHEET_ID).worksheet(SHEET_LISTINO)
 
@@ -328,18 +342,26 @@ def append_listino(row_data):
     categoria  = row_data.get('categoria', '')
     reparto    = row_data.get('reparto') or 'Cucina'
 
-    import sys
     all_values = ws.get_all_values()
-    print(f"[DEBUG] Totale righe: {len(all_values)}", flush=True, file=sys.stderr)
-    for i, row in enumerate(all_values[:5]):
-        print(f"[DEBUG] Riga {i+1}, colonna A: '{row[0] if row else 'VUOTA'}'", flush=True, file=sys.stderr)
-    next_row = 2
-    for i, row in enumerate(all_values):
-        if row and row[0].strip():
-            next_row = i + 2
-            print(f"[DEBUG] Ultima riga trovata: {i+1}, next_row={next_row}", flush=True, file=sys.stderr)
-    print(f"[DEBUG] Scrivo in riga: {next_row}", flush=True, file=sys.stderr)
+    headers = [h.strip() for h in all_values[0]] if all_values else []
 
-    ws.update(f'A{next_row}:D{next_row}', [[prodotto, fornitore, unita, scorta_min]])
-    ws.update(f'E{next_row}', [[reparto]])
-    ws.update(f'G{next_row}', [[categoria]])
+    # Indici fissi di fallback (struttura attuale: A-D base, F formula, G Categoria, I Reparto)
+    _FIXED = {'prodotto': 0, 'fornitore': 1, 'unita': 2, 'scorta_min': 3,
+              'categoria': 6, 'reparto_prodotto': 8}
+    col = {}
+    for k in ('prodotto', 'fornitore', 'unita', 'scorta_min', 'categoria', 'reparto_prodotto'):
+        detected = _detect(headers, k)
+        col[k] = detected if detected is not None else _FIXED[k]
+
+    next_row = 2
+    for i, row in enumerate(all_values[1:], start=2):
+        idx = col['prodotto']
+        if idx < len(row) and row[idx].strip():
+            next_row = i + 1
+
+    field_vals = {
+        'prodotto': prodotto, 'fornitore': fornitore, 'unita': unita,
+        'scorta_min': scorta_min, 'categoria': categoria, 'reparto_prodotto': reparto,
+    }
+    for key, val in field_vals.items():
+        ws.update_cell(next_row, col[key] + 1, val)

@@ -40,6 +40,7 @@ body {
   --blue:    #3b82f6;
   --orange:  #f97316;
   --violet:  #8b5cf6;
+  --teal:    #0d9488;
   --success: #16a34a;
   --warning: #f97316;
   --error:   #ef4444;
@@ -213,6 +214,7 @@ main {
 .hcard-in-uso   .hcard-icon { background: var(--orange); }
 .hcard-giacenze .hcard-icon { background: var(--blue); }
 .hcard-alert    .hcard-icon { background: var(--orange); }
+.hcard-temperature .hcard-icon { background: var(--teal); }
 .hcard-spesa {
   background: #ffffff;
   border: none;
@@ -519,6 +521,55 @@ main {
   display: inline-block; font-size: 10px; font-weight: 500;
   padding: 2px 8px; border-radius: 100px;
   background: #f3f4f6; color: var(--muted);
+}
+
+/* ─── TEMPERATURE ───────────────────────────────────────────────────────── */
+.temp-app-card {
+  background: #ffffff; border: 1px solid var(--border); border-radius: 16px;
+  padding: 16px; box-shadow: var(--shadow); margin-bottom: 10px;
+}
+.temp-app-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.temp-app-nome { font-size: 16px; font-weight: 600; color: #111827; }
+.temp-app-tipo { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.temp-app-range { font-size: 12px; color: var(--muted); text-align: right; white-space: nowrap; }
+.temp-app-last { font-size: 12px; color: var(--muted); margin-top: 8px; display: flex; align-items: center; gap: 8px; }
+.temp-app-actions { display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap; }
+.btn-temp-registra {
+  flex: 1; height: 40px; min-width: 140px;
+  background: rgba(13,148,136,.1); color: var(--teal);
+  border: 1px solid rgba(13,148,136,.3); border-radius: 12px;
+  font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600;
+  cursor: pointer;
+}
+.btn-temp-registra:active { background: rgba(13,148,136,.2); }
+.btn-temp-icon {
+  width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
+  background: #f3f4f6; border: none; color: #111827;
+  display: flex; align-items: center; justify-content: center; cursor: pointer;
+}
+.btn-temp-icon:active { background: #e5e7eb; }
+.temp-badge {
+  font-size: 11px; font-weight: 600; padding: 3px 10px;
+  border-radius: 100px; white-space: nowrap;
+}
+.temp-badge.ok     { background: rgba(34,197,94,.12); color: var(--green); }
+.temp-badge.danger { background: rgba(239,68,68,.12); color: var(--red); }
+.temp-storico-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: #ffffff; border: 1px solid var(--border); border-radius: 14px;
+  padding: 12px 14px; margin-bottom: 8px;
+}
+.temp-storico-info { min-width: 0; }
+.temp-storico-app { font-size: 14px; font-weight: 600; color: #111827; }
+.temp-storico-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.temp-storico-nota { font-size: 12px; color: var(--red); margin-top: 4px; }
+.temp-storico-right { text-align: right; flex-shrink: 0; }
+.temp-storico-val { font-size: 15px; font-weight: 700; color: #111827; }
+.rt-fuori-soglia {
+  background: rgba(239,68,68,.1); color: var(--red);
+  border: 1px solid rgba(239,68,68,.3); border-radius: 10px;
+  padding: 10px 14px; font-size: 13px; font-weight: 700; text-align: center;
+  margin-bottom: 16px;
 }
 
 /* ─── ALERT CARDS ───────────────────────────────────────────────────────── */
@@ -1145,6 +1196,16 @@ body.help-mode { background: #0f1f3d; }
         </div>
       </div>
 
+      <div class="hcard hcard-temperature" onclick="navTo('temperature')">
+        <div class="hcard-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/></svg>
+        </div>
+        <div>
+          <div class="hcard-label">Temperature</div>
+          <div class="hcard-sub">Registro HACCP</div>
+        </div>
+      </div>
+
     </div>
   </section>
 
@@ -1184,6 +1245,14 @@ body.help-mode { background: #0f1f3d; }
       <div>
         <div class="help-card-title">Giacenze</div>
         <div class="help-card-text">Visualizza tutto il magazzino in tempo reale. Filtra per reparto e categoria. I prodotti in scadenza sono evidenziati in rosso o giallo.</div>
+      </div>
+    </div>
+
+    <div class="help-card">
+      <div class="help-card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/></svg></div>
+      <div>
+        <div class="help-card-title">Temperature</div>
+        <div class="help-card-text">Registra le temperature di frigoriferi e congelatori due volte al giorno (mattina e sera). Se la temperatura è fuori dalla soglia consentita apparirà un avviso rosso e sarà obbligatorio inserire una nota. Tutte le rilevazioni vengono salvate automaticamente nel tuo Google Sheets nel foglio TEMPERATURE.</div>
       </div>
     </div>
 
@@ -1234,6 +1303,34 @@ body.help-mode { background: #0f1f3d; }
         <div class="help-card-text">Aggiorna i dati dal tuo Google Sheets. Premi il pulsante in alto a destra. Fallo ogni volta che modifichi il listino direttamente dal foglio.</div>
       </div>
     </div>
+  </section>
+
+  <!-- TEMPERATURE -->
+  <section class="page" id="page-temperature">
+    <div class="back-bar" onclick="navTo('home')">
+      <div class="back-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+      <span class="back-label">Temperature</span>
+    </div>
+
+    <div class="pg-sub">Rilevazioni HACCP di frigoriferi, congelatori e abbattitori</div>
+
+    <div id="temp-apparecchi-list"></div>
+
+    <button type="button" class="btn-nuovo-prodotto" id="btn-nuovo-apparecchio" onclick="openApparecchioModal()" style="display:none;margin:4px 0 24px">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      Nuovo apparecchio
+    </button>
+
+    <div class="pg-title" style="margin-top:8px">Storico rilevazioni</div>
+    <div class="pg-sub">Ultimi 30 giorni</div>
+
+    <div class="filter-row">
+      <select class="fselect-pill" id="temp-filter-apparecchio" onchange="renderStoricoTemperature()">
+        <option value="">Tutti gli apparecchi</option>
+      </select>
+    </div>
+
+    <div id="temp-storico-list"></div>
   </section>
 
   <!-- CARICO -->
@@ -1669,6 +1766,90 @@ body.help-mode { background: #0f1f3d; }
   </div>
 </div>
 
+<!-- ── MODAL APPARECCHIO (nuovo/modifica) ────────────────────────────────── -->
+<div class="modal-backdrop" id="modal-apparecchio" onclick="bgCloseApparecchio(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="app-modal-title">Nuovo apparecchio</div>
+    <div class="modal-body">
+      <input type="hidden" id="app-id" value="0">
+
+      <div class="fgroup">
+        <label class="flabel">Nome *</label>
+        <input class="finput" type="text" id="app-nome" placeholder="es. Frigo Cucina 1" autocomplete="off">
+      </div>
+
+      <div class="fgroup">
+        <label class="flabel">Tipo *</label>
+        <div class="fselect-wrap">
+          <select class="fselect" id="app-tipo" onchange="onApparecchioTipoChange()">
+            <option value="" disabled selected>Seleziona tipo…</option>
+            <option value="Frigorifero">Frigorifero</option>
+            <option value="Congelatore">Congelatore</option>
+            <option value="Abbattitore">Abbattitore</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="fgroup">
+        <label class="flabel">Temperatura minima (°C) *</label>
+        <input class="finput" type="number" id="app-temp-min" step="0.1" inputmode="decimal">
+      </div>
+
+      <div class="fgroup" style="margin-bottom:0">
+        <label class="flabel">Temperatura massima (°C) *</label>
+        <input class="finput" type="number" id="app-temp-max" step="0.1" inputmode="decimal">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-close-modal" onclick="closeApparecchioModal()">Annulla</button>
+      <button class="btn-print" id="btn-app-salva" onclick="submitApparecchio()" style="color:#10b981;font-weight:700">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL REGISTRA TEMPERATURA ─────────────────────────────────────────── -->
+<div class="modal-backdrop" id="modal-registra-temp" onclick="bgCloseRegistraTemp(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="rt-titolo">Registra temperatura</div>
+    <div class="modal-body">
+      <input type="hidden" id="rt-apparecchio-id" value="0">
+
+      <div class="fgroup">
+        <label class="flabel">Data</label>
+        <input class="finput" type="date" id="rt-data">
+      </div>
+
+      <div class="fgroup">
+        <label class="flabel">Ora</label>
+        <input class="finput" type="time" id="rt-ora">
+      </div>
+
+      <div class="fgroup">
+        <label class="flabel">Temperatura rilevata (°C) *</label>
+        <input class="finput" type="number" id="rt-temperatura" step="0.1" inputmode="decimal" oninput="onRtTemperaturaInput()">
+      </div>
+
+      <div class="rt-fuori-soglia" id="rt-fuori-soglia" style="display:none">FUORI SOGLIA</div>
+
+      <div class="fgroup" id="rt-nota-group">
+        <label class="flabel" id="rt-nota-label">Nota</label>
+        <textarea class="ftextarea" id="rt-nota" placeholder="Note opzionali…"></textarea>
+      </div>
+
+      <div class="fgroup" style="margin-bottom:0">
+        <label class="flabel">Operatore</label>
+        <div class="freadonly">{{ current_user.nome if current_user.is_authenticated else '—' }}</div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-close-modal" onclick="closeRegistraTempModal()">Annulla</button>
+      <button class="btn-print" id="btn-rt-salva" onclick="submitRegistraTemp()" style="color:#10b981;font-weight:700">Salva</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── LOT DETAIL SHEET ─────────────────────────────────────────────────── -->
 <div class="lot-detail-overlay" id="lot-detail-overlay"
      onclick="if(event.target===this) closeLotDetail()">
@@ -1708,6 +1889,10 @@ const S = {
   caricoReparto:   '', caricoCategoria:   '',   // '' = Tutti/Tutte
   inUsoReparto:    '', inUsoCategoria:    '',
   scaricoReparto:  '', scaricoCategoria:  '',
+  apparecchi:            [],
+  puoGestireApparecchi:  false,
+  rangeRiferimento:      {},
+  temperatureStorico:    [],
 };
 
 // ── FILTRI REPARTO + CATEGORIA (Carico / In uso / Scarico) ────────────────
@@ -1779,7 +1964,7 @@ function _updateCategorieUI() {
 async function init() {
   setHdrDate();
   animHomeCards();
-  await Promise.all([loadCategorie(), loadProdottiCarico(), loadGiacenze(), loadAlerts(), loadFeed(), loadListaSpesa(), loadInUso()]);
+  await Promise.all([loadCategorie(), loadProdottiCarico(), loadGiacenze(), loadAlerts(), loadFeed(), loadListaSpesa(), loadInUso(), loadApparecchi(), loadStoricoTemperature()]);
   renderInUsoProdotti();
   renderScaricoProdotti();
 }
@@ -1825,6 +2010,7 @@ function navTo(page) {
   if (page === 'giacenze')   { updateFornitoriFilter(); renderGiacenze(); }
   if (page === 'alert')      renderAlerts();
   if (page === 'lista-spesa') loadListaSpesa();
+  if (page === 'temperature') { loadApparecchi(); loadStoricoTemperature(); }
 }
 // alias for backward compat
 function switchTab(t) { navTo(t); }
@@ -3088,8 +3274,217 @@ function toast(msg, type = 'info') {
   _toastT = setTimeout(() => el.classList.remove('show'), 3600);
 }
 
+// ── TEMPERATURE ──────────────────────────────────────────────────────────
+async function loadApparecchi() {
+  const data = await api('/api/apparecchi');
+  S.apparecchi = data.apparecchi || [];
+  S.puoGestireApparecchi = !!data.puo_gestire;
+  S.rangeRiferimento = data.range_riferimento || {};
+  renderApparecchi();
+}
+
+function _fmtTemp(v) {
+  const n = Number(v);
+  const s = Number.isInteger(n) ? String(n) : n.toFixed(1);
+  return (n > 0 ? '+' : '') + s;
+}
+
+function renderApparecchi() {
+  const list = document.getElementById('temp-apparecchi-list');
+  const btnNuovo = document.getElementById('btn-nuovo-apparecchio');
+  if (btnNuovo) btnNuovo.style.display = S.puoGestireApparecchi ? 'flex' : 'none';
+  if (!list) return;
+
+  if (!S.apparecchi.length) {
+    list.innerHTML = `<div class="empty-state"><p>Nessun apparecchio configurato${S.puoGestireApparecchi ? ' — aggiungine uno' : ''}</p></div>`;
+  } else {
+    list.innerHTML = S.apparecchi.map(a => {
+      const ultima = S.temperatureStorico.find(t => t.apparecchio === a.nome);
+      const ultimaHtml = ultima
+        ? `<span class="temp-badge ${ultima.esito === 'OK' ? 'ok' : 'danger'}">${ultima.esito === 'OK' ? 'OK' : 'FUORI SOGLIA'}</span> ${_fmtTemp(ultima.temperatura)}°C — ${fmtDate(ultima.data)} ${esc(ultima.ora||'')}`
+        : 'Nessuna rilevazione';
+      return `<div class="temp-app-card">
+        <div class="temp-app-top">
+          <div>
+            <div class="temp-app-nome">${esc(a.nome)}</div>
+            <div class="temp-app-tipo">${esc(a.tipo)}</div>
+          </div>
+          <div class="temp-app-range">${_fmtTemp(a.temp_min)}°C / ${_fmtTemp(a.temp_max)}°C</div>
+        </div>
+        <div class="temp-app-last">${ultimaHtml}</div>
+        <div class="temp-app-actions">
+          <button type="button" class="btn-temp-registra" onclick="openRegistraTempModal(${a.id})">Registra temperatura</button>
+          ${S.puoGestireApparecchi ? `
+          <button type="button" class="btn-temp-icon" onclick="openApparecchioModal(${a.id})" aria-label="Modifica">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5Z"/></svg>
+          </button>
+          <button type="button" class="btn-temp-icon" onclick="eliminaApparecchio(${a.id})" aria-label="Elimina">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+          </button>` : ''}
+        </div>
+      </div>`;
+    }).join('');
+  }
+
+  const fsel = document.getElementById('temp-filter-apparecchio');
+  if (fsel) {
+    const cur = fsel.value;
+    fsel.innerHTML = '<option value="">Tutti gli apparecchi</option>' +
+      S.apparecchi.map(a => `<option value="${esc(a.nome)}">${esc(a.nome)}</option>`).join('');
+    if (cur) fsel.value = cur;
+  }
+}
+
+// ── APPARECCHIO: nuovo / modifica / elimina ────────────────────────────────
+function openApparecchioModal(id = 0) {
+  const a = id ? S.apparecchi.find(x => x.id === id) : null;
+  document.getElementById('app-id').value = id || 0;
+  document.getElementById('app-modal-title').textContent = a ? 'Modifica apparecchio' : 'Nuovo apparecchio';
+  document.getElementById('app-nome').value = a ? a.nome : '';
+  document.getElementById('app-tipo').value = a ? a.tipo : '';
+  document.getElementById('app-temp-min').value = a ? a.temp_min : '';
+  document.getElementById('app-temp-max').value = a ? a.temp_max : '';
+  document.getElementById('modal-apparecchio').classList.add('open');
+}
+function closeApparecchioModal() { document.getElementById('modal-apparecchio').classList.remove('open'); }
+function bgCloseApparecchio(e) { if (e.target === document.getElementById('modal-apparecchio')) closeApparecchioModal(); }
+
+function onApparecchioTipoChange() {
+  const tipo  = document.getElementById('app-tipo').value;
+  const range = S.rangeRiferimento[tipo];
+  if (range) {
+    document.getElementById('app-temp-min').value = range[0];
+    document.getElementById('app-temp-max').value = range[1];
+  }
+}
+
+async function submitApparecchio() {
+  const id      = parseInt(document.getElementById('app-id').value) || 0;
+  const nome    = document.getElementById('app-nome').value.trim();
+  const tipo    = document.getElementById('app-tipo').value;
+  const tempMin = document.getElementById('app-temp-min').value;
+  const tempMax = document.getElementById('app-temp-max').value;
+
+  if (!nome) { toast('Inserisci il nome dell\'apparecchio', 'error'); return; }
+  if (!tipo) { toast('Seleziona il tipo', 'error'); return; }
+  if (tempMin === '' || tempMax === '') { toast('Inserisci temperatura minima e massima', 'error'); return; }
+
+  const body = { nome, tipo, temp_min: parseFloat(tempMin), temp_max: parseFloat(tempMax) };
+  const result = id
+    ? await api(`/api/apparecchi/${id}`, { method: 'PUT', body })
+    : await api('/api/apparecchi', { method: 'POST', body });
+
+  if (!result.success) { toast(result.error || 'Errore', 'error'); return; }
+  closeApparecchioModal();
+  await loadApparecchi();
+  toast(id ? 'Apparecchio aggiornato' : 'Apparecchio aggiunto', 'success');
+}
+
+async function eliminaApparecchio(id) {
+  const a = S.apparecchi.find(x => x.id === id);
+  if (!a) return;
+  if (!confirm(`Eliminare "${a.nome}"? Le rilevazioni storiche resteranno salvate.`)) return;
+  const result = await api(`/api/apparecchi/${id}`, { method: 'DELETE' });
+  if (!result.success) { toast(result.error || 'Errore', 'error'); return; }
+  await loadApparecchi();
+  toast('Apparecchio eliminato', 'success');
+}
+
+// ── REGISTRA TEMPERATURA ───────────────────────────────────────────────────
+function openRegistraTempModal(apparecchioId) {
+  const a = S.apparecchi.find(x => x.id === apparecchioId);
+  if (!a) return;
+  const now = new Date();
+  document.getElementById('rt-apparecchio-id').value = apparecchioId;
+  document.getElementById('rt-titolo').textContent = `Registra temperatura — ${a.nome}`;
+  document.getElementById('rt-data').value = now.toISOString().slice(0, 10);
+  document.getElementById('rt-ora').value  = now.toTimeString().slice(0, 5);
+  document.getElementById('rt-temperatura').value = '';
+  document.getElementById('rt-nota').value = '';
+  document.getElementById('rt-fuori-soglia').style.display = 'none';
+  document.getElementById('rt-nota-label').textContent = 'Nota';
+  document.getElementById('modal-registra-temp').classList.add('open');
+}
+function closeRegistraTempModal() { document.getElementById('modal-registra-temp').classList.remove('open'); }
+function bgCloseRegistraTemp(e) { if (e.target === document.getElementById('modal-registra-temp')) closeRegistraTempModal(); }
+
+function onRtTemperaturaInput() {
+  const id  = parseInt(document.getElementById('rt-apparecchio-id').value);
+  const a   = S.apparecchi.find(x => x.id === id);
+  const val = parseFloat(document.getElementById('rt-temperatura').value);
+  const banner    = document.getElementById('rt-fuori-soglia');
+  const notaLabel = document.getElementById('rt-nota-label');
+  if (!a || isNaN(val)) { banner.style.display = 'none'; notaLabel.textContent = 'Nota'; return; }
+  const fuori = val < a.temp_min || val > a.temp_max;
+  banner.style.display = fuori ? 'block' : 'none';
+  notaLabel.textContent = fuori ? 'Nota *  (obbligatoria — temperatura fuori soglia)' : 'Nota';
+}
+
+async function submitRegistraTemp() {
+  const apparecchioId = parseInt(document.getElementById('rt-apparecchio-id').value);
+  const a    = S.apparecchi.find(x => x.id === apparecchioId);
+  const data = document.getElementById('rt-data').value;
+  const ora  = document.getElementById('rt-ora').value;
+  const temperaturaStr = document.getElementById('rt-temperatura').value;
+  const nota = document.getElementById('rt-nota').value.trim();
+
+  if (temperaturaStr === '') { toast('Inserisci la temperatura rilevata', 'error'); return; }
+  const temperatura = parseFloat(temperaturaStr);
+
+  const fuori = a && (temperatura < a.temp_min || temperatura > a.temp_max);
+  if (fuori && !nota) { toast('Temperatura fuori soglia: la nota è obbligatoria', 'error'); return; }
+
+  const btn = document.getElementById('btn-rt-salva');
+  btn.disabled = true;
+  const result = await api('/api/temperature', {
+    method: 'POST',
+    body: { apparecchio_id: apparecchioId, data, ora, temperatura, nota },
+  });
+  btn.disabled = false;
+
+  if (!result.success) { toast(result.error || 'Errore', 'error'); return; }
+  closeRegistraTempModal();
+  await Promise.all([loadApparecchi(), loadStoricoTemperature()]);
+  toast(result.esito === 'FUORI_SOGLIA' ? 'Registrato — FUORI SOGLIA' : 'Temperatura registrata',
+        result.esito === 'FUORI_SOGLIA' ? 'error' : 'success');
+}
+
+// ── STORICO TEMPERATURE ─────────────────────────────────────────────────────
+async function loadStoricoTemperature() {
+  const data = await api('/api/temperature?giorni=30');
+  S.temperatureStorico = data.rilevazioni || [];
+  renderStoricoTemperature();
+  renderApparecchi();
+}
+
+function renderStoricoTemperature() {
+  const list = document.getElementById('temp-storico-list');
+  if (!list) return;
+  const filtro = document.getElementById('temp-filter-apparecchio')?.value || '';
+  const items = filtro ? S.temperatureStorico.filter(t => t.apparecchio === filtro) : S.temperatureStorico;
+
+  if (!items.length) {
+    list.innerHTML = `<div class="empty-state"><p>Nessuna rilevazione negli ultimi 30 giorni</p></div>`;
+    return;
+  }
+
+  list.innerHTML = items.map(t => `
+    <div class="temp-storico-row">
+      <div class="temp-storico-info">
+        <div class="temp-storico-app">${esc(t.apparecchio)}</div>
+        <div class="temp-storico-meta">${fmtDate(t.data)} ${esc(t.ora||'')} · ${esc(t.operatore||'')}</div>
+        ${t.nota ? `<div class="temp-storico-nota">${esc(t.nota)}</div>` : ''}
+      </div>
+      <div class="temp-storico-right">
+        <div class="temp-storico-val">${_fmtTemp(t.temperatura)}°C</div>
+        <span class="temp-badge ${t.esito === 'OK' ? 'ok' : 'danger'}">${t.esito === 'OK' ? 'OK' : 'FUORI SOGLIA'}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeModal(); closeLotDetail(); closeDrawer(); }
+  if (e.key === 'Escape') { closeModal(); closeLotDetail(); closeDrawer(); closeApparecchioModal(); closeRegistraTempModal(); }
 });
 
 // ── BOOT ─────────────────────────────────────────────────────────────────

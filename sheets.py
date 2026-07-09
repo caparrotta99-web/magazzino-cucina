@@ -7,8 +7,27 @@ SPREADSHEET_ID   = '1Dg0J181wAEUctJCWrNI1pmtOb7YlF_msOqTsqRPDILw'
 CREDENTIALS_FILE = os.path.join(os.path.dirname(__file__), 'credentials.json')
 SCOPES           = ['https://www.googleapis.com/auth/spreadsheets']
 
-SHEET_LISTINO  = 'LISTINO'
-SHEET_REGISTRO = 'REGISTRO'
+SHEET_LISTINO      = 'LISTINO'
+SHEET_REGISTRO     = 'REGISTRO'
+SHEET_TEMPERATURE  = 'TEMPERATURE'
+
+# Colonne reali del foglio TEMPERATURE (già esistente):
+# Data, Apparecchio, Temp. rilevata (°C), Temp. limite (°C), Esito (OK/NO), Operatore, Note
+TEMPERATURE_COLS = [
+    'data', 'apparecchio', 'temp_rilevata', 'temp_limite', 'esito', 'operatore', 'nota'
+]
+
+# Il foglio usa 'NO' per un esito fuori soglia; internamente l'app usa 'FUORI_SOGLIA'.
+_ESITO_DISPLAY = {'OK': 'OK', 'FUORI_SOGLIA': 'NO'}
+
+
+def _normalizza_esito(raw):
+    t = (raw or '').strip().upper()
+    if t in ('NO', 'FUORI SOGLIA', 'FUORI_SOGLIA', 'KO'):
+        return 'FUORI_SOGLIA'
+    if t == 'OK':
+        return 'OK'
+    return None
 
 # Colonne attese nel REGISTRO (ordine fisso per le scritture)
 REGISTRO_COLS = [
@@ -54,6 +73,12 @@ _SYNS = {
     'operatore':   ['operatore', 'operator', 'utente', 'user'],
     'reparto':     ['reparto', 'department', 'dept', 'settore'],
     'tipo_movimento': ['tipo movimento'],
+    # TEMPERATURE
+    'apparecchio':   ['apparecchio', 'dispositivo', 'frigo'],
+    'temp_rilevata': ['rilevata'],
+    'temp_limite':   ['limite', 'range'],
+    'esito':         ['esito', 'stato'],
+    'nota':          ['note', 'nota', 'osservazioni'],
 }
 
 
@@ -365,3 +390,95 @@ def append_listino(row_data):
     }
     for key, val in field_vals.items():
         ws.update_cell(next_row, col[key] + 1, val)
+
+
+# ─── TEMPERATURE ─────────────────────────────────────────────────────────────
+
+def append_temperatura(row_data):
+    """Appende una rilevazione al foglio TEMPERATURE esistente, rilevando
+    dinamicamente le colonne dall'header (Data, Apparecchio, Temp. rilevata,
+    Temp. limite, Esito, Operatore, Note)."""
+    gc = _get_client()
+    ws = gc.open_by_key(SPREADSHEET_ID).worksheet(SHEET_TEMPERATURE)
+
+    headers = [h.strip() for h in ws.row_values(1)]
+    col = {k: _detect(headers, k) for k in TEMPERATURE_COLS}
+
+    n_cols = len(headers) if headers else len(TEMPERATURE_COLS)
+    new_row = [''] * n_cols
+
+    data_ora = row_data.get('data', '')
+    ora      = row_data.get('ora', '')
+    data_str = _to_sheet_date(data_ora)
+    if ora:
+        data_str = f"{data_str} {ora}"
+
+    temp_min = row_data.get('temp_min', 0)
+    temp_max = row_data.get('temp_max', 0)
+    limite   = f"{temp_min:g} / {temp_max:g}"
+
+    field_vals = {
+        'data':          data_str,
+        'apparecchio':   row_data.get('apparecchio', ''),
+        'temp_rilevata': row_data.get('temperatura', ''),
+        'temp_limite':   limite,
+        'esito':         _ESITO_DISPLAY.get(row_data.get('esito', 'OK'), 'OK'),
+        'operatore':     row_data.get('operatore', ''),
+        'nota':          row_data.get('nota', ''),
+    }
+    for key, val in field_vals.items():
+        idx = col.get(key)
+        if idx is not None and idx < n_cols:
+            new_row[idx] = val
+
+    ws.append_row(new_row, value_input_option='USER_ENTERED')
+
+
+def load_temperatura():
+    """Legge il foglio TEMPERATURE e ritorna lista di dict."""
+    gc = _get_client()
+    ws = gc.open_by_key(SPREADSHEET_ID).worksheet(SHEET_TEMPERATURE)
+    all_rows = ws.get_all_values()
+    if len(all_rows) < 2:
+        return []
+
+    headers = [h.strip() for h in all_rows[0]]
+    col = {k: _detect(headers, k) for k in TEMPERATURE_COLS}
+    if col['apparecchio'] is None:
+        raise ValueError(f"Colonna 'Apparecchio' non trovata nel foglio TEMPERATURE. Header: {headers}")
+
+    result = []
+    for row in all_rows[1:]:
+        def v(key):
+            idx = col.get(key)
+            return row[idx].strip() if idx is not None and idx < len(row) else ''
+
+        apparecchio = v('apparecchio')
+        if not apparecchio:
+            continue
+
+        data_raw = v('data')
+        data_parte, _, ora_parte = data_raw.partition(' ')
+
+        limite = v('temp_limite')
+        tmin, tmax = 0.0, 0.0
+        m = re.match(r'^\s*(-?[\d.,]+)\s*/\s*(-?[\d.,]+)\s*$', limite)
+        if m:
+            tmin = _to_float(m.group(1))
+            tmax = _to_float(m.group(2))
+
+        esito = _normalizza_esito(v('esito')) or 'OK'
+
+        result.append({
+            'apparecchio': apparecchio,
+            'tipo':        '',
+            'data':        normalize_date(data_parte),
+            'ora':         ora_parte,
+            'temperatura': _to_float(v('temp_rilevata')),
+            'temp_min':    tmin,
+            'temp_max':    tmax,
+            'esito':       esito,
+            'nota':        v('nota'),
+            'operatore':   v('operatore'),
+        })
+    return result

@@ -184,8 +184,30 @@ def db_init():
                 completato INTEGER NOT NULL DEFAULT 0,
                 created_at TEXT NOT NULL
             )""",
+            f"""CREATE TABLE IF NOT EXISTS apparecchi (
+                id         {pk},
+                nome       TEXT NOT NULL,
+                tipo       TEXT NOT NULL DEFAULT 'Frigorifero',
+                temp_min   REAL NOT NULL DEFAULT 0,
+                temp_max   REAL NOT NULL DEFAULT 4,
+                attivo     INTEGER NOT NULL DEFAULT 1
+            )""",
+            f"""CREATE TABLE IF NOT EXISTS temperature (
+                id          {pk},
+                apparecchio TEXT NOT NULL,
+                tipo        TEXT NOT NULL DEFAULT '',
+                data        TEXT NOT NULL,
+                ora         TEXT NOT NULL DEFAULT '',
+                temperatura REAL NOT NULL DEFAULT 0,
+                temp_min    REAL NOT NULL DEFAULT 0,
+                temp_max    REAL NOT NULL DEFAULT 0,
+                esito       TEXT NOT NULL DEFAULT 'OK',
+                nota        TEXT NOT NULL DEFAULT '',
+                operatore   TEXT NOT NULL DEFAULT ''
+            )""",
             "CREATE INDEX IF NOT EXISTS idx_reg_prod_lotto ON registro(prodotto, lotto)",
             "CREATE INDEX IF NOT EXISTS idx_reg_mov_id     ON registro(movimento_id)",
+            "CREATE INDEX IF NOT EXISTS idx_temp_data      ON temperature(data)",
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email    ON users(email)",
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_telefono ON users(telefono)",
         ]:
@@ -204,6 +226,7 @@ def db_init():
         ('listino',  'reparto',      "TEXT NOT NULL DEFAULT 'Cucina'"),
         ('lista_spesa', 'reparto',   "TEXT NOT NULL DEFAULT ''"),
         ('users',    'username',     "TEXT NOT NULL DEFAULT ''"),
+        ('users',    'gestisce_apparecchi', "INTEGER NOT NULL DEFAULT 0"),
     ]
     for table, col, defn in migrations:
         if _USE_PG:
@@ -677,7 +700,7 @@ def get_user_by_id(user_id):
 def get_all_users():
     with get_conn() as conn:
         cur = conn.execute(
-            "SELECT id, nome, email, telefono, reparto, role FROM users ORDER BY nome"
+            "SELECT id, nome, email, telefono, reparto, role, gestisce_apparecchi FROM users ORDER BY nome"
         )
         return _rows(cur)
 
@@ -814,3 +837,105 @@ def get_feed(limit=40):
             (limit,)
         )
         return _rows(cur)
+
+
+# ─── APPARECCHI / TEMPERATURE ─────────────────────────────────────────────────
+
+# Range di riferimento HACCP per tipo apparecchio (usati per pre-compilare il
+# form di creazione; l'admin può comunque personalizzarli per ogni apparecchio).
+RANGE_RIFERIMENTO_TIPO = {
+    'Frigorifero':  (0, 4),
+    'Congelatore':  (-25, -18),
+    'Abbattitore':  (0, 0),
+}
+
+
+def get_apparecchi(solo_attivi=True):
+    with get_conn() as conn:
+        sql = "SELECT id, nome, tipo, temp_min, temp_max, attivo FROM apparecchi"
+        if solo_attivi:
+            sql += " WHERE attivo = 1"
+        sql += " ORDER BY LOWER(nome)"
+        cur = conn.execute(sql)
+        return _rows(cur)
+
+
+def get_apparecchio_by_id(apparecchio_id):
+    with get_conn() as conn:
+        cur = conn.execute(
+            "SELECT id, nome, tipo, temp_min, temp_max, attivo FROM apparecchi WHERE id = ?",
+            (apparecchio_id,)
+        )
+        return _row(cur)
+
+
+def create_apparecchio(nome, tipo, temp_min, temp_max):
+    with get_conn() as conn:
+        return conn.execute_insert(
+            "INSERT INTO apparecchi (nome, tipo, temp_min, temp_max, attivo) "
+            "VALUES (?, ?, ?, ?, 1)",
+            (nome, tipo, float(temp_min), float(temp_max))
+        )
+
+
+def update_apparecchio(apparecchio_id, nome, tipo, temp_min, temp_max):
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE apparecchi SET nome = ?, tipo = ?, temp_min = ?, temp_max = ? WHERE id = ?",
+            (nome, tipo, float(temp_min), float(temp_max), apparecchio_id)
+        )
+
+
+def delete_apparecchio(apparecchio_id):
+    """Soft delete: le rilevazioni storiche restano intatte."""
+    with get_conn() as conn:
+        conn.execute("UPDATE apparecchi SET attivo = 0 WHERE id = ?", (apparecchio_id,))
+
+
+def insert_temperatura(row):
+    with get_conn() as conn:
+        return conn.execute_insert(
+            """INSERT INTO temperature
+               (apparecchio, tipo, data, ora, temperatura, temp_min, temp_max, esito, nota, operatore)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (row['apparecchio'], row['tipo'], row['data'], row['ora'],
+             row['temperatura'], row['temp_min'], row['temp_max'],
+             row['esito'], row.get('nota', ''), row['operatore'])
+        )
+
+
+def get_temperature_storico(giorni=30, apparecchio=None):
+    limite = (date.today() - timedelta(days=giorni)).isoformat()
+    with get_conn() as conn:
+        sql = ("SELECT id, apparecchio, tipo, data, ora, temperatura, temp_min, temp_max, "
+               "esito, nota, operatore FROM temperature WHERE data >= ?")
+        params = [limite]
+        if apparecchio:
+            sql += " AND apparecchio = ?"
+            params.append(apparecchio)
+        sql += " ORDER BY data DESC, ora DESC, id DESC"
+        cur = conn.execute(sql, tuple(params))
+        return _rows(cur)
+
+
+def replace_temperatura(rows):
+    """Ricarica lo storico temperature dal foglio Google (usato da /api/sync)."""
+    with get_conn() as conn:
+        conn.execute("DELETE FROM temperature")
+        if rows:
+            conn.executemany(
+                """INSERT INTO temperature
+                   (apparecchio, tipo, data, ora, temperatura, temp_min, temp_max, esito, nota, operatore)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                [(r['apparecchio'], r.get('tipo', ''), r['data'], r.get('ora', ''),
+                  r['temperatura'], r['temp_min'], r['temp_max'],
+                  r['esito'], r.get('nota', ''), r['operatore']) for r in rows]
+            )
+
+
+def update_user_apparecchi_permesso(user_id, permesso):
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE users SET gestisce_apparecchi = ? WHERE id = ?",
+            (1 if permesso else 0, user_id)
+        )

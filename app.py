@@ -31,8 +31,15 @@ from database import (
     update_user_profile, update_user_reparto, is_username_taken, get_feed,
     get_lista_spesa, add_lista_spesa_item, update_lista_spesa_completato,
     update_lista_spesa_fornitore, delete_lista_spesa_item, clear_lista_spesa,
+    RANGE_RIFERIMENTO_TIPO, get_apparecchi, get_apparecchio_by_id,
+    create_apparecchio, update_apparecchio, delete_apparecchio,
+    insert_temperatura, get_temperature_storico, replace_temperatura,
+    update_user_apparecchi_permesso,
 )
-from sheets import load_listino, load_registro, append_registro, append_listino, aggiorna_tipo_movimento
+from sheets import (
+    load_listino, load_registro, append_registro, append_listino, aggiorna_tipo_movimento,
+    load_temperatura, append_temperatura,
+)
 
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'haccp-brigade-2024')
@@ -50,6 +57,11 @@ class User(UserMixin):
         self.username = data.get('username') or ''
         self.reparto  = data.get('reparto') or ''
         self.role     = data.get('role', 'staff')
+        self.gestisce_apparecchi = bool(data.get('gestisce_apparecchi'))
+
+    @property
+    def puo_gestire_apparecchi(self):
+        return self.role == 'admin' or self.gestisce_apparecchi
 
 
 @login_manager.user_loader
@@ -69,6 +81,15 @@ def admin_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         if not current_user.is_authenticated or current_user.role != 'admin':
+            abort(403)
+        return f(*args, **kwargs)
+    return decorated
+
+
+def gestione_apparecchi_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not current_user.is_authenticated or not current_user.puo_gestire_apparecchi:
             abort(403)
         return f(*args, **kwargs)
     return decorated
@@ -105,7 +126,10 @@ def _sync_sheets_background():
         replace_listino(listino)
         registro = load_registro()
         replace_registro(registro)
-        print(f"[SYNC] Listino: {len(listino)} prodotti | Registro: {len(registro)} movimenti")
+        temperature = load_temperatura()
+        replace_temperatura(temperature)
+        print(f"[SYNC] Listino: {len(listino)} prodotti | Registro: {len(registro)} movimenti | "
+              f"Temperature: {len(temperature)} rilevazioni")
     except Exception as e:
         print(f"[SYNC] Sheets non raggiungibile: {e}")
 
@@ -309,6 +333,18 @@ def admin_delete_user():
     if not user_id or user_id == int(current_user.id):
         abort(400)  # Non puoi eliminare te stesso
     delete_user(user_id)
+    return redirect(url_for('admin_page'))
+
+
+@app.route('/admin/apparecchi-permesso', methods=['POST'])
+@login_required
+@admin_required
+def admin_set_apparecchi_permesso():
+    user_id  = request.form.get('user_id', type=int)
+    permesso = request.form.get('permesso') == '1'
+    if not user_id:
+        abort(400)
+    update_user_apparecchi_permesso(user_id, permesso)
     return redirect(url_for('admin_page'))
 
 
@@ -634,6 +670,133 @@ def api_scarico():
     })
 
 
+# ─── TEMPERATURE ──────────────────────────────────────────────────────────────
+
+@app.route('/api/apparecchi', methods=['GET'])
+@login_required
+def api_apparecchi_list():
+    return jsonify({
+        'success':    True,
+        'apparecchi': get_apparecchi(),
+        'puo_gestire': current_user.puo_gestire_apparecchi,
+        'range_riferimento': RANGE_RIFERIMENTO_TIPO,
+    })
+
+
+@app.route('/api/apparecchi', methods=['POST'])
+@login_required
+@gestione_apparecchi_required
+def api_apparecchi_crea():
+    d    = request.get_json(force=True)
+    nome = (d.get('nome') or '').strip()
+    tipo = (d.get('tipo') or '').strip()
+    try:
+        temp_min = float(d.get('temp_min'))
+        temp_max = float(d.get('temp_max'))
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'Temperatura minima/massima non valida'}), 400
+
+    if not nome:
+        return jsonify({'success': False, 'error': 'Nome apparecchio obbligatorio'}), 400
+    if tipo not in ('Frigorifero', 'Congelatore', 'Abbattitore'):
+        return jsonify({'success': False, 'error': 'Seleziona il tipo apparecchio'}), 400
+    if temp_min > temp_max:
+        return jsonify({'success': False, 'error': 'La temperatura minima non può superare la massima'}), 400
+
+    apparecchio_id = create_apparecchio(nome, tipo, temp_min, temp_max)
+    return jsonify({'success': True, 'id': apparecchio_id})
+
+
+@app.route('/api/apparecchi/<int:apparecchio_id>', methods=['PUT'])
+@login_required
+@gestione_apparecchi_required
+def api_apparecchi_modifica(apparecchio_id):
+    if not get_apparecchio_by_id(apparecchio_id):
+        return jsonify({'success': False, 'error': 'Apparecchio non trovato'}), 404
+
+    d    = request.get_json(force=True)
+    nome = (d.get('nome') or '').strip()
+    tipo = (d.get('tipo') or '').strip()
+    try:
+        temp_min = float(d.get('temp_min'))
+        temp_max = float(d.get('temp_max'))
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'Temperatura minima/massima non valida'}), 400
+
+    if not nome:
+        return jsonify({'success': False, 'error': 'Nome apparecchio obbligatorio'}), 400
+    if tipo not in ('Frigorifero', 'Congelatore', 'Abbattitore'):
+        return jsonify({'success': False, 'error': 'Seleziona il tipo apparecchio'}), 400
+    if temp_min > temp_max:
+        return jsonify({'success': False, 'error': 'La temperatura minima non può superare la massima'}), 400
+
+    update_apparecchio(apparecchio_id, nome, tipo, temp_min, temp_max)
+    return jsonify({'success': True})
+
+
+@app.route('/api/apparecchi/<int:apparecchio_id>', methods=['DELETE'])
+@login_required
+@gestione_apparecchi_required
+def api_apparecchi_elimina(apparecchio_id):
+    if not get_apparecchio_by_id(apparecchio_id):
+        return jsonify({'success': False, 'error': 'Apparecchio non trovato'}), 404
+    delete_apparecchio(apparecchio_id)
+    return jsonify({'success': True})
+
+
+@app.route('/api/temperature', methods=['GET'])
+@login_required
+def api_temperature_storico():
+    giorni      = request.args.get('giorni', default=30, type=int)
+    apparecchio = (request.args.get('apparecchio') or '').strip() or None
+    return jsonify({'success': True, 'rilevazioni': get_temperature_storico(giorni, apparecchio)})
+
+
+@app.route('/api/temperature', methods=['POST'])
+@login_required
+def api_temperature_registra():
+    d = request.get_json(force=True)
+    try:
+        apparecchio_id = int(d.get('apparecchio_id'))
+        temperatura    = float(d.get('temperatura'))
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'Dati non validi'}), 400
+
+    nota = (d.get('nota') or '').strip()
+    data = (d.get('data') or datetime.now().strftime('%Y-%m-%d')).strip()
+    ora  = (d.get('ora')  or datetime.now().strftime('%H:%M')).strip()
+
+    app_row = get_apparecchio_by_id(apparecchio_id)
+    if not app_row:
+        return jsonify({'success': False, 'error': 'Apparecchio non trovato'}), 404
+
+    fuori_soglia = temperatura < app_row['temp_min'] or temperatura > app_row['temp_max']
+    if fuori_soglia and not nota:
+        return jsonify({'success': False, 'error': 'Temperatura fuori soglia: la nota è obbligatoria'}), 400
+    esito = 'FUORI_SOGLIA' if fuori_soglia else 'OK'
+
+    row = {
+        'apparecchio': app_row['nome'],
+        'tipo':        app_row['tipo'],
+        'data':        data,
+        'ora':         ora,
+        'temperatura': temperatura,
+        'temp_min':    app_row['temp_min'],
+        'temp_max':    app_row['temp_max'],
+        'esito':       esito,
+        'nota':        nota,
+        'operatore':   current_user.nome,
+    }
+
+    try:
+        append_temperatura(row)
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Errore Google Sheets: {e}'}), 500
+
+    insert_temperatura(row)
+    return jsonify({'success': True, 'esito': esito})
+
+
 @app.route('/api/sync', methods=['POST'])
 @login_required
 def api_sync():
@@ -642,10 +805,13 @@ def api_sync():
         replace_listino(listino)
         registro = load_registro()
         replace_registro(registro)
+        temperature = load_temperatura()
+        replace_temperatura(temperature)
         return jsonify({
-            'success':  True,
-            'listino':  len(listino),
-            'registro': len(registro),
+            'success':     True,
+            'listino':     len(listino),
+            'registro':    len(registro),
+            'temperature': len(temperature),
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500

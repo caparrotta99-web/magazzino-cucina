@@ -687,9 +687,13 @@ def api_apparecchi_list():
 @login_required
 @gestione_apparecchi_required
 def api_apparecchi_crea():
-    d    = request.get_json(force=True)
-    nome = (d.get('nome') or '').strip()
-    tipo = (d.get('tipo') or '').strip()
+    d       = request.get_json(force=True)
+    nome    = (d.get('nome') or '').strip()
+    tipo    = (d.get('tipo') or '').strip()
+    reparto = (d.get('reparto') or '').strip()
+    marca   = (d.get('marca') or '').strip()
+    modello = (d.get('modello') or '').strip()
+    seriale = (d.get('seriale') or '').strip()
     try:
         temp_min = float(d.get('temp_min'))
         temp_max = float(d.get('temp_max'))
@@ -700,10 +704,12 @@ def api_apparecchi_crea():
         return jsonify({'success': False, 'error': 'Nome apparecchio obbligatorio'}), 400
     if tipo not in ('Frigorifero', 'Congelatore', 'Abbattitore'):
         return jsonify({'success': False, 'error': 'Seleziona il tipo apparecchio'}), 400
+    if reparto not in ('Cucina', 'Sala', 'Pizzeria'):
+        return jsonify({'success': False, 'error': 'Seleziona il reparto'}), 400
     if temp_min > temp_max:
         return jsonify({'success': False, 'error': 'La temperatura minima non può superare la massima'}), 400
 
-    apparecchio_id = create_apparecchio(nome, tipo, temp_min, temp_max)
+    apparecchio_id = create_apparecchio(nome, tipo, temp_min, temp_max, reparto, marca, modello, seriale)
     return jsonify({'success': True, 'id': apparecchio_id})
 
 
@@ -714,9 +720,13 @@ def api_apparecchi_modifica(apparecchio_id):
     if not get_apparecchio_by_id(apparecchio_id):
         return jsonify({'success': False, 'error': 'Apparecchio non trovato'}), 404
 
-    d    = request.get_json(force=True)
-    nome = (d.get('nome') or '').strip()
-    tipo = (d.get('tipo') or '').strip()
+    d       = request.get_json(force=True)
+    nome    = (d.get('nome') or '').strip()
+    tipo    = (d.get('tipo') or '').strip()
+    reparto = (d.get('reparto') or '').strip()
+    marca   = (d.get('marca') or '').strip()
+    modello = (d.get('modello') or '').strip()
+    seriale = (d.get('seriale') or '').strip()
     try:
         temp_min = float(d.get('temp_min'))
         temp_max = float(d.get('temp_max'))
@@ -727,10 +737,12 @@ def api_apparecchi_modifica(apparecchio_id):
         return jsonify({'success': False, 'error': 'Nome apparecchio obbligatorio'}), 400
     if tipo not in ('Frigorifero', 'Congelatore', 'Abbattitore'):
         return jsonify({'success': False, 'error': 'Seleziona il tipo apparecchio'}), 400
+    if reparto not in ('Cucina', 'Sala', 'Pizzeria'):
+        return jsonify({'success': False, 'error': 'Seleziona il reparto'}), 400
     if temp_min > temp_max:
         return jsonify({'success': False, 'error': 'La temperatura minima non può superare la massima'}), 400
 
-    update_apparecchio(apparecchio_id, nome, tipo, temp_min, temp_max)
+    update_apparecchio(apparecchio_id, nome, tipo, temp_min, temp_max, reparto, marca, modello, seriale)
     return jsonify({'success': True})
 
 
@@ -891,6 +903,77 @@ def api_scan_label():
         return jsonify({'success': True,
                         'lotto':   result.get('lotto'),
                         'scadenza': result.get('scadenza')})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+
+_TIPO_APPARECCHIO_MAP = {
+    'frigorifero': 'Frigorifero', 'congelatore': 'Congelatore', 'abbattitore': 'Abbattitore',
+}
+
+
+@app.route('/api/scan-apparecchio', methods=['POST'])
+@login_required
+def api_scan_apparecchio():
+    api_key = os.environ.get('ANTHROPIC_API_KEY')
+    if not api_key:
+        return jsonify({'success': False, 'error': 'ANTHROPIC_API_KEY non configurata'}), 500
+
+    d          = request.get_json(force=True)
+    image_b64  = d.get('image', '')
+    media_type = d.get('media_type', 'image/jpeg')
+
+    if not image_b64:
+        return jsonify({'success': False, 'error': 'Immagine mancante'}), 400
+
+    if ',' in image_b64:
+        image_b64 = image_b64.split(',', 1)[1]
+
+    try:
+        import anthropic as _anthropic
+        client = _anthropic.Anthropic(api_key=api_key)
+        resp = client.messages.create(
+            model='claude-sonnet-4-6',
+            max_tokens=500,
+            messages=[{
+                'role': 'user',
+                'content': [
+                    {
+                        'type': 'image',
+                        'source': {
+                            'type':       'base64',
+                            'media_type': media_type,
+                            'data':       image_b64,
+                        },
+                    },
+                    {
+                        'type': 'text',
+                        'text': (
+                            "Guarda questa targhetta di un apparecchio di refrigerazione e dimmi: "
+                            "marca, modello, numero seriale, tipo (frigorifero/congelatore/abbattitore). "
+                            "Rispondi SOLO in JSON: {marca: '', modello: '', seriale: '', tipo: ''}. "
+                            "Se non leggi un campo metti null."
+                        ),
+                    },
+                ],
+            }],
+        )
+        text = resp.content[0].text
+        try:
+            result = _extract_json_object(text)
+        except json.JSONDecodeError:
+            result = None
+        if not result:
+            return jsonify({'success': False, 'error': 'Nessun dato trovato nella targhetta'})
+
+        tipo_raw = (result.get('tipo') or '').strip().lower()
+        tipo = _TIPO_APPARECCHIO_MAP.get(tipo_raw)
+
+        return jsonify({'success': True,
+                        'marca':   result.get('marca'),
+                        'modello': result.get('modello'),
+                        'seriale': result.get('seriale'),
+                        'tipo':    tipo})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

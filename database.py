@@ -188,6 +188,10 @@ def db_init():
                 id         {pk},
                 nome       TEXT NOT NULL,
                 tipo       TEXT NOT NULL DEFAULT 'Frigorifero',
+                reparto    TEXT NOT NULL DEFAULT 'Cucina',
+                marca      TEXT NOT NULL DEFAULT '',
+                modello    TEXT NOT NULL DEFAULT '',
+                seriale    TEXT NOT NULL DEFAULT '',
                 temp_min   REAL NOT NULL DEFAULT 0,
                 temp_max   REAL NOT NULL DEFAULT 4,
                 attivo     INTEGER NOT NULL DEFAULT 1
@@ -227,6 +231,10 @@ def db_init():
         ('lista_spesa', 'reparto',   "TEXT NOT NULL DEFAULT ''"),
         ('users',    'username',     "TEXT NOT NULL DEFAULT ''"),
         ('users',    'gestisce_apparecchi', "INTEGER NOT NULL DEFAULT 0"),
+        ('apparecchi', 'reparto', "TEXT NOT NULL DEFAULT 'Cucina'"),
+        ('apparecchi', 'marca',   "TEXT NOT NULL DEFAULT ''"),
+        ('apparecchi', 'modello', "TEXT NOT NULL DEFAULT ''"),
+        ('apparecchi', 'seriale', "TEXT NOT NULL DEFAULT ''"),
     ]
     for table, col, defn in migrations:
         if _USE_PG:
@@ -850,39 +858,48 @@ RANGE_RIFERIMENTO_TIPO = {
 }
 
 
-def get_apparecchi(solo_attivi=True):
+def get_apparecchi(solo_attivi=True, reparto=None):
     with get_conn() as conn:
-        sql = "SELECT id, nome, tipo, temp_min, temp_max, attivo FROM apparecchi"
+        sql = ("SELECT id, nome, tipo, reparto, marca, modello, seriale, "
+               "temp_min, temp_max, attivo FROM apparecchi")
+        clauses, params = [], []
         if solo_attivi:
-            sql += " WHERE attivo = 1"
+            clauses.append("attivo = 1")
+        if reparto:
+            clauses.append("reparto = ?")
+            params.append(reparto)
+        if clauses:
+            sql += " WHERE " + " AND ".join(clauses)
         sql += " ORDER BY LOWER(nome)"
-        cur = conn.execute(sql)
+        cur = conn.execute(sql, tuple(params))
         return _rows(cur)
 
 
 def get_apparecchio_by_id(apparecchio_id):
     with get_conn() as conn:
         cur = conn.execute(
-            "SELECT id, nome, tipo, temp_min, temp_max, attivo FROM apparecchi WHERE id = ?",
+            "SELECT id, nome, tipo, reparto, marca, modello, seriale, "
+            "temp_min, temp_max, attivo FROM apparecchi WHERE id = ?",
             (apparecchio_id,)
         )
         return _row(cur)
 
 
-def create_apparecchio(nome, tipo, temp_min, temp_max):
+def create_apparecchio(nome, tipo, temp_min, temp_max, reparto='Cucina', marca='', modello='', seriale=''):
     with get_conn() as conn:
         return conn.execute_insert(
-            "INSERT INTO apparecchi (nome, tipo, temp_min, temp_max, attivo) "
-            "VALUES (?, ?, ?, ?, 1)",
-            (nome, tipo, float(temp_min), float(temp_max))
+            "INSERT INTO apparecchi (nome, tipo, reparto, marca, modello, seriale, temp_min, temp_max, attivo) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1)",
+            (nome, tipo, reparto, marca, modello, seriale, float(temp_min), float(temp_max))
         )
 
 
-def update_apparecchio(apparecchio_id, nome, tipo, temp_min, temp_max):
+def update_apparecchio(apparecchio_id, nome, tipo, temp_min, temp_max, reparto='Cucina', marca='', modello='', seriale=''):
     with get_conn() as conn:
         conn.execute(
-            "UPDATE apparecchi SET nome = ?, tipo = ?, temp_min = ?, temp_max = ? WHERE id = ?",
-            (nome, tipo, float(temp_min), float(temp_max), apparecchio_id)
+            "UPDATE apparecchi SET nome = ?, tipo = ?, reparto = ?, marca = ?, modello = ?, "
+            "seriale = ?, temp_min = ?, temp_max = ? WHERE id = ?",
+            (nome, tipo, reparto, marca, modello, seriale, float(temp_min), float(temp_max), apparecchio_id)
         )
 
 

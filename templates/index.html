@@ -1314,6 +1314,15 @@ body.help-mode { background: #0f1f3d; }
 
     <div class="pg-sub">Rilevazioni HACCP di frigoriferi, congelatori e abbattitori</div>
 
+    <div class="filter-row">
+      <select class="fselect-pill" id="temp-filter-reparto" onchange="renderApparecchi()">
+        <option value="">Reparto</option>
+        <option value="Cucina">Cucina</option>
+        <option value="Sala">Sala</option>
+        <option value="Pizzeria">Pizzeria</option>
+      </select>
+    </div>
+
     <div id="temp-apparecchi-list"></div>
 
     <button type="button" class="btn-nuovo-prodotto" id="btn-nuovo-apparecchio" onclick="openApparecchioModal()" style="display:none;margin:4px 0 24px">
@@ -1774,6 +1783,13 @@ body.help-mode { background: #0f1f3d; }
     <div class="modal-body">
       <input type="hidden" id="app-id" value="0">
 
+      <button type="button" class="btn-scan" id="btn-scan-apparecchio" onclick="triggerApparecchioCamera()" style="margin-bottom:16px">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        Scansiona targhetta
+      </button>
+      <input type="file" id="app-camera-input" accept="image/*" capture="environment"
+             style="display:none" onchange="onApparecchioCameraCapture(this)">
+
       <div class="fgroup">
         <label class="flabel">Nome *</label>
         <input class="finput" type="text" id="app-nome" placeholder="es. Frigo Cucina 1" autocomplete="off">
@@ -1792,13 +1808,40 @@ body.help-mode { background: #0f1f3d; }
       </div>
 
       <div class="fgroup">
+        <label class="flabel">Reparto *</label>
+        <div class="fselect-wrap">
+          <select class="fselect" id="app-reparto">
+            <option value="" disabled selected>Seleziona reparto…</option>
+            <option value="Cucina">Cucina</option>
+            <option value="Sala">Sala</option>
+            <option value="Pizzeria">Pizzeria</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="fgroup">
         <label class="flabel">Temperatura minima (°C) *</label>
         <input class="finput" type="number" id="app-temp-min" step="0.1" inputmode="decimal">
       </div>
 
-      <div class="fgroup" style="margin-bottom:0">
+      <div class="fgroup">
         <label class="flabel">Temperatura massima (°C) *</label>
         <input class="finput" type="number" id="app-temp-max" step="0.1" inputmode="decimal">
+      </div>
+
+      <div class="fgroup">
+        <label class="flabel">Marca</label>
+        <input class="finput" type="text" id="app-marca" placeholder="es. Rivacold" autocomplete="off">
+      </div>
+
+      <div class="fgroup">
+        <label class="flabel">Modello</label>
+        <input class="finput" type="text" id="app-modello" placeholder="es. RC 300" autocomplete="off">
+      </div>
+
+      <div class="fgroup" style="margin-bottom:0">
+        <label class="flabel">Numero seriale</label>
+        <input class="finput" type="text" id="app-seriale" placeholder="es. SN123456" autocomplete="off">
       </div>
     </div>
     <div class="modal-actions">
@@ -3295,19 +3338,25 @@ function renderApparecchi() {
   if (btnNuovo) btnNuovo.style.display = S.puoGestireApparecchi ? 'flex' : 'none';
   if (!list) return;
 
-  if (!S.apparecchi.length) {
-    list.innerHTML = `<div class="empty-state"><p>Nessun apparecchio configurato${S.puoGestireApparecchi ? ' — aggiungine uno' : ''}</p></div>`;
+  const repartoFiltro = document.getElementById('temp-filter-reparto')?.value || '';
+  const apparecchiFiltrati = repartoFiltro
+    ? S.apparecchi.filter(a => (a.reparto || 'Cucina') === repartoFiltro)
+    : S.apparecchi;
+
+  if (!apparecchiFiltrati.length) {
+    list.innerHTML = `<div class="empty-state"><p>Nessun apparecchio${repartoFiltro ? ' per questo reparto' : ' configurato' + (S.puoGestireApparecchi ? ' — aggiungine uno' : '')}</p></div>`;
   } else {
-    list.innerHTML = S.apparecchi.map(a => {
+    list.innerHTML = apparecchiFiltrati.map(a => {
       const ultima = S.temperatureStorico.find(t => t.apparecchio === a.nome);
       const ultimaHtml = ultima
         ? `<span class="temp-badge ${ultima.esito === 'OK' ? 'ok' : 'danger'}">${ultima.esito === 'OK' ? 'OK' : 'FUORI SOGLIA'}</span> ${_fmtTemp(ultima.temperatura)}°C — ${fmtDate(ultima.data)} ${esc(ultima.ora||'')}`
         : 'Nessuna rilevazione';
+      const marcaModello = [a.marca, a.modello].filter(Boolean).join(' ');
       return `<div class="temp-app-card">
         <div class="temp-app-top">
           <div>
             <div class="temp-app-nome">${esc(a.nome)}</div>
-            <div class="temp-app-tipo">${esc(a.tipo)}</div>
+            <div class="temp-app-tipo">${esc(a.tipo)} · ${esc(a.reparto || 'Cucina')}${marcaModello ? ' · ' + esc(marcaModello) : ''}</div>
           </div>
           <div class="temp-app-range">${_fmtTemp(a.temp_min)}°C / ${_fmtTemp(a.temp_max)}°C</div>
         </div>
@@ -3342,8 +3391,12 @@ function openApparecchioModal(id = 0) {
   document.getElementById('app-modal-title').textContent = a ? 'Modifica apparecchio' : 'Nuovo apparecchio';
   document.getElementById('app-nome').value = a ? a.nome : '';
   document.getElementById('app-tipo').value = a ? a.tipo : '';
+  document.getElementById('app-reparto').value = a ? (a.reparto || 'Cucina') : '';
   document.getElementById('app-temp-min').value = a ? a.temp_min : '';
   document.getElementById('app-temp-max').value = a ? a.temp_max : '';
+  document.getElementById('app-marca').value = a ? (a.marca || '') : '';
+  document.getElementById('app-modello').value = a ? (a.modello || '') : '';
+  document.getElementById('app-seriale').value = a ? (a.seriale || '') : '';
   document.getElementById('modal-apparecchio').classList.add('open');
 }
 function closeApparecchioModal() { document.getElementById('modal-apparecchio').classList.remove('open'); }
@@ -3358,18 +3411,69 @@ function onApparecchioTipoChange() {
   }
 }
 
+function triggerApparecchioCamera() { document.getElementById('app-camera-input').click(); }
+
+async function onApparecchioCameraCapture(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const btn = document.getElementById('btn-scan-apparecchio');
+  const originalHtml = btn.innerHTML;
+  btn.disabled = true;
+  btn.classList.add('scanning');
+  btn.innerHTML = '<div class="btn-scan-spinner"></div> Analisi in corso...';
+
+  let image, mediaType = 'image/jpeg';
+  try {
+    image = await compressImage(file, 1200, 0.8);
+  } catch {
+    image = await readFileAsDataURL(file);
+    mediaType = file.type || 'image/jpeg';
+  }
+
+  const data = await api('/api/scan-apparecchio', {
+    method: 'POST',
+    body: { image, media_type: mediaType },
+  });
+
+  btn.disabled = false;
+  btn.classList.remove('scanning');
+  btn.innerHTML = originalHtml;
+
+  if (data.success) {
+    let filled = false;
+    if (data.marca)   { document.getElementById('app-marca').value   = data.marca;   filled = true; }
+    if (data.modello) { document.getElementById('app-modello').value = data.modello; filled = true; }
+    if (data.seriale) { document.getElementById('app-seriale').value = data.seriale; filled = true; }
+    if (data.tipo)    { document.getElementById('app-tipo').value    = data.tipo; onApparecchioTipoChange(); filled = true; }
+    const nomeEl = document.getElementById('app-nome');
+    if (!nomeEl.value.trim() && (data.marca || data.modello)) {
+      nomeEl.value = [data.marca, data.modello].filter(Boolean).join(' ');
+    }
+    toast(filled ? '✓ Targhetta letta' : 'Nessun dato trovato', filled ? 'success' : 'error');
+  } else {
+    toast(data.error || 'Non riesco a leggere la targhetta, inserisci manualmente', 'error');
+  }
+  input.value = '';
+}
+
 async function submitApparecchio() {
   const id      = parseInt(document.getElementById('app-id').value) || 0;
   const nome    = document.getElementById('app-nome').value.trim();
   const tipo    = document.getElementById('app-tipo').value;
+  const reparto = document.getElementById('app-reparto').value;
   const tempMin = document.getElementById('app-temp-min').value;
   const tempMax = document.getElementById('app-temp-max').value;
+  const marca   = document.getElementById('app-marca').value.trim();
+  const modello = document.getElementById('app-modello').value.trim();
+  const seriale = document.getElementById('app-seriale').value.trim();
 
   if (!nome) { toast('Inserisci il nome dell\'apparecchio', 'error'); return; }
   if (!tipo) { toast('Seleziona il tipo', 'error'); return; }
+  if (!reparto) { toast('Seleziona il reparto', 'error'); return; }
   if (tempMin === '' || tempMax === '') { toast('Inserisci temperatura minima e massima', 'error'); return; }
 
-  const body = { nome, tipo, temp_min: parseFloat(tempMin), temp_max: parseFloat(tempMax) };
+  const body = { nome, tipo, reparto, temp_min: parseFloat(tempMin), temp_max: parseFloat(tempMax), marca, modello, seriale };
   const result = id
     ? await api(`/api/apparecchi/${id}`, { method: 'PUT', body })
     : await api('/api/apparecchi', { method: 'POST', body });

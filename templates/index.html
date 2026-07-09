@@ -2886,23 +2886,13 @@ async function removeSpesaItem(id) {
 
 async function copiaOrdineSpesa() {
   const attivi = S.listaSpesa.filter(i => !i.completato);
-  if (!attivi.length) { toast('Nessun prodotto da ordinare', 'error'); return; }
+  const items = (S.spesaFornFilter && S.spesaFornFilter !== 'all')
+    ? attivi.filter(i => i.fornitore === S.spesaFornFilter)
+    : attivi;
 
-  const oggi = new Date().toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric' });
-  const fornitori = (S.spesaFornFilter && S.spesaFornFilter !== 'all')
-    ? [S.spesaFornFilter]
-    : [...new Set(attivi.map(i => i.fornitore).filter(Boolean))].sort();
+  if (!items.length) { toast('Nessun prodotto da ordinare', 'error'); return; }
 
-  const blocchi = fornitori.map(f => {
-    const items = attivi.filter(i => i.fornitore === f);
-    if (!items.length) return '';
-    const righe = items.map(i => `- ${i.prodotto}${i.quantita ? ` x ${i.quantita} ${i.unita || ''}`.trimEnd() : ''}`).join('\n');
-    return `Ordine ${f} - ${oggi}\n\n${righe}`;
-  }).filter(Boolean);
-
-  if (!blocchi.length) { toast('Nessun prodotto da ordinare', 'error'); return; }
-
-  const testo = blocchi.join('\n\n');
+  const testo = items.map(i => `- ${i.prodotto}${i.quantita ? ` x ${i.quantita}` : ''}`).join('\n');
   try {
     await navigator.clipboard.writeText(testo);
     toast('Ordine copiato! Incollalo su WhatsApp', 'success');

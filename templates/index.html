@@ -673,6 +673,28 @@ main {
   font-size: 11px; font-weight: 600; padding: 4px 12px;
   border-radius: 100px; flex-shrink: 0;
 }
+.lot-print-btn {
+  width: 32px; height: 32px; border-radius: 10px; flex-shrink: 0;
+  background: #f3f4f6; border: none; color: #111827;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: background .15s;
+}
+.lot-print-btn:active { background: #e5e7eb; }
+
+/* ─── ETICHETTA LOTTO (stampa) ──────────────────────────────────────────── */
+.eti-lotto-label {
+  background: #ffffff; color: #000000;
+  border: 2px solid #000000; border-radius: 6px;
+  max-width: 320px; margin: 20px auto; padding: 20px;
+  text-align: center;
+}
+.eti-lotto-prodotto { font-size: 21px; font-weight: 800; margin-bottom: 14px; word-break: break-word; }
+.eti-lotto-row {
+  display: flex; justify-content: space-between; gap: 10px;
+  font-size: 14px; padding: 8px 0; border-top: 1px solid #000000;
+}
+.eti-lotto-row span { color: #000000; }
+.eti-lotto-row strong { font-weight: 700; }
 
 /* ─── TOAST (top-right) ─────────────────────────────────────────────────── */
 .toast {
@@ -872,7 +894,7 @@ main {
 
 /* ─── PRINT ─────────────────────────────────────────────────────────────── */
 @media print {
-  header, .drawer-overlay, .drawer,
+  header, main, .drawer-overlay, .drawer,
   .modal-actions, .toast { display: none !important; }
   .modal-backdrop {
     display: flex !important; position: static !important;
@@ -1527,6 +1549,25 @@ body.help-mode { background: #0f1f3d; }
     <div class="modal-actions">
       <button class="btn-print" onclick="window.print()">Stampa</button>
       <button class="btn-close-modal" onclick="closeModal()">Chiudi</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL ETICHETTA LOTTO (Giacenze) ──────────────────────────────────── -->
+<div class="modal-backdrop" id="modal-eti-lotto" onclick="bgCloseEtiLotto(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-body">
+      <div class="eti-lotto-label">
+        <div class="eti-lotto-prodotto" id="eti-lotto-prodotto"></div>
+        <div class="eti-lotto-row"><span>Lotto</span><strong id="eti-lotto-lotto"></strong></div>
+        <div class="eti-lotto-row"><span>Scadenza</span><strong id="eti-lotto-scadenza"></strong></div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-print" onclick="window.print()">Stampa</button>
+      <button class="btn-print" onclick="copiaEtichettaLotto()">Copia testo</button>
+      <button class="btn-close-modal" onclick="closeEtiLotto()">Chiudi</button>
     </div>
   </div>
 </div>
@@ -2466,12 +2507,16 @@ function showLotDetail(g) {
   const lotsHtml = g.lotti.map(l => {
     const giorni = l.scadenza ? daysTo(l.scadenza) : null;
     const cls    = giorni===null ? 'scad-ok' : giorni<0 ? 'scad-danger' : giorni<=7 ? 'scad-warn' : 'scad-ok';
+    const etData = esc(JSON.stringify({ prodotto: g.prodotto, lotto: l.lotto, scadenza: l.scadenza }));
     return `<div class="lot-detail-row">
       <div>
         <div class="lot-detail-lotto">${esc(l.lotto)}</div>
         <div class="lot-detail-meta">${l.rimanenza}&nbsp;${esc(g.unita)}</div>
       </div>
       ${l.scadenza ? `<span class="lot-scad-pill ${cls}">${fmtDate(l.scadenza)}</span>` : ''}
+      <button type="button" class="lot-print-btn" onclick="event.stopPropagation(); printLotLabel(${etData})" aria-label="Stampa etichetta">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
+      </button>
     </div>`;
   }).join('');
   document.getElementById('lot-detail-body').innerHTML = scortaNote + lotsHtml;
@@ -2501,6 +2546,29 @@ function showEtichetta(d) {
 }
 function closeModal() { document.getElementById('modal-etichetta').classList.remove('open'); }
 function bgClose(e)   { if (e.target === document.getElementById('modal-etichetta')) closeModal(); }
+
+// ── ETICHETTA LOTTO (Giacenze) ──────────────────────────────────────────────
+function printLotLabel(d) {
+  document.getElementById('eti-lotto-prodotto').textContent = d.prodotto;
+  document.getElementById('eti-lotto-lotto').textContent    = d.lotto || '—';
+  document.getElementById('eti-lotto-scadenza').textContent = d.scadenza ? fmtDate(d.scadenza) : '—';
+  document.getElementById('modal-eti-lotto').classList.add('open');
+}
+function closeEtiLotto() { document.getElementById('modal-eti-lotto').classList.remove('open'); }
+function bgCloseEtiLotto(e) { if (e.target === document.getElementById('modal-eti-lotto')) closeEtiLotto(); }
+
+async function copiaEtichettaLotto() {
+  const prodotto  = document.getElementById('eti-lotto-prodotto').textContent;
+  const lotto     = document.getElementById('eti-lotto-lotto').textContent;
+  const scadenza  = document.getElementById('eti-lotto-scadenza').textContent;
+  const testo = `PRODOTTO: ${prodotto}\nLOTTO: ${lotto}\nSCADENZA: ${scadenza}`;
+  try {
+    await navigator.clipboard.writeText(testo);
+    toast('Testo copiato!', 'success');
+  } catch (e) {
+    toast('Impossibile copiare il testo', 'error');
+  }
+}
 
 // ── LISTA SPESA ───────────────────────────────────────────────────────────
 

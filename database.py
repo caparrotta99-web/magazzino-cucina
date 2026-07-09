@@ -296,12 +296,25 @@ def get_fornitori():
         return [r['fornitore'] for r in cur.fetchall()]
 
 
+CATEGORIE_FISSE = [
+    'Carne',
+    'Pesce e frutti di mare',
+    'Verdure e frutta fresche',
+    'Latticini e uova',
+    'Salumi e affettati',
+    'Pasta e cereali',
+    'Conserve e prodotti in scatola',
+    'Bevande',
+    'Dolci',
+    'Surgelati',
+    'Condimenti e spezie',
+    'Monouso e accessori',
+    'Altro',
+]
+
+
 def get_categorie():
-    with get_conn() as conn:
-        cur = conn.execute(
-            "SELECT DISTINCT categoria FROM listino WHERE categoria != '' ORDER BY categoria"
-        )
-        return [r['categoria'] for r in cur.fetchall()]
+    return CATEGORIE_FISSE
 
 
 def get_all_prodotti():

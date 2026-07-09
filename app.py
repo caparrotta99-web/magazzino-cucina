@@ -21,7 +21,7 @@ from database import (
     db_init,
     replace_listino, replace_registro,
     insert_listino_row,
-    get_fornitori, get_categorie, get_all_prodotti, get_prodotti_by_fornitore, get_reparto_prodotto,
+    get_fornitori, get_categorie, CATEGORIE_FISSE, get_all_prodotti, get_prodotti_by_fornitore, get_reparto_prodotto,
     get_ultima_rimanenza, insert_movimento,
     get_lotti_attivi, get_giacenze, get_alerts,
     get_in_uso_attivi, finalizza_in_uso, get_movimento_by_id,
@@ -367,6 +367,8 @@ def api_aggiungi_prodotto():
         return jsonify({'success': False, 'error': 'Fornitore obbligatorio'}), 400
     if reparto not in ('Cucina', 'Sala', 'Pizzeria'):
         return jsonify({'success': False, 'error': 'Seleziona il reparto'}), 400
+    if categoria not in CATEGORIE_FISSE:
+        return jsonify({'success': False, 'error': 'Seleziona la categoria'}), 400
 
     try:
         append_listino({'prodotto': prodotto, 'fornitore': fornitore, 'unita': unita,

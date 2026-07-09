@@ -1450,10 +1450,10 @@ main {
       </div>
 
       <div class="fgroup" style="margin-bottom:0">
-        <label class="flabel">Categoria</label>
+        <label class="flabel">Categoria *</label>
         <div class="fselect-wrap">
           <select class="fselect" id="np-categoria">
-            <option value="">Nessuna</option>
+            <option value="" disabled selected>Seleziona categoria…</option>
           </select>
         </div>
       </div>
@@ -1568,7 +1568,7 @@ function _updateCategorieUI() {
   const sel = document.getElementById('np-categoria');
   if (sel) {
     const cur = sel.value;
-    sel.innerHTML = '<option value="">Nessuna</option>' +
+    sel.innerHTML = '<option value="" disabled' + (cur ? '' : ' selected') + '>Seleziona categoria…</option>' +
       S.categorie.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join('');
     if (cur) sel.value = cur;
   }
@@ -2776,6 +2776,7 @@ async function submitNuovoProdotto() {
   if (!nome)      { toast('Inserisci il nome del prodotto', 'error'); return; }
   if (!fornitore) { toast('Seleziona o inserisci il fornitore', 'error'); return; }
   if (!reparto)   { toast('Seleziona il reparto', 'error'); return; }
+  if (!categoria) { toast('Seleziona la categoria', 'error'); return; }
 
   const btn = document.getElementById('btn-np-salva');
   btn.disabled = true;

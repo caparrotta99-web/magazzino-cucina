@@ -231,6 +231,7 @@ def db_init():
         ('lista_spesa', 'reparto',   "TEXT NOT NULL DEFAULT ''"),
         ('users',    'username',     "TEXT NOT NULL DEFAULT ''"),
         ('users',    'gestisce_apparecchi', "INTEGER NOT NULL DEFAULT 0"),
+        ('users',    'tema',      "TEXT NOT NULL DEFAULT 'chiaro'"),
         ('apparecchi', 'reparto', "TEXT NOT NULL DEFAULT 'Cucina'"),
         ('apparecchi', 'marca',   "TEXT NOT NULL DEFAULT ''"),
         ('apparecchi', 'modello', "TEXT NOT NULL DEFAULT ''"),
@@ -817,6 +818,13 @@ def update_user_reparto(user_id, reparto):
     with get_conn() as conn:
         conn.execute(
             "UPDATE users SET reparto = ? WHERE id = ?", (reparto, user_id)
+        )
+
+
+def update_user_tema(user_id, tema):
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE users SET tema = ? WHERE id = ?", (tema, user_id)
         )
 
 

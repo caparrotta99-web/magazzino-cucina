@@ -28,7 +28,7 @@ from database import (
     create_user, get_user_by_login, get_user_by_nome, get_user_by_id,
     get_all_users, update_user_role, delete_user,
     create_reset_token, get_reset_token, use_reset_token, update_user_password,
-    update_user_profile, update_user_reparto, is_username_taken, get_feed,
+    update_user_profile, update_user_reparto, update_user_tema, is_username_taken, get_feed,
     get_lista_spesa, add_lista_spesa_item, update_lista_spesa_completato,
     update_lista_spesa_fornitore, delete_lista_spesa_item, clear_lista_spesa,
     RANGE_RIFERIMENTO_TIPO, get_apparecchi, get_apparecchio_by_id,
@@ -58,6 +58,7 @@ class User(UserMixin):
         self.reparto  = data.get('reparto') or ''
         self.role     = data.get('role', 'staff')
         self.gestisce_apparecchi = bool(data.get('gestisce_apparecchi'))
+        self.tema     = data.get('tema') or 'chiaro'
 
     @property
     def puo_gestire_apparecchi(self):
@@ -266,6 +267,9 @@ def profile():
         cur_pw   =  request.form.get('current_password') or ''
         new_pw   =  request.form.get('new_password')     or ''
         new_pw2  =  request.form.get('new_password2')    or ''
+        tema     = (request.form.get('tema') or '').strip()
+        if tema not in ('chiaro', 'scuro'):
+            tema = 'chiaro'
 
         uid      = int(current_user.id)
         is_admin = current_user.role == 'admin'
@@ -287,6 +291,7 @@ def profile():
                 error = 'Le nuove password non coincidono'
             else:
                 update_user_profile(uid, nome, username)
+                update_user_tema(uid, tema)
                 if is_admin:
                     update_user_reparto(uid, (request.form.get('reparto') or '').strip())
                 update_user_password(uid, generate_password_hash(new_pw, method='pbkdf2:sha256'))
@@ -294,6 +299,7 @@ def profile():
                 user = get_user_by_id(uid)
         else:
             update_user_profile(uid, nome, username)
+            update_user_tema(uid, tema)
             if is_admin:
                 update_user_reparto(uid, (request.form.get('reparto') or '').strip())
             success = 'Profilo aggiornato con successo'

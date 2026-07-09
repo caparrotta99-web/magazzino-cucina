@@ -535,7 +535,6 @@ main {
   padding: 0 4px; margin-bottom: 10px;
 }
 .alert-cat-hdr::after { content: ''; flex: 1; height: 1px; background: var(--border); }
-.alert-cat-icon { font-size: 14px; line-height: 1; flex-shrink: 0; }
 .alert-cat-count {
   font-size: 10px; font-weight: 600; color: var(--muted);
   background: #f3f4f6; border-radius: 100px;
@@ -2149,21 +2148,6 @@ async function loadAlerts() {
   if (S.activePage === 'alert') renderAlerts();
 }
 
-const _ALERT_CAT_ICONS = {
-  'Carne':'🥩',
-  'Pesce e frutti di mare':'🐟',
-  'Verdure e frutta fresche':'🥬',
-  'Latticini e uova':'🧀',
-  'Salumi e affettati':'🍖',
-  'Pasta e cereali':'🍝',
-  'Conserve e prodotti in scatola':'🥫',
-  'Bevande':'🥤',
-  'Dolci':'🍰',
-  'Surgelati':'❄️',
-  'Condimenti e spezie':'🌶️',
-  'Monouso e accessori':'📦',
-  'Altro':'📋',
-};
 function setAlertTypeFilter(val) {
   S.alertTypeFilter = val;
   renderAlertFilters();
@@ -2208,7 +2192,7 @@ function renderAlertFilters() {
       `<button class="fpill ${S.alertRepartoFilter === r ? 'active' : ''}" onclick="setAlertRepartoFilter('${r}')">${_REPARTO_ICONS[r]} ${r.charAt(0).toUpperCase()+r.slice(1)}</button>`
     ),
     ...sortedCats.map(c =>
-      `<button class="fpill ${S.alertCatFilter === c ? 'active' : ''}" onclick="setAlertCatFilter('${esc(c)}')">${_ALERT_CAT_ICONS[c] || ''} ${esc(c)}</button>`
+      `<button class="fpill ${S.alertCatFilter === c ? 'active' : ''}" onclick="setAlertCatFilter('${esc(c)}')">${esc(c)}</button>`
     ),
   ].join('');
 }
@@ -2272,12 +2256,10 @@ function renderAlerts() {
   ];
 
   el.innerHTML = orderedCats.map(cat => {
-    const icon  = _ALERT_CAT_ICONS[cat] || '📋';
     const count = groups[cat].length;
     const cardsHtml = groups[cat].map(a => _renderAlertCard(a)).join('');
     return `<div class="alert-cat-group">
       <div class="alert-cat-hdr">
-        <span class="alert-cat-icon">${icon}</span>
         ${esc(cat)}
         <span class="alert-cat-count">${count}</span>
       </div>

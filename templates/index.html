@@ -773,6 +773,15 @@ main {
   transition: all .15s;
 }
 .btn-svuota:active { background: #f3f4f6; }
+.btn-whatsapp {
+  height: 36px; padding: 0 14px;
+  background: rgba(37,211,102,.12); color: #128C4A;
+  border: 1px solid rgba(37,211,102,.35); border-radius: 10px;
+  font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 600;
+  cursor: pointer; display: flex; align-items: center; gap: 6px;
+  transition: background .15s;
+}
+.btn-whatsapp:active { background: rgba(37,211,102,.22); }
 .spesa-add-panel {
   background: #ffffff;
   border: 1px solid rgba(59,130,246,.3); border-radius: 16px;
@@ -1496,7 +1505,11 @@ body.help-mode { background: #0f1f3d; }
 
     <div class="spesa-topbar">
       <div class="spesa-counter" id="spesa-counter"><strong>—</strong> prodotti da ordinare</div>
-      <div style="display:flex;gap:8px;align-items:center">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <button class="btn-whatsapp" onclick="copiaOrdineSpesa()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.48 1.32 5L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91C21.96 6.45 17.5 2 12.04 2zm0 18.11h-.01a8.2 8.2 0 0 1-4.18-1.14l-.3-.18-3.12.82.83-3.04-.2-.31a8.2 8.2 0 0 1-1.26-4.35c0-4.54 3.7-8.24 8.24-8.24 2.2 0 4.27.86 5.83 2.42a8.18 8.18 0 0 1 2.41 5.83c0 4.54-3.7 8.24-8.24 8.24zm4.52-6.16c-.25-.12-1.47-.72-1.7-.81-.23-.08-.4-.12-.56.12-.17.25-.64.81-.79.97-.14.17-.29.19-.54.06-.25-.12-1.05-.39-2-1.23-.74-.66-1.24-1.47-1.39-1.72-.14-.25-.02-.38.11-.51.11-.11.25-.29.37-.43.12-.14.16-.25.25-.41.08-.17.04-.31-.02-.43-.06-.12-.56-1.35-.77-1.85-.2-.48-.41-.42-.56-.43h-.48c-.17 0-.43.06-.66.31-.23.25-.86.85-.86 2.07 0 1.22.89 2.39 1.01 2.56.12.17 1.75 2.67 4.24 3.74.59.26 1.05.41 1.41.52.59.19 1.13.16 1.56.1.48-.07 1.47-.6 1.67-1.18.21-.58.21-1.08.15-1.18-.06-.1-.23-.16-.48-.28z"/></svg>
+          Copia ordine
+        </button>
         <button class="btn-svuota" onclick="svuotaLista()">Svuota lista</button>
         <button class="btn-spesa-add" onclick="toggleAddPanel()">
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -1513,10 +1526,21 @@ body.help-mode { background: #0f1f3d; }
     <!-- Panel aggiunta manuale -->
     <div class="spesa-add-panel" id="spesa-add-panel">
       <div class="fgroup" style="margin-bottom:10px">
+        <div class="flabel">Reparto</div>
+        <div class="fselect-wrap">
+          <select class="fselect" id="spesa-sel-reparto" onchange="onSpesaReparto()">
+            <option value="">Seleziona reparto…</option>
+            <option value="Cucina">Cucina</option>
+            <option value="Sala">Sala</option>
+            <option value="Pizzeria">Pizzeria</option>
+          </select>
+        </div>
+      </div>
+      <div class="fgroup" style="margin-bottom:10px">
         <div class="flabel">Fornitore</div>
         <div class="fselect-wrap">
-          <select class="fselect" id="spesa-sel-fornitore" onchange="onSpesaFornitore()">
-            <option value="">Seleziona fornitore…</option>
+          <select class="fselect" id="spesa-sel-fornitore" disabled onchange="onSpesaFornitore()">
+            <option value="">Seleziona prima il reparto</option>
           </select>
         </div>
       </div>
@@ -2598,16 +2622,38 @@ async function loadListaSpesa() {
 }
 
 function _populateSpesaFornitori() {
+  const selR = document.getElementById('spesa-sel-reparto');
+  if (selR) selR.value = '';
   const selF = document.getElementById('spesa-sel-fornitore');
-  if (!selF) return;
-  const fornitori = [...new Set(S.prodotti.map(p => p.fornitore).filter(Boolean))].sort();
-  selF.innerHTML = '<option value="">Seleziona fornitore…</option>' +
-    fornitori.map(f => `<option value="${esc(f)}">${esc(f)}</option>`).join('');
+  if (selF) {
+    selF.innerHTML = '<option value="">Seleziona prima il reparto</option>';
+    selF.disabled = true;
+  }
   const selP = document.getElementById('spesa-sel-prodotto');
   if (selP) { selP.innerHTML = '<option value="">Seleziona prima il fornitore</option>'; selP.disabled = true; }
 }
 
+function onSpesaReparto() {
+  const reparto = document.getElementById('spesa-sel-reparto').value;
+  const selF = document.getElementById('spesa-sel-fornitore');
+  const selP = document.getElementById('spesa-sel-prodotto');
+  selP.innerHTML = '<option value="">Seleziona prima il fornitore</option>';
+  selP.disabled = true;
+  if (!reparto) {
+    selF.innerHTML = '<option value="">Seleziona prima il reparto</option>';
+    selF.disabled = true;
+    return;
+  }
+  const fornitori = [...new Set(
+    S.prodotti.filter(p => (p.reparto || 'Cucina') === reparto).map(p => p.fornitore).filter(Boolean)
+  )].sort();
+  selF.innerHTML = '<option value="">Seleziona fornitore…</option>' +
+    fornitori.map(f => `<option value="${esc(f)}">${esc(f)}</option>`).join('');
+  selF.disabled = false;
+}
+
 function onSpesaFornitore() {
+  const reparto   = document.getElementById('spesa-sel-reparto').value;
   const fornitore = document.getElementById('spesa-sel-fornitore').value;
   const selP = document.getElementById('spesa-sel-prodotto');
   if (!fornitore) {
@@ -2615,7 +2661,7 @@ function onSpesaFornitore() {
     selP.disabled = true;
     return;
   }
-  const filtered = S.prodotti.filter(p => p.fornitore === fornitore);
+  const filtered = S.prodotti.filter(p => p.fornitore === fornitore && (p.reparto || 'Cucina') === reparto);
   selP.innerHTML = '<option value="">Scegli prodotto…</option>' +
     filtered.map(p => `<option value="${esc(p.prodotto)}|${esc(p.unita)}">${esc(p.prodotto)}</option>`).join('');
   selP.disabled = false;
@@ -2838,6 +2884,33 @@ async function removeSpesaItem(id) {
   await api(`/api/lista-spesa/${id}`, { method: 'DELETE' });
 }
 
+async function copiaOrdineSpesa() {
+  const attivi = S.listaSpesa.filter(i => !i.completato);
+  if (!attivi.length) { toast('Nessun prodotto da ordinare', 'error'); return; }
+
+  const oggi = new Date().toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric' });
+  const fornitori = (S.spesaFornFilter && S.spesaFornFilter !== 'all')
+    ? [S.spesaFornFilter]
+    : [...new Set(attivi.map(i => i.fornitore).filter(Boolean))].sort();
+
+  const blocchi = fornitori.map(f => {
+    const items = attivi.filter(i => i.fornitore === f);
+    if (!items.length) return '';
+    const righe = items.map(i => `- ${i.prodotto}${i.quantita ? ` x ${i.quantita} ${i.unita || ''}`.trimEnd() : ''}`).join('\n');
+    return `Ordine ${f} - ${oggi}\n\n${righe}`;
+  }).filter(Boolean);
+
+  if (!blocchi.length) { toast('Nessun prodotto da ordinare', 'error'); return; }
+
+  const testo = blocchi.join('\n\n');
+  try {
+    await navigator.clipboard.writeText(testo);
+    toast('Ordine copiato! Incollalo su WhatsApp', 'success');
+  } catch (e) {
+    toast('Impossibile copiare l\'ordine', 'error');
+  }
+}
+
 async function svuotaLista() {
   if (!S.listaSpesa.length) return;
   S.listaSpesa = [];
@@ -2858,9 +2931,11 @@ function toggleAddPanel() {
 }
 
 async function confirmAddProdotto() {
+  const selR = document.getElementById('spesa-sel-reparto');
   const selF = document.getElementById('spesa-sel-fornitore');
   const selP = document.getElementById('spesa-sel-prodotto');
   const qtyEl = document.getElementById('spesa-add-qty');
+  if (!selR?.value) { toast('Seleziona il reparto', 'error'); return; }
   if (!selF?.value) { toast('Seleziona il fornitore', 'error'); return; }
   if (!selP?.value) { toast('Seleziona il prodotto', 'error'); return; }
 
@@ -2886,9 +2961,7 @@ async function confirmAddProdotto() {
   });
   if (!result.success) { toast(result.error || 'Errore', 'error'); return; }
 
-  selF.value = '';
-  selP.innerHTML = '<option value="">Seleziona prima il fornitore</option>';
-  selP.disabled = true;
+  _populateSpesaFornitori();
   qtyEl.value = '';
   document.getElementById('spesa-add-panel').classList.remove('open');
   await loadListaSpesa();

@@ -2154,7 +2154,7 @@ function setAlertTypeFilter(val) {
   renderAlerts();
 }
 function setAlertCatFilter(val) {
-  S.alertCatFilter = S.alertCatFilter === val ? 'all' : val;
+  S.alertCatFilter = val || 'all';
   renderAlertFilters();
   renderAlerts();
 }
@@ -2169,21 +2169,12 @@ const _REPARTO_ICONS = { cucina: '🍳', sala: '🍷', pizzeria: '🍕' };
 function renderAlertFilters() {
   const row = document.getElementById('alert-filter-row');
   if (!row) return;
-  const { scadenze, scorte } = S.alerts;
-  const allItems = [
-    ...scadenze.map(a => ({ ...a, _type: 'scadenza' })),
-    ...scorte.map(a => ({ ...a, _type: 'scorta' })),
-  ];
-  const catsPresent = [...new Set(allItems.map(a => a.categoria).filter(Boolean))];
-  const sortedCats = [
-    ...S.categorie.filter(c => catsPresent.includes(c)),
-    ...catsPresent.filter(c => !S.categorie.includes(c)).sort(),
-  ];
   const typeFilters = [
     { val: 'all',     lbl: 'Tutti' },
     { val: 'scadenza', lbl: 'In scadenza' },
     { val: 'scorta',   lbl: 'Sotto scorta' },
   ];
+  const catValue = S.alertCatFilter === 'all' ? '' : S.alertCatFilter;
   row.innerHTML = [
     ...typeFilters.map(f =>
       `<button class="fpill ${S.alertTypeFilter === f.val ? 'active' : ''}" onclick="setAlertTypeFilter('${f.val}')">${f.lbl}</button>`
@@ -2191,9 +2182,10 @@ function renderAlertFilters() {
     ...REPARTI.map(r =>
       `<button class="fpill ${S.alertRepartoFilter === r ? 'active' : ''}" onclick="setAlertRepartoFilter('${r}')">${_REPARTO_ICONS[r]} ${r.charAt(0).toUpperCase()+r.slice(1)}</button>`
     ),
-    ...sortedCats.map(c =>
-      `<button class="fpill ${S.alertCatFilter === c ? 'active' : ''}" onclick="setAlertCatFilter('${esc(c)}')">${esc(c)}</button>`
-    ),
+    `<select class="fselect-pill ${catValue ? 'active' : ''}" onchange="setAlertCatFilter(this.value)">
+       <option value="">Tutte</option>
+       ${S.categorie.map(c => `<option value="${esc(c)}" ${catValue===c?'selected':''}>${esc(c)}</option>`).join('')}
+     </select>`,
   ].join('');
 }
 

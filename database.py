@@ -1058,7 +1058,7 @@ def ricalcola_stato_apparecchio(apparecchio_id, apparecchio_nome):
         try:
             y, m, d = (int(x) for x in r['data'].split('-'))
             hh, mm = (int(x) for x in (r['ora'] or '00:00').split(':'))
-            dt = _dt(y, m, d, hh, mm)
+            dt = datetime(y, m, d, hh, mm)
         except (ValueError, TypeError):
             continue
         turno, data_rif = turno_e_data_riferimento(dt)

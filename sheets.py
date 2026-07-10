@@ -12,9 +12,11 @@ SHEET_REGISTRO     = 'REGISTRO'
 SHEET_TEMPERATURE  = 'TEMPERATURE'
 
 # Colonne reali del foglio TEMPERATURE (già esistente):
-# Data, Apparecchio, Temp. rilevata (°C), Temp. limite (°C), Esito (OK/NO), Operatore, Note
+# Data, Ora, Fascia oraria, Apparecchio, Temp. rilevata (°C), Temp. limite (°C),
+# Esito (OK/NO), Operatore, Note
 TEMPERATURE_COLS = [
-    'data', 'apparecchio', 'temp_rilevata', 'temp_limite', 'esito', 'operatore', 'nota'
+    'data', 'ora', 'fascia_oraria', 'apparecchio', 'temp_rilevata', 'temp_limite',
+    'esito', 'operatore', 'nota'
 ]
 
 # Il foglio usa 'NO' per un esito fuori soglia; internamente l'app usa 'FUORI_SOGLIA'.
@@ -74,6 +76,8 @@ _SYNS = {
     'reparto':     ['reparto', 'department', 'dept', 'settore'],
     'tipo_movimento': ['tipo movimento'],
     # TEMPERATURE
+    'ora':           ['ora', 'orario', 'time'],
+    'fascia_oraria': ['fascia'],
     'apparecchio':   ['apparecchio', 'dispositivo', 'frigo'],
     'temp_rilevata': ['rilevata'],
     'temp_limite':   ['limite', 'range'],
@@ -394,10 +398,19 @@ def append_listino(row_data):
 
 # ─── TEMPERATURE ─────────────────────────────────────────────────────────────
 
+def _fascia_oraria(ora):
+    """'Mattina' per 00:00-20:59, 'Sera' per 21:00-23:59."""
+    try:
+        h = int((ora or '').split(':')[0])
+    except (ValueError, IndexError):
+        return ''
+    return 'Sera' if h >= 21 else 'Mattina'
+
+
 def append_temperatura(row_data):
     """Appende una rilevazione al foglio TEMPERATURE esistente, rilevando
-    dinamicamente le colonne dall'header (Data, Apparecchio, Temp. rilevata,
-    Temp. limite, Esito, Operatore, Note)."""
+    dinamicamente le colonne dall'header (Data, Ora, Fascia oraria,
+    Apparecchio, Temp. rilevata, Temp. limite, Esito, Operatore, Note)."""
     gc = _get_client()
     ws = gc.open_by_key(SPREADSHEET_ID).worksheet(SHEET_TEMPERATURE)
 
@@ -407,11 +420,8 @@ def append_temperatura(row_data):
     n_cols = len(headers) if headers else len(TEMPERATURE_COLS)
     new_row = [''] * n_cols
 
-    data_ora = row_data.get('data', '')
     ora      = row_data.get('ora', '')
-    data_str = _to_sheet_date(data_ora)
-    if ora:
-        data_str = f"{data_str} {ora}"
+    data_str = _to_sheet_date(row_data.get('data', ''))
 
     temp_min = row_data.get('temp_min', 0)
     temp_max = row_data.get('temp_max', 0)
@@ -419,6 +429,8 @@ def append_temperatura(row_data):
 
     field_vals = {
         'data':          data_str,
+        'ora':           ora,
+        'fascia_oraria': _fascia_oraria(ora),
         'apparecchio':   row_data.get('apparecchio', ''),
         'temp_rilevata': row_data.get('temperatura', ''),
         'temp_limite':   limite,
@@ -443,17 +455,19 @@ def elimina_temperatura_foglio(apparecchio, data_iso, ora):
 
     headers = [h.strip() for h in ws.row_values(1)]
     col_data = _detect(headers, 'data')
+    col_ora  = _detect(headers, 'ora')
     col_app  = _detect(headers, 'apparecchio')
     if col_data is None or col_app is None:
         raise ValueError(f"Colonne 'Data'/'Apparecchio' non trovate nel foglio TEMPERATURE. Header: {headers}")
 
-    target = f"{_to_sheet_date(data_iso)} {ora}".strip()
+    target_data = _to_sheet_date(data_iso)
 
     all_values = ws.get_all_values()
     for i, row in enumerate(all_values[1:], start=2):
         cella_data = row[col_data].strip() if col_data < len(row) else ''
-        cella_app  = row[col_app].strip()  if col_app  < len(row) else ''
-        if cella_data == target and cella_app == apparecchio:
+        cella_ora  = row[col_ora].strip()  if (col_ora is not None and col_ora < len(row)) else ''
+        cella_app  = row[col_app].strip()  if col_app < len(row) else ''
+        if cella_data == target_data and cella_ora == (ora or '') and cella_app == apparecchio:
             ws.delete_rows(i)
             return True
     return False
@@ -482,9 +496,6 @@ def load_temperatura():
         if not apparecchio:
             continue
 
-        data_raw = v('data')
-        data_parte, _, ora_parte = data_raw.partition(' ')
-
         limite = v('temp_limite')
         tmin, tmax = 0.0, 0.0
         m = re.match(r'^\s*(-?[\d.,]+)\s*/\s*(-?[\d.,]+)\s*$', limite)
@@ -497,8 +508,8 @@ def load_temperatura():
         result.append({
             'apparecchio': apparecchio,
             'tipo':        '',
-            'data':        normalize_date(data_parte),
-            'ora':         ora_parte,
+            'data':        normalize_date(v('data')),
+            'ora':         v('ora'),
             'temperatura': _to_float(v('temp_rilevata')),
             'temp_min':    tmin,
             'temp_max':    tmax,

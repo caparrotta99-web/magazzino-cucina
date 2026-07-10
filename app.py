@@ -33,7 +33,7 @@ from database import (
     update_lista_spesa_fornitore, delete_lista_spesa_item, clear_lista_spesa,
     RANGE_RIFERIMENTO_TIPO, get_apparecchi, get_apparecchio_by_id,
     create_apparecchio, update_apparecchio, delete_apparecchio,
-    insert_temperatura, get_temperature_storico, replace_temperatura,
+    insert_temperatura, get_temperature_storico, replace_temperatura, registra_controllo_apparecchio,
     update_user_apparecchi_permesso,
 )
 from sheets import (
@@ -817,6 +817,7 @@ def api_temperature_registra():
         return jsonify({'success': False, 'error': f'Errore Google Sheets: {e}'}), 500
 
     insert_temperatura(row)
+    registra_controllo_apparecchio(apparecchio_id)
     return jsonify({'success': True, 'esito': esito})
 
 

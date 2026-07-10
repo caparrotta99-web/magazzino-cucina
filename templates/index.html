@@ -635,6 +635,23 @@ main {
   padding: 10px 14px; font-size: 13px; font-weight: 700; text-align: center;
   margin-bottom: 16px;
 }
+.temp-input-row { display: flex; gap: 8px; }
+.temp-input-row .finput { flex: 1; }
+.btn-temp-sign {
+  width: 52px; height: 52px; flex-shrink: 0; border-radius: 12px;
+  border: 1.5px solid var(--border); background: var(--surface-3);
+  color: var(--text); font-size: 22px; font-weight: 700; line-height: 1;
+  cursor: pointer;
+}
+.btn-temp-sign:active { background: var(--surface-2); }
+
+/* ─── STATO CONTROLLO APPARECCHIO ───────────────────────────────────────── */
+.temp-stato-badge {
+  font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 100px;
+  display: inline-block; margin-bottom: 8px;
+}
+.temp-stato-badge.ok { background: rgba(34,197,94,.12); color: var(--green); }
+.temp-stato-badge.da-controllare { background: rgba(249,115,22,.14); color: var(--orange); }
 
 /* ─── ALERT CARDS ───────────────────────────────────────────────────────── */
 .alert-sec-hdr {
@@ -1956,7 +1973,10 @@ body.help-mode { background: #0f1f3d; }
 
       <div class="fgroup">
         <label class="flabel">Temperatura rilevata (°C) *</label>
-        <input class="finput" type="number" id="rt-temperatura" step="0.1" inputmode="decimal" oninput="onRtTemperaturaInput()">
+        <div class="temp-input-row">
+          <button type="button" class="btn-temp-sign" onclick="toggleSegnoTemperatura()" aria-label="Cambia segno (negativo/positivo)">−</button>
+          <input class="finput" type="number" id="rt-temperatura" step="0.1" inputmode="decimal" oninput="onRtTemperaturaInput()">
+        </div>
       </div>
 
       <div class="rt-fuori-soglia" id="rt-fuori-soglia" style="display:none">FUORI SOGLIA</div>
@@ -3453,7 +3473,10 @@ function renderApparecchi() {
         ? `<span class="temp-badge ${ultima.esito === 'OK' ? 'ok' : 'danger'}">${ultima.esito === 'OK' ? 'OK' : 'FUORI SOGLIA'}</span> ${_fmtTemp(ultima.temperatura)}°C — ${fmtDate(ultima.data)} ${esc(ultima.ora||'')}`
         : 'Nessuna rilevazione';
       const marcaModello = [a.marca, a.modello].filter(Boolean).join(' ');
+      const daControllare = a.stato_controllo === 'DA_CONTROLLARE';
+      const statoBadge = `<span class="temp-stato-badge ${daControllare ? 'da-controllare' : 'ok'}">${daControllare ? 'DA CONTROLLARE' : 'OK'}</span>`;
       return `<div class="temp-app-card">
+        ${statoBadge}
         <div class="temp-app-top">
           <div>
             <div class="temp-app-nome">${esc(a.nome)}</div>
@@ -3623,6 +3646,16 @@ function onRtTemperaturaInput() {
   const fuori = val < a.temp_min || val > a.temp_max;
   banner.style.display = fuori ? 'block' : 'none';
   notaLabel.textContent = fuori ? 'Nota *  (obbligatoria — temperatura fuori soglia)' : 'Nota';
+}
+
+function toggleSegnoTemperatura() {
+  const el  = document.getElementById('rt-temperatura');
+  const raw = el.value.trim();
+  if (!raw || raw === '-')      el.value = raw === '-' ? '' : '-';
+  else if (raw.startsWith('-')) el.value = raw.slice(1);
+  else                          el.value = '-' + raw;
+  onRtTemperaturaInput();
+  el.focus();
 }
 
 async function submitRegistraTemp() {

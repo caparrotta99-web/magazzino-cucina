@@ -236,6 +236,8 @@ def db_init():
         ('apparecchi', 'marca',   "TEXT NOT NULL DEFAULT ''"),
         ('apparecchi', 'modello', "TEXT NOT NULL DEFAULT ''"),
         ('apparecchi', 'seriale', "TEXT NOT NULL DEFAULT ''"),
+        ('apparecchi', 'ultima_mattina', "TEXT NOT NULL DEFAULT ''"),
+        ('apparecchi', 'ultima_sera',    "TEXT NOT NULL DEFAULT ''"),
     ]
     for table, col, defn in migrations:
         if _USE_PG:
@@ -866,10 +868,35 @@ RANGE_RIFERIMENTO_TIPO = {
 }
 
 
+def turno_e_data_riferimento(now=None):
+    """
+    Determina il turno di controllo corrente ('mattina' | 'sera') e la data
+    a cui quel controllo si riferisce.
+
+    Mattina: 08:00-20:59, riferita al giorno corrente.
+    Sera: 21:00-07:59, riferita al giorno in cui la sera è iniziata (quindi
+    tra mezzanotte e le 07:59 si fa ancora riferimento al giorno precedente,
+    perché la sera "di oggi" comincia solo alle 21:00).
+    """
+    from datetime import datetime as _dt
+    now = now or _dt.now()
+    if 8 <= now.hour < 21:
+        return 'mattina', now.date()
+    if now.hour >= 21:
+        return 'sera', now.date()
+    return 'sera', now.date() - timedelta(days=1)
+
+
+def _stato_controllo(row, now=None):
+    turno, data_rif = turno_e_data_riferimento(now)
+    ultima = row.get('ultima_mattina' if turno == 'mattina' else 'ultima_sera') or ''
+    return 'OK' if ultima == data_rif.isoformat() else 'DA_CONTROLLARE'
+
+
 def get_apparecchi(solo_attivi=True, reparto=None):
     with get_conn() as conn:
         sql = ("SELECT id, nome, tipo, reparto, marca, modello, seriale, "
-               "temp_min, temp_max, attivo FROM apparecchi")
+               "temp_min, temp_max, attivo, ultima_mattina, ultima_sera FROM apparecchi")
         clauses, params = [], []
         if solo_attivi:
             clauses.append("attivo = 1")
@@ -880,17 +907,30 @@ def get_apparecchi(solo_attivi=True, reparto=None):
             sql += " WHERE " + " AND ".join(clauses)
         sql += " ORDER BY LOWER(nome)"
         cur = conn.execute(sql, tuple(params))
-        return _rows(cur)
+        rows = _rows(cur)
+        for r in rows:
+            r['stato_controllo'] = _stato_controllo(r)
+        return rows
 
 
 def get_apparecchio_by_id(apparecchio_id):
     with get_conn() as conn:
         cur = conn.execute(
             "SELECT id, nome, tipo, reparto, marca, modello, seriale, "
-            "temp_min, temp_max, attivo FROM apparecchi WHERE id = ?",
+            "temp_min, temp_max, attivo, ultima_mattina, ultima_sera FROM apparecchi WHERE id = ?",
             (apparecchio_id,)
         )
         return _row(cur)
+
+
+def registra_controllo_apparecchio(apparecchio_id, now=None):
+    """Segna il turno corrente (mattina/sera) come controllato oggi per
+    questo apparecchio. Chiamata dopo ogni registrazione di temperatura."""
+    turno, data_rif = turno_e_data_riferimento(now)
+    campo = 'ultima_mattina' if turno == 'mattina' else 'ultima_sera'
+    with get_conn() as conn:
+        conn.execute(f"UPDATE apparecchi SET {campo} = ? WHERE id = ?",
+                     (data_rif.isoformat(), apparecchio_id))
 
 
 def create_apparecchio(nome, tipo, temp_min, temp_max, reparto='Cucina', marca='', modello='', seriale=''):

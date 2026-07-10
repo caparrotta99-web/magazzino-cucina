@@ -188,6 +188,14 @@ def db_init():
                 utente    TEXT NOT NULL DEFAULT '',
                 quando    TEXT NOT NULL DEFAULT ''
             )""",
+            f"""CREATE TABLE IF NOT EXISTS log_modifiche_registro (
+                id        {pk},
+                prodotto  TEXT NOT NULL DEFAULT '',
+                lotto     TEXT NOT NULL DEFAULT '',
+                modifiche TEXT NOT NULL DEFAULT '',
+                utente    TEXT NOT NULL DEFAULT '',
+                quando    TEXT NOT NULL DEFAULT ''
+            )""",
             f"""CREATE TABLE IF NOT EXISTS reset_tokens (
                 id         {pk},
                 user_id    INTEGER NOT NULL,
@@ -502,7 +510,7 @@ def get_lotti_attivi(prodotto):
 def get_giacenze():
     with get_conn() as conn:
         cur = conn.execute(
-            """SELECT r.prodotto, r.fornitore, r.lotto, r.scadenza,
+            """SELECT r.id, r.prodotto, r.fornitore, r.lotto, r.scadenza,
                       r.rimanenza, r.unita, r.etichetta,
                       l.scorta_min, l.categoria, l.reparto
                FROM registro r
@@ -551,6 +559,7 @@ def get_giacenze():
         if scad and (not g['prossima_scadenza'] or scad < g['prossima_scadenza']):
             g['prossima_scadenza'] = scad
         g['lotti'].append({
+            'id':        r['id'],
             'lotto':     r['lotto'],
             'scadenza':  r['scadenza'],
             'rimanenza': r['rimanenza'],
@@ -1108,6 +1117,32 @@ def get_log_lista_spesa(limit=200):
     with get_conn() as conn:
         cur = conn.execute(
             "SELECT * FROM log_lista_spesa ORDER BY id DESC LIMIT ?",
+            (limit,)
+        )
+        return _rows(cur)
+
+
+def update_registro_lotto(row_id, lotto, scadenza, rimanenza):
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE registro SET lotto = ?, scadenza = ?, rimanenza = ? WHERE id = ?",
+            (lotto, scadenza, float(rimanenza), row_id)
+        )
+
+
+def log_modifica_registro(prodotto, lotto, modifiche, utente):
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO log_modifiche_registro (prodotto, lotto, modifiche, utente, quando) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (prodotto, lotto, modifiche, utente, datetime.now().isoformat(timespec='seconds'))
+        )
+
+
+def get_log_modifiche_registro(limit=200):
+    with get_conn() as conn:
+        cur = conn.execute(
+            "SELECT * FROM log_modifiche_registro ORDER BY id DESC LIMIT ?",
             (limit,)
         )
         return _rows(cur)

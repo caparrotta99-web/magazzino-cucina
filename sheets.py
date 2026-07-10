@@ -357,6 +357,40 @@ def aggiorna_tipo_movimento(movimento_id, nuovo_tipo):
     return False
 
 
+def aggiorna_riga_registro(movimento_id, lotto, scadenza, rimanenza):
+    """
+    Trova la riga del REGISTRO con questo movimento_id e aggiorna Lotto,
+    Scadenza e Rimanenza lotto (usato per correggere un carico esistente).
+    Non crea nuove righe. Ritorna True se trovata e aggiornata, False altrimenti.
+    """
+    gc = _get_client()
+    ws = gc.open_by_key(SPREADSHEET_ID).worksheet(SHEET_REGISTRO)
+
+    all_values = ws.get_all_values()
+    if len(all_values) < 2:
+        return False
+
+    headers = [h.strip() for h in all_values[0]]
+    col_id        = _detect(headers, 'movimento_id')
+    col_lotto     = _detect(headers, 'lotto')
+    col_scadenza  = _detect(headers, 'scadenza')
+    col_rimanenza = _detect(headers, 'rimanenza')
+    if col_id is None:
+        raise ValueError(f"Colonna 'ID' non trovata nel REGISTRO. Header: {headers}")
+
+    for i, row in enumerate(all_values[1:], start=2):
+        val = row[col_id].strip() if col_id < len(row) else ''
+        if val == movimento_id:
+            if col_lotto is not None:
+                ws.update_cell(i, col_lotto + 1, lotto)
+            if col_scadenza is not None:
+                ws.update_cell(i, col_scadenza + 1, _to_sheet_date(scadenza))
+            if col_rimanenza is not None:
+                ws.update_cell(i, col_rimanenza + 1, rimanenza)
+            return True
+    return False
+
+
 def append_listino(row_data):
     """Appende una nuova riga al foglio LISTINO, rilevando dinamicamente le
     colonne dall'header (nessun indice fisso). La colonna 'nome' (SORT/FILTER

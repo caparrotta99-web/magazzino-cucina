@@ -138,6 +138,14 @@ select {
 <body>
 <div class="card">
   <div class="logo"><span>▲</span> HACCP Magazzino</div>
+
+  {% if inviata %}
+  <h1>Richiesta inviata</h1>
+  <p class="sub">Il tuo account è stato creato ed è in attesa di approvazione da un amministratore. Riceverai accesso non appena verrà approvato.</p>
+  <div class="footer">
+    <a href="/login">Torna al login</a>
+  </div>
+  {% else %}
   <h1>Registrati</h1>
   <p class="sub">Crea il tuo account — il ruolo assegnato è Staff</p>
 
@@ -181,6 +189,7 @@ select {
   <div class="footer">
     Hai già un account? <a href="/login">Accedi</a>
   </div>
+  {% endif %}
 </div>
 </body>
 </html>

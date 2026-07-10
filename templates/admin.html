@@ -143,6 +143,36 @@ main {
 .badge.admin  { background: var(--acc-bg); color: var(--accent); border: 1px solid rgba(200,160,32,.3); }
 .badge.staff  { background: var(--surface); color: var(--muted); border: 1px solid var(--border); }
 .badge.reparto { background: var(--grn-bg); color: var(--green); border: 1px solid rgba(42,122,42,.2); }
+.badge.pending { background: rgba(200,160,32,.15); color: var(--accent); border: 1px solid rgba(200,160,32,.4); }
+.badge.controllo { background: rgba(71,85,105,.1); color: #475569; border: 1px solid rgba(71,85,105,.25); }
+
+.section-label {
+  font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px;
+  color: var(--muted); margin: 24px 0 10px;
+}
+.section-label:first-child { margin-top: 0; }
+.pending-card { border-color: rgba(200,160,32,.4); background: #fffdf5; }
+.pending-actions { display: flex; gap: 8px; }
+.btn-action.approve { border-color: rgba(42,122,42,.3); color: var(--green); background: var(--grn-bg); }
+.btn-action.approve:hover { background: rgba(42,122,42,.15); }
+.btn-action.reject  { border-color: rgba(200,48,48,.3); color: var(--red); background: var(--red-bg); }
+.btn-action.reject:hover { background: rgba(200,48,48,.15); }
+
+.btn-settings {
+  font-family: 'Outfit', sans-serif; font-size: 13px; font-weight: 600;
+  padding: 9px 16px; border-radius: 10px; border: 1.5px solid var(--border);
+  background: var(--surface); color: var(--text); cursor: pointer;
+  transition: border-color .15s, color .15s;
+}
+.btn-settings:hover { border-color: var(--accent); color: var(--accent); }
+.settings-panel {
+  display: none; flex-direction: column; gap: 12px;
+  border-top: 1px solid var(--border); padding-top: 14px; margin-top: 2px;
+}
+.settings-panel.open { display: flex; }
+.settings-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.settings-label { font-size: 13px; font-weight: 600; color: var(--text); }
+.settings-row form { margin: 0; }
 
 /* ── ACTIONS ── */
 .user-actions {
@@ -198,8 +228,44 @@ main {
   <div class="page-title">Gestione Utenti</div>
   <div class="page-sub">{{ users|length }} utente{% if users|length != 1 %}i{% endif %} registrat{% if users|length != 1 %}i{% endif %}</div>
 
+  {% set pending = users|selectattr('stato', 'equalto', 'in_attesa')|list %}
+  {% set attivi  = users|rejectattr('stato', 'equalto', 'in_attesa')|list %}
+
+  {% if pending %}
+  <div class="section-label">In attesa di approvazione ({{ pending|length }})</div>
   <div class="user-list">
-    {% for u in users %}
+    {% for u in pending %}
+    <div class="user-card pending-card">
+      <div class="user-info">
+        <div class="user-avatar">{{ u.nome[0]|upper }}</div>
+        <div class="user-details">
+          <div class="user-nome">{{ u.nome }}</div>
+          <div class="user-contact">@{{ u.username or '—' }}</div>
+          <div class="user-badges">
+            <span class="badge pending">in attesa</span>
+            {% if u.reparto %}<span class="badge reparto">{{ u.reparto }}</span>{% endif %}
+          </div>
+        </div>
+      </div>
+      <div class="pending-actions">
+        <form method="post" action="/admin/approva">
+          <input type="hidden" name="user_id" value="{{ u.id }}">
+          <button type="submit" class="btn-action approve">✓ Approva</button>
+        </form>
+        <form method="post" action="/admin/rifiuta"
+              onsubmit="return confirm('Rifiutare la richiesta di {{ u.nome }}? L\'account verrà eliminato.')">
+          <input type="hidden" name="user_id" value="{{ u.id }}">
+          <button type="submit" class="btn-action reject">✕ Rifiuta</button>
+        </form>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
+
+  <div class="section-label">Utenti attivi ({{ attivi|length }})</div>
+  <div class="user-list">
+    {% for u in attivi %}
     <div class="user-card {% if u.role == 'admin' %}is-admin{% endif %}">
       <div class="user-info">
         <div class="user-avatar">{{ u.nome[0]|upper }}</div>
@@ -212,6 +278,7 @@ main {
             <span class="badge {{ u.role }}">{{ u.role }}</span>
             {% if u.reparto %}<span class="badge reparto">{{ u.reparto }}</span>{% endif %}
             {% if u.role == 'staff' and u.gestisce_apparecchi %}<span class="badge reparto">Gestisce apparecchi</span>{% endif %}
+            {% if u.role == 'staff' and u.puo_vedere_controllo %}<span class="badge controllo">Accesso Controllo</span>{% endif %}
           </div>
         </div>
       </div>
@@ -220,18 +287,20 @@ main {
         {% if u.id == current_user.id | int %}
           <span class="you-label">Sei tu</span>
         {% else %}
+          <button type="button" class="btn-settings" onclick="toggleSettings({{ u.id }})">⚙ Impostazioni</button>
+        {% endif %}
+      </div>
+
+      {% if u.id != current_user.id | int %}
+      <div class="settings-panel" id="settings-{{ u.id }}">
+
+        <div class="settings-row">
+          <span class="settings-label">Ruolo</span>
           {% if u.role == 'staff' %}
           <form method="post" action="/admin/role">
             <input type="hidden" name="user_id" value="{{ u.id }}">
             <input type="hidden" name="role" value="admin">
             <button type="submit" class="btn-action promote">↑ Promuovi ad Admin</button>
-          </form>
-          <form method="post" action="/admin/apparecchi-permesso">
-            <input type="hidden" name="user_id" value="{{ u.id }}">
-            <input type="hidden" name="permesso" value="{{ '0' if u.gestisce_apparecchi else '1' }}">
-            <button type="submit" class="btn-action">
-              {% if u.gestisce_apparecchi %}✕ Revoca gestione apparecchi{% else %}+ Abilita gestione apparecchi{% endif %}
-            </button>
           </form>
           {% else %}
           <form method="post" action="/admin/role">
@@ -240,20 +309,54 @@ main {
             <button type="submit" class="btn-action demote">↓ Declassa a Staff</button>
           </form>
           {% endif %}
+        </div>
 
+        <div class="settings-row">
+          <span class="settings-label">Accesso pannello Controllo</span>
+          <form method="post" action="/admin/controllo-permesso">
+            <input type="hidden" name="user_id" value="{{ u.id }}">
+            <input type="hidden" name="permesso" value="{{ '0' if u.puo_vedere_controllo else '1' }}">
+            <button type="submit" class="btn-action">
+              {% if u.puo_vedere_controllo %}✕ Revoca accesso{% else %}+ Abilita accesso{% endif %}
+            </button>
+          </form>
+        </div>
+
+        <div class="settings-row">
+          <span class="settings-label">Gestione apparecchi temperature</span>
+          <form method="post" action="/admin/apparecchi-permesso">
+            <input type="hidden" name="user_id" value="{{ u.id }}">
+            <input type="hidden" name="permesso" value="{{ '0' if u.gestisce_apparecchi else '1' }}">
+            <button type="submit" class="btn-action">
+              {% if u.gestisce_apparecchi %}✕ Revoca gestione{% else %}+ Abilita gestione{% endif %}
+            </button>
+          </form>
+        </div>
+
+        <div class="settings-row">
+          <span class="settings-label">Account</span>
           <form method="post" action="/admin/delete"
                 onsubmit="return confirm('Eliminare {{ u.nome }}? Questa azione non è reversibile.')">
             <input type="hidden" name="user_id" value="{{ u.id }}">
-            <button type="submit" class="btn-action delete">✕ Elimina</button>
+            <button type="submit" class="btn-action delete">✕ Elimina utente</button>
           </form>
-        {% endif %}
+        </div>
+
       </div>
+      {% endif %}
     </div>
     {% else %}
-    <div class="empty">Nessun utente registrato.</div>
+    <div class="empty">Nessun utente attivo.</div>
     {% endfor %}
   </div>
 </main>
+
+<script>
+function toggleSettings(id) {
+  const panel = document.getElementById('settings-' + id);
+  if (panel) panel.classList.toggle('open');
+}
+</script>
 
 </body>
 </html>

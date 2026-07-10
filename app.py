@@ -27,18 +27,23 @@ from database import (
     get_in_uso_attivi, finalizza_in_uso, get_movimento_by_id,
     create_user, get_user_by_login, get_user_by_nome, get_user_by_id,
     get_all_users, update_user_role, delete_user,
+    approva_utente, rifiuta_utente, update_user_controllo_permesso,
     create_reset_token, get_reset_token, use_reset_token, update_user_password,
     update_user_profile, update_user_reparto, update_user_tema, is_username_taken, get_feed,
     get_lista_spesa, add_lista_spesa_item, update_lista_spesa_completato,
     update_lista_spesa_fornitore, delete_lista_spesa_item, clear_lista_spesa,
+    get_lista_spesa_item_by_id,
     RANGE_RIFERIMENTO_TIPO, get_apparecchi, get_apparecchio_by_id,
     create_apparecchio, update_apparecchio, delete_apparecchio,
     insert_temperatura, get_temperature_storico, replace_temperatura, registra_controllo_apparecchio,
     update_user_apparecchi_permesso,
+    get_temperatura_by_id, elimina_temperatura, ricalcola_stato_apparecchio, get_apparecchio_by_nome,
+    log_eliminazione_temperatura, get_log_eliminazioni_temperature,
+    log_lista_spesa_azione, get_log_lista_spesa,
 )
 from sheets import (
     load_listino, load_registro, append_registro, append_listino, aggiorna_tipo_movimento,
-    load_temperatura, append_temperatura,
+    load_temperatura, append_temperatura, elimina_temperatura_foglio,
 )
 
 app = Flask(__name__)
@@ -59,10 +64,16 @@ class User(UserMixin):
         self.role     = data.get('role', 'staff')
         self.gestisce_apparecchi = bool(data.get('gestisce_apparecchi'))
         self.tema     = data.get('tema') or 'chiaro'
+        self.stato    = data.get('stato') or 'attivo'
+        self.puo_vedere_controllo = bool(data.get('puo_vedere_controllo'))
 
     @property
     def puo_gestire_apparecchi(self):
         return self.role == 'admin' or self.gestisce_apparecchi
+
+    @property
+    def puo_accedere_controllo(self):
+        return self.role == 'admin' or self.puo_vedere_controllo
 
 
 @login_manager.user_loader
@@ -91,6 +102,15 @@ def gestione_apparecchi_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         if not current_user.is_authenticated or not current_user.puo_gestire_apparecchi:
+            abort(403)
+        return f(*args, **kwargs)
+    return decorated
+
+
+def controllo_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not current_user.is_authenticated or not current_user.puo_accedere_controllo:
             abort(403)
         return f(*args, **kwargs)
     return decorated
@@ -149,9 +169,13 @@ def login_page():
         password  = request.form.get('password') or ''
         user_data = get_user_by_nome(nome)
         if user_data and check_password_hash(user_data['password'], password):
-            login_user(User(user_data), remember=True)
-            return redirect(url_for('index'))
-        error = 'Credenziali non valide'
+            if user_data.get('stato') == 'in_attesa':
+                error = 'Il tuo account è in attesa di approvazione da un amministratore.'
+            else:
+                login_user(User(user_data), remember=True)
+                return redirect(url_for('index'))
+        else:
+            error = 'Credenziali non valide'
     return render_template('login.html', error=error)
 
 
@@ -160,6 +184,7 @@ def register_page():
     if current_user.is_authenticated:
         return redirect(url_for('index'))
     error = None
+    inviata = False
     if request.method == 'POST':
         nome     = (request.form.get('nome')     or '').strip()
         username = (request.form.get('username') or '').strip().lower()
@@ -183,13 +208,13 @@ def register_page():
         else:
             try:
                 create_user(nome, username,
-                            generate_password_hash(password, method='pbkdf2:sha256'), reparto)
-                login_user(User(get_user_by_login(username)), remember=True)
-                return redirect(url_for('index'))
+                            generate_password_hash(password, method='pbkdf2:sha256'),
+                            reparto, stato='in_attesa')
+                inviata = True
             except Exception:
                 error = 'Errore durante la registrazione'
 
-    return render_template('register.html', error=error)
+    return render_template('register.html', error=error, inviata=inviata)
 
 
 @app.route('/logout')
@@ -349,6 +374,40 @@ def admin_set_apparecchi_permesso():
     return redirect(url_for('admin_page'))
 
 
+@app.route('/admin/controllo-permesso', methods=['POST'])
+@login_required
+@admin_required
+def admin_set_controllo_permesso():
+    user_id  = request.form.get('user_id', type=int)
+    permesso = request.form.get('permesso') == '1'
+    if not user_id:
+        abort(400)
+    update_user_controllo_permesso(user_id, permesso)
+    return redirect(url_for('admin_page'))
+
+
+@app.route('/admin/approva', methods=['POST'])
+@login_required
+@admin_required
+def admin_approva_utente():
+    user_id = request.form.get('user_id', type=int)
+    if not user_id:
+        abort(400)
+    approva_utente(user_id)
+    return redirect(url_for('admin_page'))
+
+
+@app.route('/admin/rifiuta', methods=['POST'])
+@login_required
+@admin_required
+def admin_rifiuta_utente():
+    user_id = request.form.get('user_id', type=int)
+    if not user_id:
+        abort(400)
+    rifiuta_utente(user_id)
+    return redirect(url_for('admin_page'))
+
+
 # ─── PAGINE ──────────────────────────────────────────────────────────────────
 
 @app.route('/')
@@ -467,14 +526,16 @@ def api_lista_spesa_add():
     prodotto = (data.get('prodotto') or '').strip()
     if not prodotto:
         return jsonify({'error': 'prodotto richiesto'}), 400
+    fornitore = (data.get('fornitore')  or '').strip()
     new_id = add_lista_spesa_item(
         prodotto,
-        (data.get('fornitore')  or '').strip(),
+        fornitore,
         (data.get('categoria')  or '').strip(),
         data.get('quantita', 0),
         (data.get('unita') or '').strip(),
         (data.get('reparto') or '').strip(),
     )
+    log_lista_spesa_azione('aggiunto', prodotto, fornitore, current_user.nome)
     return jsonify({'id': new_id, 'success': True})
 
 
@@ -492,14 +553,20 @@ def api_lista_spesa_patch(item_id):
 @app.route('/api/lista-spesa/<int:item_id>', methods=['DELETE'])
 @login_required
 def api_lista_spesa_delete_one(item_id):
+    item = get_lista_spesa_item_by_id(item_id)
     delete_lista_spesa_item(item_id)
+    if item:
+        log_lista_spesa_azione('eliminato', item['prodotto'], item['fornitore'], current_user.nome)
     return jsonify({'success': True})
 
 
 @app.route('/api/lista-spesa', methods=['DELETE'])
 @login_required
 def api_lista_spesa_clear():
+    items = get_lista_spesa()
     clear_lista_spesa()
+    for item in items:
+        log_lista_spesa_azione('eliminato', item['prodotto'], item['fornitore'], current_user.nome)
     return jsonify({'success': True})
 
 
@@ -819,6 +886,42 @@ def api_temperature_registra():
     insert_temperatura(row)
     registra_controllo_apparecchio(apparecchio_id)
     return jsonify({'success': True, 'esito': esito})
+
+
+@app.route('/api/temperature/<int:temperatura_id>', methods=['DELETE'])
+@login_required
+def api_temperature_elimina(temperatura_id):
+    temp_row = get_temperatura_by_id(temperatura_id)
+    if not temp_row:
+        return jsonify({'success': False, 'error': 'Rilevazione non trovata'}), 404
+
+    try:
+        elimina_temperatura_foglio(temp_row['apparecchio'], temp_row['data'], temp_row['ora'])
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Errore Google Sheets: {e}'}), 500
+
+    elimina_temperatura(temperatura_id)
+    log_eliminazione_temperatura(temp_row, current_user.nome)
+
+    app_row = get_apparecchio_by_nome(temp_row['apparecchio'])
+    if app_row:
+        ricalcola_stato_apparecchio(app_row['id'], app_row['nome'])
+
+    return jsonify({'success': True})
+
+
+@app.route('/api/controllo/log-temperature')
+@login_required
+@controllo_required
+def api_controllo_log_temperature():
+    return jsonify({'success': True, 'log': get_log_eliminazioni_temperature()})
+
+
+@app.route('/api/controllo/log-lista-spesa')
+@login_required
+@controllo_required
+def api_controllo_log_lista_spesa():
+    return jsonify({'success': True, 'log': get_log_lista_spesa()})
 
 
 @app.route('/api/sync', methods=['POST'])

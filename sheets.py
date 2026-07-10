@@ -434,6 +434,31 @@ def append_temperatura(row_data):
     ws.append_row(new_row, value_input_option='USER_ENTERED')
 
 
+def elimina_temperatura_foglio(apparecchio, data_iso, ora):
+    """Elimina dal foglio TEMPERATURE la riga che corrisponde esattamente ad
+    apparecchio + data + ora. Ritorna True se una riga è stata trovata ed
+    eliminata, False altrimenti."""
+    gc = _get_client()
+    ws = gc.open_by_key(SPREADSHEET_ID).worksheet(SHEET_TEMPERATURE)
+
+    headers = [h.strip() for h in ws.row_values(1)]
+    col_data = _detect(headers, 'data')
+    col_app  = _detect(headers, 'apparecchio')
+    if col_data is None or col_app is None:
+        raise ValueError(f"Colonne 'Data'/'Apparecchio' non trovate nel foglio TEMPERATURE. Header: {headers}")
+
+    target = f"{_to_sheet_date(data_iso)} {ora}".strip()
+
+    all_values = ws.get_all_values()
+    for i, row in enumerate(all_values[1:], start=2):
+        cella_data = row[col_data].strip() if col_data < len(row) else ''
+        cella_app  = row[col_app].strip()  if col_app  < len(row) else ''
+        if cella_data == target and cella_app == apparecchio:
+            ws.delete_rows(i)
+            return True
+    return False
+
+
 def load_temperatura():
     """Legge il foglio TEMPERATURE e ritorna lista di dict."""
     gc = _get_client()

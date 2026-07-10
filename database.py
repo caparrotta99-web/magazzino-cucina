@@ -1,7 +1,7 @@
 import os
 import re
 import sqlite3
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from collections import OrderedDict
 from urllib.parse import unquote
 
@@ -164,7 +164,29 @@ def db_init():
                 telefono TEXT,
                 password TEXT NOT NULL,
                 reparto  TEXT NOT NULL DEFAULT '',
-                role     TEXT NOT NULL DEFAULT 'staff'
+                role     TEXT NOT NULL DEFAULT 'staff',
+                stato    TEXT NOT NULL DEFAULT 'attivo'
+            )""",
+            f"""CREATE TABLE IF NOT EXISTS log_eliminazioni_temperature (
+                id                  {pk},
+                apparecchio         TEXT NOT NULL,
+                temperatura         REAL NOT NULL DEFAULT 0,
+                temp_min            REAL NOT NULL DEFAULT 0,
+                temp_max            REAL NOT NULL DEFAULT 0,
+                esito               TEXT NOT NULL DEFAULT '',
+                data_originale      TEXT NOT NULL DEFAULT '',
+                ora_originale       TEXT NOT NULL DEFAULT '',
+                operatore_originale TEXT NOT NULL DEFAULT '',
+                eliminato_da        TEXT NOT NULL DEFAULT '',
+                eliminato_il        TEXT NOT NULL DEFAULT ''
+            )""",
+            f"""CREATE TABLE IF NOT EXISTS log_lista_spesa (
+                id        {pk},
+                azione    TEXT NOT NULL DEFAULT '',
+                prodotto  TEXT NOT NULL DEFAULT '',
+                fornitore TEXT NOT NULL DEFAULT '',
+                utente    TEXT NOT NULL DEFAULT '',
+                quando    TEXT NOT NULL DEFAULT ''
             )""",
             f"""CREATE TABLE IF NOT EXISTS reset_tokens (
                 id         {pk},
@@ -232,6 +254,8 @@ def db_init():
         ('users',    'username',     "TEXT NOT NULL DEFAULT ''"),
         ('users',    'gestisce_apparecchi', "INTEGER NOT NULL DEFAULT 0"),
         ('users',    'tema',      "TEXT NOT NULL DEFAULT 'chiaro'"),
+        ('users',    'stato',     "TEXT NOT NULL DEFAULT 'attivo'"),
+        ('users',    'puo_vedere_controllo', "INTEGER NOT NULL DEFAULT 0"),
         ('apparecchi', 'reparto', "TEXT NOT NULL DEFAULT 'Cucina'"),
         ('apparecchi', 'marca',   "TEXT NOT NULL DEFAULT ''"),
         ('apparecchi', 'modello', "TEXT NOT NULL DEFAULT ''"),
@@ -646,19 +670,19 @@ def replace_registro(rows):
 
 # ─── USERS ───────────────────────────────────────────────────────────────────
 
-def create_user(nome, username, password_hash, reparto, role='staff'):
-    params = (nome, username.strip().lower(), password_hash, reparto, role)
+def create_user(nome, username, password_hash, reparto, role='staff', stato='attivo'):
+    params = (nome, username.strip().lower(), password_hash, reparto, role, stato)
     with get_conn() as conn:
         if _USE_PG:
             conn.execute(
-                "INSERT INTO users (nome, username, password, reparto, role) "
-                "VALUES (?, ?, ?, ?, ?) ON CONFLICT (username) DO NOTHING",
+                "INSERT INTO users (nome, username, password, reparto, role, stato) "
+                "VALUES (?, ?, ?, ?, ?, ?) ON CONFLICT (username) DO NOTHING",
                 params
             )
         else:
             conn.execute(
-                "INSERT OR IGNORE INTO users (nome, username, password, reparto, role) "
-                "VALUES (?, ?, ?, ?, ?)",
+                "INSERT OR IGNORE INTO users (nome, username, password, reparto, role, stato) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
                 params
             )
 
@@ -711,7 +735,9 @@ def get_user_by_id(user_id):
 def get_all_users():
     with get_conn() as conn:
         cur = conn.execute(
-            "SELECT id, nome, email, telefono, reparto, role, gestisce_apparecchi FROM users ORDER BY nome"
+            "SELECT id, nome, email, telefono, reparto, role, gestisce_apparecchi, "
+            "stato, puo_vedere_controllo FROM users ORDER BY "
+            "CASE WHEN stato = 'in_attesa' THEN 0 ELSE 1 END, nome"
         )
         return _rows(cur)
 
@@ -719,6 +745,23 @@ def get_all_users():
 def update_user_role(user_id, role):
     with get_conn() as conn:
         conn.execute("UPDATE users SET role = ? WHERE id = ?", (role, user_id))
+
+
+def update_user_controllo_permesso(user_id, permesso):
+    with get_conn() as conn:
+        conn.execute("UPDATE users SET puo_vedere_controllo = ? WHERE id = ?",
+                     (1 if permesso else 0, user_id))
+
+
+def approva_utente(user_id):
+    with get_conn() as conn:
+        conn.execute("UPDATE users SET stato = 'attivo' WHERE id = ?", (user_id,))
+
+
+def rifiuta_utente(user_id):
+    """Rifiuta una richiesta di registrazione: elimina l'account in attesa."""
+    with get_conn() as conn:
+        conn.execute("DELETE FROM users WHERE id = ? AND stato = 'in_attesa'", (user_id,))
 
 
 def delete_user(user_id):
@@ -806,6 +849,12 @@ def update_lista_spesa_fornitore(item_id, fornitore):
         )
 
 
+def get_lista_spesa_item_by_id(item_id):
+    with get_conn() as conn:
+        cur = conn.execute("SELECT * FROM lista_spesa WHERE id = ?", (item_id,))
+        return _row(cur)
+
+
 def delete_lista_spesa_item(item_id):
     with get_conn() as conn:
         conn.execute("DELETE FROM lista_spesa WHERE id = ?", (item_id,))
@@ -878,8 +927,7 @@ def turno_e_data_riferimento(now=None):
     tra mezzanotte e le 07:59 si fa ancora riferimento al giorno precedente,
     perché la sera "di oggi" comincia solo alle 21:00).
     """
-    from datetime import datetime as _dt
-    now = now or _dt.now()
+    now = now or datetime.now()
     if 8 <= now.hour < 21:
         return 'mattina', now.date()
     if now.hour >= 21:
@@ -919,6 +967,16 @@ def get_apparecchio_by_id(apparecchio_id):
             "SELECT id, nome, tipo, reparto, marca, modello, seriale, "
             "temp_min, temp_max, attivo, ultima_mattina, ultima_sera FROM apparecchi WHERE id = ?",
             (apparecchio_id,)
+        )
+        return _row(cur)
+
+
+def get_apparecchio_by_nome(nome):
+    with get_conn() as conn:
+        cur = conn.execute(
+            "SELECT id, nome, tipo, reparto, marca, modello, seriale, "
+            "temp_min, temp_max, attivo, ultima_mattina, ultima_sera FROM apparecchi WHERE nome = ?",
+            (nome,)
         )
         return _row(cur)
 
@@ -967,6 +1025,92 @@ def insert_temperatura(row):
              row['temperatura'], row['temp_min'], row['temp_max'],
              row['esito'], row.get('nota', ''), row['operatore'])
         )
+
+
+def get_temperatura_by_id(temperatura_id):
+    with get_conn() as conn:
+        cur = conn.execute(
+            "SELECT id, apparecchio, tipo, data, ora, temperatura, temp_min, temp_max, "
+            "esito, nota, operatore FROM temperature WHERE id = ?",
+            (temperatura_id,)
+        )
+        return _row(cur)
+
+
+def elimina_temperatura(temperatura_id):
+    with get_conn() as conn:
+        conn.execute("DELETE FROM temperature WHERE id = ?", (temperatura_id,))
+
+
+def ricalcola_stato_apparecchio(apparecchio_id, apparecchio_nome):
+    """Ricalcola ultima_mattina/ultima_sera scandendo le rilevazioni rimaste
+    per questo apparecchio. Da chiamare dopo l'eliminazione di una rilevazione,
+    così lo stato torna 'DA_CONTROLLARE' se non ce n'erano altre per il turno."""
+    with get_conn() as conn:
+        cur = conn.execute(
+            "SELECT data, ora FROM temperature WHERE apparecchio = ?",
+            (apparecchio_nome,)
+        )
+        rows = _rows(cur)
+
+    ultima_mattina, ultima_sera = '', ''
+    for r in rows:
+        try:
+            y, m, d = (int(x) for x in r['data'].split('-'))
+            hh, mm = (int(x) for x in (r['ora'] or '00:00').split(':'))
+            dt = _dt(y, m, d, hh, mm)
+        except (ValueError, TypeError):
+            continue
+        turno, data_rif = turno_e_data_riferimento(dt)
+        rif_iso = data_rif.isoformat()
+        if turno == 'mattina':
+            ultima_mattina = max(ultima_mattina, rif_iso)
+        else:
+            ultima_sera = max(ultima_sera, rif_iso)
+
+    with get_conn() as conn:
+        conn.execute("UPDATE apparecchi SET ultima_mattina = ?, ultima_sera = ? WHERE id = ?",
+                     (ultima_mattina, ultima_sera, apparecchio_id))
+
+
+def log_eliminazione_temperatura(temp_row, eliminato_da):
+    with get_conn() as conn:
+        conn.execute(
+            """INSERT INTO log_eliminazioni_temperature
+               (apparecchio, temperatura, temp_min, temp_max, esito,
+                data_originale, ora_originale, operatore_originale, eliminato_da, eliminato_il)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (temp_row['apparecchio'], temp_row['temperatura'], temp_row['temp_min'], temp_row['temp_max'],
+             temp_row['esito'], temp_row['data'], temp_row['ora'], temp_row['operatore'],
+             eliminato_da, datetime.now().isoformat(timespec='seconds'))
+        )
+
+
+def get_log_eliminazioni_temperature(limit=200):
+    with get_conn() as conn:
+        cur = conn.execute(
+            "SELECT * FROM log_eliminazioni_temperature ORDER BY id DESC LIMIT ?",
+            (limit,)
+        )
+        return _rows(cur)
+
+
+def log_lista_spesa_azione(azione, prodotto, fornitore, utente):
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO log_lista_spesa (azione, prodotto, fornitore, utente, quando) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (azione, prodotto, fornitore, utente, datetime.now().isoformat(timespec='seconds'))
+        )
+
+
+def get_log_lista_spesa(limit=200):
+    with get_conn() as conn:
+        cur = conn.execute(
+            "SELECT * FROM log_lista_spesa ORDER BY id DESC LIMIT ?",
+            (limit,)
+        )
+        return _rows(cur)
 
 
 def get_temperature_storico(giorni=30, apparecchio=None):

@@ -33,11 +33,11 @@ body {
 
 /* ── HEADER ── */
 header {
-  height: 58px;
+  height: calc(58px + env(safe-area-inset-top));
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 20px;
+  padding: env(safe-area-inset-top) 20px 0;
   border-bottom: 1.5px solid var(--border);
   background: var(--white);
   position: sticky;

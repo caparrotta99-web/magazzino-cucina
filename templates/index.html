@@ -572,7 +572,11 @@ main {
 .giac-fornitore { font-size: 12px; color: var(--muted); margin-top: 2px; }
 .giac-qty-big  { font-size: 28px; font-weight: 700; color: var(--text); line-height: 1; text-align: right; }
 .giac-unit     { font-size: 12px; color: var(--muted); text-align: right; }
-.giac-in-uso   { font-size: 11px; font-weight: 600; color: var(--orange); text-align: right; margin-top: 2px; white-space: nowrap; }
+.giac-sec-title {
+  font-size: 16px; font-weight: 700; color: var(--text);
+  margin: 4px 4px 12px;
+}
+.giac-sec-title:not(:first-child) { margin-top: 26px; }
 .giac-lots { border-top: 1px solid var(--border); padding-top: 10px; display: flex; flex-direction: column; gap: 6px; }
 .giac-lot-row  { display: flex; align-items: center; gap: 8px; font-size: 13px; }
 .giac-lot-code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12px; }
@@ -653,8 +657,9 @@ main {
 .log-row-tag {
   font-size: 11px; font-weight: 700; padding: 3px 10px; border-radius: 100px; flex-shrink: 0;
 }
-.log-row-tag.aggiunto  { background: rgba(34,197,94,.12); color: var(--green); }
-.log-row-tag.eliminato { background: rgba(239,68,68,.12); color: var(--red); }
+.log-row-tag.aggiunto   { background: rgba(34,197,94,.12); color: var(--green); }
+.log-row-tag.eliminato  { background: rgba(239,68,68,.12); color: var(--red); }
+.log-row-tag.modificato { background: rgba(59,130,246,.12); color: var(--blue); }
 .log-row-meta { font-size: 12px; color: var(--muted); margin-top: 4px; }
 .rt-fuori-soglia {
   background: rgba(239,68,68,.1); color: var(--red);
@@ -1497,6 +1502,9 @@ body.help-mode { background: #0f1f3d; }
 
     <div class="pg-title" style="margin-top:24px">Lista Spesa</div>
     <div id="controllo-log-lista-spesa"></div>
+
+    <div class="pg-title" style="margin-top:24px">Modifiche lotti</div>
+    <div id="controllo-log-modifiche-registro"></div>
   </section>
 
   <!-- CARICO -->
@@ -1855,6 +1863,41 @@ body.help-mode { background: #0f1f3d; }
       <button class="btn-print" onclick="window.print()">Stampa</button>
       <button class="btn-print" onclick="copiaEtichettaLotto()">Copia testo</button>
       <button class="btn-close-modal" onclick="closeEtiLotto()">Chiudi</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL MODIFICA LOTTO (Giacenze) ────────────────────────────────────── -->
+<div class="modal-backdrop" id="modal-modifica-lotto" onclick="bgCloseML(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Modifica lotto</div>
+    <div class="modal-body">
+      <input type="hidden" id="ml-row-id" value="0">
+
+      <div class="fgroup">
+        <label class="flabel">Prodotto</label>
+        <div class="freadonly has-val" id="ml-prodotto"></div>
+      </div>
+
+      <div class="fgroup">
+        <label class="flabel">Quantità *</label>
+        <input class="finput" type="number" id="ml-qty" min="0" step="0.01" inputmode="decimal">
+      </div>
+
+      <div class="fgroup">
+        <label class="flabel">Lotto *</label>
+        <input class="finput" type="text" id="ml-lotto" autocomplete="off">
+      </div>
+
+      <div class="fgroup" style="margin-bottom:0">
+        <label class="flabel">Scadenza</label>
+        <input class="finput" type="date" id="ml-scadenza">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-close-modal" onclick="closeModificaLotto()">Annulla</button>
+      <button class="btn-print" id="btn-ml-salva" onclick="submitModificaLotto()" style="color:#10b981;font-weight:700">Salva</button>
     </div>
   </div>
 </div>
@@ -2702,15 +2745,25 @@ function renderGiacenze() {
     return;
   }
 
-  el.innerHTML = list.map(g => {
+  // Un prodotto con quantità attualmente in uso (tipo movimento IN USO) va
+  // mostrato solo nella sezione "In uso", non tra quelli "In magazzino".
+  const magazzino = list.filter(g => !(g.in_uso > 0));
+  const inUso     = list.filter(g => g.in_uso > 0);
+
+  const scadCls = (scadenza) => {
+    const giorni = scadenza ? daysTo(scadenza) : null;
+    return giorni === null ? '' : giorni < 0 ? 'scad-danger' : giorni <= 7 ? 'scad-warn' : 'scad-ok';
+  };
+
+  const magazzinoCard = (g) => {
     const idx      = S.giacenze.indexOf(g);
     const lotsHtml = g.lotti.map(l => {
-      const giorni = l.scadenza ? daysTo(l.scadenza) : null;
-      const cls    = giorni === null ? '' : giorni < 0 ? 'scad-danger' : giorni <= 7 ? 'scad-warn' : 'scad-ok';
+      const etData = esc(JSON.stringify({ prodotto: g.prodotto, lotto: l.lotto, scadenza: l.scadenza }));
       return `<div class="giac-lot-row">
         <span class="giac-lot-code">${esc(l.lotto)}</span>
-        ${l.scadenza ? `<span class="scad-badge ${cls}">${fmtDate(l.scadenza)}</span>` : ''}
+        ${l.scadenza ? `<span class="scad-badge ${scadCls(l.scadenza)}">${fmtDate(l.scadenza)}</span>` : ''}
         <span class="giac-lot-qty">${l.rimanenza}&nbsp;${esc(g.unita)}</span>
+        <button type="button" class="lot-print-btn" onclick="event.stopPropagation(); openModificaLotto(${l.id}, ${etData})" aria-label="Modifica lotto">${_ICON_MATITA}</button>
       </div>`;
     }).join('');
     return `<div class="giac-card" onclick="showLotDetail(S.giacenze[${idx}])">
@@ -2722,12 +2775,40 @@ function renderGiacenze() {
         <div>
           <div class="giac-qty-big">${g.totale}</div>
           <div class="giac-unit">${esc(g.unita)}</div>
-          ${g.in_uso > 0 ? `<div class="giac-in-uso">🔄 ${g.in_uso} in uso</div>` : ''}
         </div>
       </div>
       <div class="giac-lots">${lotsHtml}</div>
     </div>`;
-  }).join('');
+  };
+
+  const inUsoCard = (g) => {
+    const idx      = S.giacenze.indexOf(g);
+    const lotsHtml = S.inUso.filter(r => r.prodotto === g.prodotto).map(l => {
+      return `<div class="giac-lot-row">
+        <span class="giac-lot-code">${esc(l.lotto)}</span>
+        ${l.scadenza ? `<span class="scad-badge ${scadCls(l.scadenza)}">${fmtDate(l.scadenza)}</span>` : ''}
+        <span class="giac-lot-qty">${l.qty}&nbsp;${esc(l.unita)}</span>
+      </div>`;
+    }).join('');
+    return `<div class="giac-card" onclick="showLotDetail(S.giacenze[${idx}])">
+      <div class="giac-top">
+        <div>
+          <div class="giac-name">${esc(g.prodotto)}</div>
+          <div class="giac-fornitore">${esc(g.fornitore||'—')}${g.categoria?`&nbsp;·&nbsp;<span class="cat-badge">${esc(g.categoria)}</span>`:''}</div>
+        </div>
+        <div>
+          <div class="giac-qty-big">${g.in_uso}</div>
+          <div class="giac-unit">${esc(g.unita)}</div>
+        </div>
+      </div>
+      <div class="giac-lots">${lotsHtml}</div>
+    </div>`;
+  };
+
+  let html = '';
+  if (magazzino.length) html += `<div class="giac-sec-title">In magazzino</div>` + magazzino.map(magazzinoCard).join('');
+  if (inUso.length)     html += `<div class="giac-sec-title">In uso</div>` + inUso.map(inUsoCard).join('');
+  el.innerHTML = html;
 }
 
 // ── ALERTS ───────────────────────────────────────────────────────────────
@@ -2930,11 +3011,15 @@ async function addToListaFromAlert(a) {
 }
 
 // ── LOT DETAIL ────────────────────────────────────────────────────────────
+const _ICON_STAMPA = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>`;
+const _ICON_MATITA = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>`;
+
 function showLotDetail(g) {
   document.getElementById('lot-detail-title').textContent = g.prodotto;
   const scortaNote = g.scorta_min > 0
     ? `<div class="lot-detail-row"><span style="font-size:12px;color:var(--muted)">Scorta minima</span><span style="font-weight:600">${g.scorta_min}&nbsp;${esc(g.unita)}</span></div>` : '';
-  const lotsHtml = g.lotti.map(l => {
+
+  const magazzinoHtml = g.lotti.length ? g.lotti.map(l => {
     const giorni = l.scadenza ? daysTo(l.scadenza) : null;
     const cls    = giorni===null ? 'scad-ok' : giorni<0 ? 'scad-danger' : giorni<=7 ? 'scad-warn' : 'scad-ok';
     const etData = esc(JSON.stringify({ prodotto: g.prodotto, lotto: l.lotto, scadenza: l.scadenza }));
@@ -2944,12 +3029,31 @@ function showLotDetail(g) {
         <div class="lot-detail-meta">${l.rimanenza}&nbsp;${esc(g.unita)}</div>
       </div>
       ${l.scadenza ? `<span class="lot-scad-pill ${cls}">${fmtDate(l.scadenza)}</span>` : ''}
-      <button type="button" class="lot-print-btn" onclick="event.stopPropagation(); printLotLabel(${etData})" aria-label="Stampa etichetta">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>
-      </button>
+      <div style="display:flex;gap:6px;flex-shrink:0">
+        <button type="button" class="lot-print-btn" onclick="event.stopPropagation(); openModificaLotto(${l.id}, ${etData})" aria-label="Modifica lotto">${_ICON_MATITA}</button>
+        <button type="button" class="lot-print-btn" onclick="event.stopPropagation(); printLotLabel(${etData})" aria-label="Stampa etichetta">${_ICON_STAMPA}</button>
+      </div>
     </div>`;
-  }).join('');
-  document.getElementById('lot-detail-body').innerHTML = scortaNote + lotsHtml;
+  }).join('') : `<div class="lot-detail-row"><span style="font-size:13px;color:var(--muted)">Nessun lotto in magazzino</span></div>`;
+
+  const inUsoLotti = S.inUso.filter(r => r.prodotto === g.prodotto);
+  const inUsoHtml = inUsoLotti.length ? inUsoLotti.map(l => {
+    const giorni = l.scadenza ? daysTo(l.scadenza) : null;
+    const cls    = giorni===null ? 'scad-ok' : giorni<0 ? 'scad-danger' : giorni<=7 ? 'scad-warn' : 'scad-ok';
+    const etData = esc(JSON.stringify({ prodotto: g.prodotto, lotto: l.lotto, scadenza: l.scadenza }));
+    return `<div class="lot-detail-row">
+      <div>
+        <div class="lot-detail-lotto">${esc(l.lotto)}</div>
+        <div class="lot-detail-meta">${l.qty}&nbsp;${esc(l.unita)}</div>
+      </div>
+      ${l.scadenza ? `<span class="lot-scad-pill ${cls}">${fmtDate(l.scadenza)}</span>` : ''}
+      <button type="button" class="lot-print-btn" onclick="event.stopPropagation(); printLotLabel(${etData})" aria-label="Stampa etichetta">${_ICON_STAMPA}</button>
+    </div>`;
+  }).join('') : `<div class="lot-detail-row"><span style="font-size:13px;color:var(--muted)">Nessun prodotto in uso</span></div>`;
+
+  document.getElementById('lot-detail-body').innerHTML = scortaNote +
+    `<div class="spesa-group-hdr" style="margin:14px 4px 8px">In magazzino</div>` + magazzinoHtml +
+    `<div class="spesa-group-hdr" style="margin:18px 4px 8px">In uso</div>` + inUsoHtml;
   document.getElementById('lot-detail-overlay').classList.add('open');
 }
 function closeLotDetail() {
@@ -2998,6 +3102,42 @@ async function copiaEtichettaLotto() {
   } catch (e) {
     toast('Impossibile copiare il testo', 'error');
   }
+}
+
+// ── MODIFICA LOTTO (Giacenze — In magazzino) ────────────────────────────────
+function openModificaLotto(rowId, d) {
+  const g = S.giacenze.find(x => x.prodotto === d.prodotto);
+  const l = g ? g.lotti.find(x => x.id === rowId) : null;
+  document.getElementById('ml-row-id').value    = rowId;
+  document.getElementById('ml-prodotto').textContent = d.prodotto;
+  document.getElementById('ml-qty').value       = l ? l.rimanenza : '';
+  document.getElementById('ml-lotto').value     = d.lotto || '';
+  document.getElementById('ml-scadenza').value  = d.scadenza || '';
+  document.getElementById('modal-modifica-lotto').classList.add('open');
+}
+function closeModificaLotto() { document.getElementById('modal-modifica-lotto').classList.remove('open'); }
+function bgCloseML(e) { if (e.target === document.getElementById('modal-modifica-lotto')) closeModificaLotto(); }
+
+async function submitModificaLotto() {
+  const rowId    = parseInt(document.getElementById('ml-row-id').value) || 0;
+  const qty      = parseFloat(document.getElementById('ml-qty').value);
+  const lotto    = document.getElementById('ml-lotto').value.trim();
+  const scadenza = document.getElementById('ml-scadenza').value;
+
+  if (!rowId) return;
+  if (!lotto) { toast('Il lotto è obbligatorio', 'error'); return; }
+  if (isNaN(qty) || qty < 0) { toast('Quantità non valida', 'error'); return; }
+
+  const result = await api(`/api/registro/${rowId}`, {
+    method: 'PUT',
+    body: { rimanenza: qty, lotto, scadenza },
+  });
+  if (!result.success) { toast(result.error || 'Errore', 'error'); return; }
+
+  closeModificaLotto();
+  closeLotDetail();
+  toast('Lotto aggiornato', 'success');
+  await Promise.all([loadGiacenze(), loadAlerts(), loadFeed()]);
 }
 
 // ── LISTA SPESA ───────────────────────────────────────────────────────────
@@ -3837,12 +3977,14 @@ function fmtDateTime(iso) {
 }
 
 async function loadControlloLogs() {
-  const [dataTemp, dataSpesa] = await Promise.all([
+  const [dataTemp, dataSpesa, dataRegistro] = await Promise.all([
     api('/api/controllo/log-temperature'),
     api('/api/controllo/log-lista-spesa'),
+    api('/api/controllo/log-modifiche-registro'),
   ]);
   renderLogEliminazioniTemperature(dataTemp.log || []);
   renderLogListaSpesa(dataSpesa.log || []);
+  renderLogModificheRegistro(dataRegistro.log || []);
 }
 
 function renderLogEliminazioniTemperature(log) {
@@ -3888,8 +4030,29 @@ function renderLogListaSpesa(log) {
   `).join('');
 }
 
+function renderLogModificheRegistro(log) {
+  const el = document.getElementById('controllo-log-modifiche-registro');
+  if (!el) return;
+  if (!log.length) {
+    el.innerHTML = `<div class="empty-state"><p>Nessuna modifica registrata</p></div>`;
+    return;
+  }
+  el.innerHTML = log.map(l => `
+    <div class="log-row">
+      <div class="log-row-top">
+        <div class="log-row-title">${esc(l.prodotto)}${l.lotto ? ' · lotto ' + esc(l.lotto) : ''}</div>
+        <span class="log-row-tag modificato">Modificato</span>
+      </div>
+      <div class="log-row-meta">${esc(l.modifiche)}</div>
+      <div class="log-row-meta">
+        <strong>${esc(l.utente)}</strong> il ${fmtDateTime(l.quando)}
+      </div>
+    </div>
+  `).join('');
+}
+
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeModal(); closeLotDetail(); closeDrawer(); closeApparecchioModal(); closeRegistraTempModal(); }
+  if (e.key === 'Escape') { closeModal(); closeLotDetail(); closeModificaLotto(); closeDrawer(); closeApparecchioModal(); closeRegistraTempModal(); }
 });
 
 // ── BOOT ─────────────────────────────────────────────────────────────────

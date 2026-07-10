@@ -40,10 +40,12 @@ from database import (
     get_temperatura_by_id, elimina_temperatura, ricalcola_stato_apparecchio, get_apparecchio_by_nome,
     log_eliminazione_temperatura, get_log_eliminazioni_temperature,
     log_lista_spesa_azione, get_log_lista_spesa,
+    update_registro_lotto, log_modifica_registro, get_log_modifiche_registro,
 )
 from sheets import (
     load_listino, load_registro, append_registro, append_listino, aggiorna_tipo_movimento,
     load_temperatura, append_temperatura, elimina_temperatura_foglio,
+    aggiorna_riga_registro,
 )
 
 app = Flask(__name__)
@@ -125,6 +127,14 @@ def _gen_id():
 
 def _gen_etichetta(prodotto, lotto, scadenza):
     return f"PRODOTTO: {prodotto}  LOTTO: {lotto}  SCADENZA: {scadenza or '—'}"
+
+
+def _fmt_data_it(iso):
+    """Converte una data ISO yyyy-mm-dd in dd/mm/yyyy per i messaggi di log."""
+    if not iso:
+        return '—'
+    m = re.match(r'^(\d{4})-(\d{2})-(\d{2})$', iso)
+    return f"{m.group(3)}/{m.group(2)}/{m.group(1)}" if m else iso
 
 
 # ─── AVVIO ────────────────────────────────────────────────────────────────────
@@ -748,6 +758,50 @@ def api_scarico():
     })
 
 
+@app.route('/api/registro/<int:row_id>', methods=['PUT'])
+@login_required
+def api_registro_modifica(row_id):
+    """Corregge lotto/scadenza/quantità di un lotto già registrato (sezione
+    'In magazzino' di Giacenze). Aggiorna DB e REGISTRO Google Sheets, e
+    registra la modifica nel log visibile dal pannello Controllo."""
+    row = get_movimento_by_id(row_id)
+    if not row:
+        return jsonify({'success': False, 'error': 'Movimento non trovato'}), 404
+
+    d        = request.get_json(force=True)
+    lotto    = (d.get('lotto') or '').strip()
+    scadenza = (d.get('scadenza') or '').strip()
+    try:
+        rimanenza = round(float(d.get('rimanenza', -1)), 4)
+    except (TypeError, ValueError):
+        rimanenza = -1
+
+    if not lotto:
+        return jsonify({'success': False, 'error': 'Il lotto è obbligatorio'}), 400
+    if rimanenza < 0:
+        return jsonify({'success': False, 'error': 'Quantità non valida'}), 400
+
+    try:
+        aggiorna_riga_registro(row['movimento_id'], lotto, scadenza, rimanenza)
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Errore Google Sheets: {e}'}), 500
+
+    update_registro_lotto(row_id, lotto, scadenza, rimanenza)
+
+    modifiche = []
+    if round(row['rimanenza'], 4) != rimanenza:
+        modifiche.append(f"Quantità: {row['rimanenza']} → {rimanenza} {row['unita']}")
+    if row['lotto'] != lotto:
+        modifiche.append(f"Lotto: {row['lotto'] or '—'} → {lotto}")
+    if (row['scadenza'] or '') != scadenza:
+        modifiche.append(f"Scadenza: {_fmt_data_it(row['scadenza'])} → {_fmt_data_it(scadenza)}")
+
+    if modifiche:
+        log_modifica_registro(row['prodotto'], lotto, '; '.join(modifiche), current_user.nome)
+
+    return jsonify({'success': True, 'lotto': lotto, 'scadenza': scadenza, 'rimanenza': rimanenza})
+
+
 # ─── TEMPERATURE ──────────────────────────────────────────────────────────────
 
 @app.route('/api/apparecchi', methods=['GET'])
@@ -922,6 +976,13 @@ def api_controllo_log_temperature():
 @controllo_required
 def api_controllo_log_lista_spesa():
     return jsonify({'success': True, 'log': get_log_lista_spesa()})
+
+
+@app.route('/api/controllo/log-modifiche-registro')
+@login_required
+@controllo_required
+def api_controllo_log_modifiche_registro():
+    return jsonify({'success': True, 'log': get_log_modifiche_registro()})
 
 
 @app.route('/api/sync', methods=['POST'])

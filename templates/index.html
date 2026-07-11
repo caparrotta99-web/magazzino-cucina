@@ -2775,9 +2775,10 @@ function renderGiacenze() {
     return new Date(a.prossima_scadenza) - new Date(b.prossima_scadenza);
   });
 
-  // Un prodotto con quantità attualmente in uso (tipo movimento IN USO) va
-  // mostrato solo nella sezione "In uso", non tra quelli "In magazzino".
-  const magazzino = list.filter(g => !(g.in_uso > 0));
+  // Le due sezioni sono indipendenti: un prodotto può comparire in entrambe.
+  // "In magazzino" mostra la rimanenza residua (carico - in uso, già netta
+  // lato backend); "In uso" mostra la quantità attualmente prelevata.
+  const magazzino = list.filter(g => g.totale > 0);
   const inUso     = list.filter(g => g.in_uso > 0);
 
   const emptyState = (msg) => `<div class="empty-state">

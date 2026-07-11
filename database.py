@@ -5,6 +5,8 @@ from datetime import date, datetime, timedelta
 from collections import OrderedDict
 from urllib.parse import unquote
 
+from timezone_utils import now_it, today_it
+
 DATABASE_URL = os.environ.get('DATABASE_URL', '')
 if DATABASE_URL.startswith('postgres://'):
     DATABASE_URL = DATABASE_URL.replace('postgres://', 'postgresql://', 1)
@@ -595,7 +597,7 @@ def get_giacenze():
 
 
 def get_alerts():
-    today      = date.today()
+    today      = today_it()
     limite_str = (today + timedelta(days=7)).isoformat()
 
     with get_conn() as conn:
@@ -832,13 +834,12 @@ def get_lista_spesa():
 
 
 def add_lista_spesa_item(prodotto, fornitore, categoria, quantita, unita, reparto=''):
-    from datetime import datetime
     with get_conn() as conn:
         return conn.execute_insert(
             "INSERT INTO lista_spesa (prodotto, fornitore, categoria, reparto, quantita, unita, completato, created_at) "
             "VALUES (?, ?, ?, ?, ?, ?, 0, ?)",
             (prodotto, fornitore or '', categoria or '', reparto or '', float(quantita or 0),
-             unita or '', datetime.now().isoformat())
+             unita or '', now_it().isoformat())
         )
 
 
@@ -935,8 +936,11 @@ def turno_e_data_riferimento(now=None):
     Sera: 21:00-07:59, riferita al giorno in cui la sera è iniziata (quindi
     tra mezzanotte e le 07:59 si fa ancora riferimento al giorno precedente,
     perché la sera "di oggi" comincia solo alle 21:00).
+
+    Gli orari sono sempre riferiti al fuso orario italiano (Europe/Rome),
+    indipendentemente dal fuso orario del server.
     """
-    now = now or datetime.now()
+    now = now or now_it()
     if 8 <= now.hour < 21:
         return 'mattina', now.date()
     if now.hour >= 21:
@@ -1091,7 +1095,7 @@ def log_eliminazione_temperatura(temp_row, eliminato_da):
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (temp_row['apparecchio'], temp_row['temperatura'], temp_row['temp_min'], temp_row['temp_max'],
              temp_row['esito'], temp_row['data'], temp_row['ora'], temp_row['operatore'],
-             eliminato_da, datetime.now().isoformat(timespec='seconds'))
+             eliminato_da, now_it().isoformat(timespec='seconds'))
         )
 
 
@@ -1109,7 +1113,7 @@ def log_lista_spesa_azione(azione, prodotto, fornitore, utente):
         conn.execute(
             "INSERT INTO log_lista_spesa (azione, prodotto, fornitore, utente, quando) "
             "VALUES (?, ?, ?, ?, ?)",
-            (azione, prodotto, fornitore, utente, datetime.now().isoformat(timespec='seconds'))
+            (azione, prodotto, fornitore, utente, now_it().isoformat(timespec='seconds'))
         )
 
 
@@ -1135,7 +1139,7 @@ def log_modifica_registro(prodotto, lotto, modifiche, utente):
         conn.execute(
             "INSERT INTO log_modifiche_registro (prodotto, lotto, modifiche, utente, quando) "
             "VALUES (?, ?, ?, ?, ?)",
-            (prodotto, lotto, modifiche, utente, datetime.now().isoformat(timespec='seconds'))
+            (prodotto, lotto, modifiche, utente, now_it().isoformat(timespec='seconds'))
         )
 
 
@@ -1149,7 +1153,7 @@ def get_log_modifiche_registro(limit=200):
 
 
 def get_temperature_storico(giorni=30, apparecchio=None):
-    limite = (date.today() - timedelta(days=giorni)).isoformat()
+    limite = (today_it() - timedelta(days=giorni)).isoformat()
     with get_conn() as conn:
         sql = ("SELECT id, apparecchio, tipo, data, ora, temperatura, temp_min, temp_max, "
                "esito, nota, operatore FROM temperature WHERE data >= ?")

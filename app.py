@@ -7,6 +7,8 @@ import threading
 from datetime import datetime, timedelta
 from functools import wraps
 
+from timezone_utils import now_it
+
 from flask import (
     Flask, render_template, request, jsonify,
     send_from_directory, send_file, redirect, url_for, abort,
@@ -126,7 +128,7 @@ def controllo_required(f):
 
 def _gen_id():
     rand = ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
-    return f"{datetime.now().strftime('%Y%m%d')}-{rand}"
+    return f"{now_it().strftime('%Y%m%d')}-{rand}"
 
 
 def _gen_etichetta(prodotto, lotto, scadenza):
@@ -253,7 +255,7 @@ def forgot_password():
             error = 'Nessun account trovato con questi dati'
         else:
             code       = str(random.randint(100000, 999999))
-            expires_at = (datetime.now() + timedelta(minutes=15)).isoformat()
+            expires_at = (now_it() + timedelta(minutes=15)).isoformat()
             create_reset_token(user_data['id'], code, expires_at)
     return render_template('forgot.html', code=code, error=error)
 
@@ -278,7 +280,7 @@ def reset_password():
             token_data = get_reset_token(token)
             if not token_data:
                 error = 'Codice non valido o già utilizzato'
-            elif datetime.fromisoformat(token_data['expires_at']) < datetime.now():
+            elif datetime.fromisoformat(token_data['expires_at']) < now_it():
                 use_reset_token(token_data['id'])
                 error = 'Codice scaduto — richiedine uno nuovo'
             else:
@@ -613,7 +615,7 @@ def api_carico():
     nuova_rimanenza = round(rimanenza_prec + qty, 4)
     movimento_id    = _gen_id()
     etichetta       = _gen_etichetta(prodotto, lotto, scadenza)
-    oggi            = datetime.now().strftime('%Y-%m-%d')
+    oggi            = now_it().strftime('%Y-%m-%d')
 
     row = {
         'data':         oggi,
@@ -685,7 +687,7 @@ def api_in_uso_crea():
 
     nuova_rimanenza = round(rimanenza_prec - qty, 4)
     movimento_id    = _gen_id()
-    oggi            = datetime.now().strftime('%Y-%m-%d')
+    oggi            = now_it().strftime('%Y-%m-%d')
 
     row = {
         'data':         oggi,
@@ -746,7 +748,7 @@ def api_scarico():
     except Exception as e:
         return jsonify({'success': False, 'error': f'Errore Google Sheets: {e}'}), 500
 
-    oggi     = datetime.now().strftime('%Y-%m-%d')
+    oggi     = now_it().strftime('%Y-%m-%d')
     finalized = finalizza_in_uso(row_id, oggi)
 
     if not finalized:
@@ -911,8 +913,8 @@ def api_temperature_registra():
         return jsonify({'success': False, 'error': 'Dati non validi'}), 400
 
     nota = (d.get('nota') or '').strip()
-    data = (d.get('data') or datetime.now().strftime('%Y-%m-%d')).strip()
-    ora  = (d.get('ora')  or datetime.now().strftime('%H:%M')).strip()
+    data = (d.get('data') or now_it().strftime('%Y-%m-%d')).strip()
+    ora  = (d.get('ora')  or now_it().strftime('%H:%M')).strip()
 
     app_row = get_apparecchio_by_id(apparecchio_id)
     if not app_row:

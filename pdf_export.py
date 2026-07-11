@@ -1,6 +1,7 @@
 import os
-from datetime import datetime
 from io import BytesIO
+
+from timezone_utils import now_it
 
 from reportlab.lib import colors
 from reportlab.lib.enums import TA_CENTER
@@ -89,7 +90,7 @@ def _intestazione(titolo_report, sottotitolo):
 
     elementi.append(Paragraph(RISTORANTE, _stile_sub))
     elementi.append(Paragraph(titolo_report, _stile_titolo_report))
-    generato_il = datetime.now().strftime('%d/%m/%Y %H:%M')
+    generato_il = now_it().strftime('%d/%m/%Y %H:%M')
     meta = sottotitolo + (' — ' if sottotitolo else '') + f'Generato il {generato_il}'
     elementi.append(Paragraph(meta, _stile_meta))
     return elementi

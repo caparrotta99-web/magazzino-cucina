@@ -334,14 +334,16 @@ def aggiorna_tipo_movimento(movimento_id, nuovo_tipo):
     Trova la riga del REGISTRO con questo movimento_id (colonna 'ID') e
     aggiorna la colonna 'Tipo movimento' — es. da 'IN USO' a 'SCARICO'
     quando un prelievo in uso viene finalizzato. Non crea nuove righe.
-    Ritorna True se una riga è stata trovata e aggiornata, False altrimenti.
+    Solleva ValueError se la riga non viene trovata, così il chiamante non
+    finalizza il movimento solo in locale credendo che la scrittura su
+    Sheets sia andata a buon fine.
     """
     gc = _get_client()
     ws = gc.open_by_key(SPREADSHEET_ID).worksheet(SHEET_REGISTRO)
 
     all_values = ws.get_all_values()
     if len(all_values) < 2:
-        return False
+        raise ValueError(f"Foglio REGISTRO vuoto: movimento '{movimento_id}' non trovato")
 
     headers  = [h.strip() for h in all_values[0]]
     col_id   = _detect(headers, 'movimento_id')
@@ -354,21 +356,24 @@ def aggiorna_tipo_movimento(movimento_id, nuovo_tipo):
         if val == movimento_id:
             ws.update_cell(i, col_tipo + 1, _TIPO_DISPLAY.get(nuovo_tipo, nuovo_tipo))
             return True
-    return False
+
+    raise ValueError(f"Movimento '{movimento_id}' non trovato nel foglio REGISTRO")
 
 
 def aggiorna_riga_registro(movimento_id, lotto, scadenza, rimanenza):
     """
     Trova la riga del REGISTRO con questo movimento_id e aggiorna Lotto,
     Scadenza e Rimanenza lotto (usato per correggere un carico esistente).
-    Non crea nuove righe. Ritorna True se trovata e aggiornata, False altrimenti.
+    Non crea nuove righe. Solleva ValueError se la riga non viene trovata,
+    così il chiamante non salva la modifica solo in locale credendo che la
+    scrittura su Sheets sia andata a buon fine.
     """
     gc = _get_client()
     ws = gc.open_by_key(SPREADSHEET_ID).worksheet(SHEET_REGISTRO)
 
     all_values = ws.get_all_values()
     if len(all_values) < 2:
-        return False
+        raise ValueError(f"Foglio REGISTRO vuoto: movimento '{movimento_id}' non trovato")
 
     headers = [h.strip() for h in all_values[0]]
     col_id        = _detect(headers, 'movimento_id')
@@ -388,7 +393,8 @@ def aggiorna_riga_registro(movimento_id, lotto, scadenza, rimanenza):
             if col_rimanenza is not None:
                 ws.update_cell(i, col_rimanenza + 1, rimanenza)
             return True
-    return False
+
+    raise ValueError(f"Movimento '{movimento_id}' non trovato nel foglio REGISTRO")
 
 
 def append_listino(row_data):

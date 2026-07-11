@@ -47,6 +47,7 @@ body {
   --violet:  #8b5cf6;
   --teal:    #0d9488;
   --slate:   #475569;
+  --indigo:  #6366f1;
   --success: #16a34a;
   --warning: #f97316;
   --error:   #ef4444;
@@ -282,6 +283,7 @@ main {
 .hcard-alert    .hcard-icon { background: var(--orange); }
 .hcard-temperature .hcard-icon { background: var(--teal); }
 .hcard-controllo    .hcard-icon { background: var(--slate); }
+.hcard-export       .hcard-icon { background: var(--indigo); }
 .hcard-spesa {
   background: var(--card);
   border: none;
@@ -1252,6 +1254,11 @@ body.help-mode { background: #0f1f3d; }
       <span class="lbl">Lista spesa</span>
     </button>
 
+    <button class="drw-item" data-page="export" onclick="navTo('export')">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      <span class="lbl">Export</span>
+    </button>
+
     {% if current_user.is_authenticated %}
     <button class="drw-item" onclick="window.location='/profile'; closeDrawer()">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
@@ -1337,6 +1344,16 @@ body.help-mode { background: #0f1f3d; }
         <div>
           <div class="hcard-label">Temperature</div>
           <div class="hcard-sub">Registro HACCP</div>
+        </div>
+      </div>
+
+      <div class="hcard hcard-export" onclick="navTo('export')">
+        <div class="hcard-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        </div>
+        <div>
+          <div class="hcard-label">Export</div>
+          <div class="hcard-sub">Esporta PDF</div>
         </div>
       </div>
 
@@ -1521,6 +1538,61 @@ body.help-mode { background: #0f1f3d; }
 
     <div class="pg-title" style="margin-top:24px">Modifiche lotti</div>
     <div id="controllo-log-modifiche-registro"></div>
+  </section>
+
+  <!-- EXPORT -->
+  <section class="page" id="page-export">
+    <div class="back-bar" onclick="navTo('home')">
+      <div class="back-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+      <span class="back-label">Export</span>
+    </div>
+
+    <div class="pg-sub">Genera un PDF con i dati HACCP del periodo selezionato</div>
+
+    <div class="form-card">
+      <div class="fgroup">
+        <label class="flabel">Tipo report *</label>
+        <div class="fselect-wrap">
+          <select class="fselect" id="exp-tipo" onchange="onExportTipoChange()">
+            <option value="registro">Registro movimenti</option>
+            <option value="report_mensile">Report mensile</option>
+            <option value="temperature">Registro temperature</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="fgroup" id="exp-mese-group">
+        <label class="flabel">Mese *</label>
+        <div class="fselect-wrap">
+          <select class="fselect" id="exp-mese">
+            <option value="1">Gennaio</option>
+            <option value="2">Febbraio</option>
+            <option value="3">Marzo</option>
+            <option value="4">Aprile</option>
+            <option value="5">Maggio</option>
+            <option value="6">Giugno</option>
+            <option value="7">Luglio</option>
+            <option value="8">Agosto</option>
+            <option value="9">Settembre</option>
+            <option value="10">Ottobre</option>
+            <option value="11">Novembre</option>
+            <option value="12">Dicembre</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="fgroup" style="margin-bottom:0">
+        <label class="flabel">Anno *</label>
+        <div class="fselect-wrap">
+          <select class="fselect" id="exp-anno"></select>
+        </div>
+      </div>
+    </div>
+
+    <button class="btn-primary" id="btn-export" onclick="generaExportPdf()">
+      <span class="spinner"></span>
+      <span class="btn-lbl">Genera PDF</span>
+    </button>
   </section>
 
   <!-- CARICO -->
@@ -2311,6 +2383,7 @@ function navTo(page) {
   if (page === 'lista-spesa') loadListaSpesa();
   if (page === 'temperature') { loadApparecchi(); loadStoricoTemperature(); }
   if (page === 'controllo')  loadControlloLogs();
+  if (page === 'export')    initExportPage();
 }
 // alias for backward compat
 function switchTab(t) { navTo(t); }
@@ -4153,6 +4226,73 @@ function renderLogModificheRegistro(log) {
       </div>
     </div>
   `).join('');
+}
+
+// ── EXPORT PDF ────────────────────────────────────────────────────────────
+function initExportPage() {
+  const selAnno = document.getElementById('exp-anno');
+  if (!selAnno.dataset.init) {
+    const oggi = new Date();
+    const annoCorrente = oggi.getFullYear();
+    selAnno.innerHTML = '';
+    for (let y = annoCorrente; y >= annoCorrente - 4; y--) {
+      const opt = document.createElement('option');
+      opt.value = y;
+      opt.textContent = y;
+      selAnno.appendChild(opt);
+    }
+    document.getElementById('exp-mese').value = String(oggi.getMonth() + 1);
+    selAnno.dataset.init = '1';
+  }
+  onExportTipoChange();
+}
+
+function onExportTipoChange() {
+  const tipo = document.getElementById('exp-tipo').value;
+  document.getElementById('exp-mese-group').style.display = (tipo === 'report_mensile') ? 'none' : '';
+}
+
+async function generaExportPdf() {
+  const tipo = document.getElementById('exp-tipo').value;
+  const anno = document.getElementById('exp-anno').value;
+  const mese = document.getElementById('exp-mese').value;
+
+  const params = new URLSearchParams({ tipo, anno });
+  if (tipo !== 'report_mensile') params.set('mese', mese);
+
+  const btn = document.getElementById('btn-export');
+  btn.classList.add('loading');
+  btn.disabled = true;
+
+  try {
+    const res = await fetch(`/api/export/pdf?${params.toString()}`);
+    if (!res.ok) {
+      let msg = 'Errore durante la generazione del PDF';
+      try { const data = await res.json(); msg = data.error || msg; } catch (e) {}
+      toast(msg, 'error');
+      return;
+    }
+    const blob     = await res.blob();
+    const cd       = res.headers.get('Content-Disposition') || '';
+    const match    = cd.match(/filename="?([^"]+)"?/);
+    const filename = match ? match[1] : `export_${tipo}.pdf`;
+
+    const url = URL.createObjectURL(blob);
+    const a   = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 4000);
+
+    toast('PDF generato', 'success');
+  } catch (e) {
+    toast('Errore di rete', 'error');
+  } finally {
+    btn.classList.remove('loading');
+    btn.disabled = false;
+  }
 }
 
 document.addEventListener('keydown', e => {

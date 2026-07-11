@@ -9,7 +9,7 @@ from functools import wraps
 
 from flask import (
     Flask, render_template, request, jsonify,
-    send_from_directory, redirect, url_for, abort,
+    send_from_directory, send_file, redirect, url_for, abort,
 )
 from flask_login import (
     LoginManager, UserMixin,
@@ -41,11 +41,15 @@ from database import (
     log_eliminazione_temperatura, get_log_eliminazioni_temperature,
     log_lista_spesa_azione, get_log_lista_spesa,
     update_registro_lotto, log_modifica_registro, get_log_modifiche_registro,
+    get_registro_by_mese, get_temperature_by_mese, get_report_mensile_anno,
 )
 from sheets import (
     load_listino, load_registro, append_registro, append_listino, aggiorna_tipo_movimento,
     load_temperatura, append_temperatura, elimina_temperatura_foglio,
     aggiorna_riga_registro,
+)
+from pdf_export import (
+    genera_pdf_registro, genera_pdf_temperature, genera_pdf_report_mensile,
 )
 
 app = Flask(__name__)
@@ -1003,6 +1007,44 @@ def api_sync():
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ─── EXPORT PDF ───────────────────────────────────────────────────────────────
+
+@app.route('/api/export/pdf')
+@login_required
+def api_export_pdf():
+    tipo = (request.args.get('tipo') or '').strip()
+    if tipo not in ('registro', 'temperature', 'report_mensile'):
+        return jsonify({'success': False, 'error': 'Tipo report non valido'}), 400
+
+    try:
+        anno = int(request.args.get('anno', 0))
+    except (TypeError, ValueError):
+        anno = 0
+    if not (2000 <= anno <= 2100):
+        return jsonify({'success': False, 'error': 'Anno non valido'}), 400
+
+    mese = None
+    if tipo in ('registro', 'temperature'):
+        try:
+            mese = int(request.args.get('mese', 0))
+        except (TypeError, ValueError):
+            mese = 0
+        if not (1 <= mese <= 12):
+            return jsonify({'success': False, 'error': 'Mese non valido'}), 400
+
+    if tipo == 'registro':
+        buf = genera_pdf_registro(get_registro_by_mese(anno, mese), anno, mese)
+        filename = f'registro-movimenti_{anno}-{mese:02d}.pdf'
+    elif tipo == 'temperature':
+        buf = genera_pdf_temperature(get_temperature_by_mese(anno, mese), anno, mese)
+        filename = f'registro-temperature_{anno}-{mese:02d}.pdf'
+    else:
+        buf = genera_pdf_report_mensile(get_report_mensile_anno(anno), anno)
+        filename = f'report-mensile_{anno}.pdf'
+
+    return send_file(buf, mimetype='application/pdf', as_attachment=True, download_name=filename)
 
 
 # ─── SCAN ETICHETTA (Claude Vision) ──────────────────────────────────────────

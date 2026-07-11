@@ -1183,3 +1183,63 @@ def update_user_apparecchi_permesso(user_id, permesso):
             "UPDATE users SET gestisce_apparecchi = ? WHERE id = ?",
             (1 if permesso else 0, user_id)
         )
+
+
+# ─── EXPORT PDF ───────────────────────────────────────────────────────────────
+
+def get_registro_by_mese(anno, mese):
+    """Righe di registro del mese/anno indicato, per l'export PDF del
+    Registro movimenti."""
+    pattern = f"{anno:04d}-{mese:02d}-%"
+    with get_conn() as conn:
+        cur = conn.execute(
+            "SELECT data, prodotto, lotto, scadenza, carico, scarico, unita, "
+            "operatore, reparto, tipo FROM registro WHERE data LIKE ? "
+            "ORDER BY data, id",
+            (pattern,)
+        )
+        return _rows(cur)
+
+
+def get_temperature_by_mese(anno, mese):
+    """Rilevazioni temperature del mese/anno indicato, per l'export PDF del
+    Registro temperature."""
+    pattern = f"{anno:04d}-{mese:02d}-%"
+    with get_conn() as conn:
+        cur = conn.execute(
+            "SELECT data, ora, apparecchio, temperatura, esito, operatore "
+            "FROM temperature WHERE data LIKE ? ORDER BY data, ora",
+            (pattern,)
+        )
+        return _rows(cur)
+
+
+def get_report_mensile_anno(anno):
+    """Quantità scaricata (consumata) per prodotto e mese nell'anno indicato,
+    per l'export PDF del Report mensile — stesso calcolo del foglio
+    REPORT MENSILE di Google Sheets, ma dal DB locale."""
+    pattern = f"{anno:04d}-%"
+    with get_conn() as conn:
+        cur = conn.execute(
+            "SELECT prodotto, substr(data, 6, 2) AS mese, SUM(scarico) AS tot "
+            "FROM registro WHERE data LIKE ? GROUP BY prodotto, mese",
+            (pattern,)
+        )
+        rows = _rows(cur)
+        prodotti_rows = _rows(conn.execute(
+            "SELECT prodotto FROM listino ORDER BY LOWER(prodotto)"
+        ))
+
+    per_prodotto = {r['prodotto']: {m: 0.0 for m in range(1, 13)} for r in prodotti_rows}
+    for r in rows:
+        p = r['prodotto']
+        if p not in per_prodotto:
+            per_prodotto[p] = {m: 0.0 for m in range(1, 13)}
+        try:
+            mese = int(r['mese'])
+        except (TypeError, ValueError):
+            continue
+        if 1 <= mese <= 12:
+            per_prodotto[p][mese] = round(float(r['tot'] or 0), 3)
+
+    return [{'prodotto': p, 'mesi': mesi} for p, mesi in per_prodotto.items()]

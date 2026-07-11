@@ -1,7 +1,7 @@
 import os
 import re
 import sqlite3
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, timedelta, timezone
 from collections import OrderedDict
 from urllib.parse import unquote
 
@@ -1087,6 +1087,10 @@ def ricalcola_stato_apparecchio(apparecchio_id, apparecchio_nome):
 
 
 def log_eliminazione_temperatura(temp_row, eliminato_da):
+    # Timestamp di log (metadato "quando è avvenuta l'azione"): salvato come
+    # istante UTC esplicito (con offset), non come ora italiana ingenua, così
+    # il frontend può convertirlo correttamente con
+    # new Date(iso).toLocaleString('it-IT', {timeZone:'Europe/Rome'}).
     with get_conn() as conn:
         conn.execute(
             """INSERT INTO log_eliminazioni_temperature
@@ -1095,7 +1099,7 @@ def log_eliminazione_temperatura(temp_row, eliminato_da):
                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (temp_row['apparecchio'], temp_row['temperatura'], temp_row['temp_min'], temp_row['temp_max'],
              temp_row['esito'], temp_row['data'], temp_row['ora'], temp_row['operatore'],
-             eliminato_da, now_it().isoformat(timespec='seconds'))
+             eliminato_da, datetime.now(timezone.utc).isoformat(timespec='seconds'))
         )
 
 
@@ -1109,11 +1113,12 @@ def get_log_eliminazioni_temperature(limit=200):
 
 
 def log_lista_spesa_azione(azione, prodotto, fornitore, utente):
+    # Timestamp di log in UTC esplicito, vedi nota in log_eliminazione_temperatura.
     with get_conn() as conn:
         conn.execute(
             "INSERT INTO log_lista_spesa (azione, prodotto, fornitore, utente, quando) "
             "VALUES (?, ?, ?, ?, ?)",
-            (azione, prodotto, fornitore, utente, now_it().isoformat(timespec='seconds'))
+            (azione, prodotto, fornitore, utente, datetime.now(timezone.utc).isoformat(timespec='seconds'))
         )
 
 
@@ -1135,11 +1140,12 @@ def update_registro_lotto(row_id, lotto, scadenza, rimanenza):
 
 
 def log_modifica_registro(prodotto, lotto, modifiche, utente):
+    # Timestamp di log in UTC esplicito, vedi nota in log_eliminazione_temperatura.
     with get_conn() as conn:
         conn.execute(
             "INSERT INTO log_modifiche_registro (prodotto, lotto, modifiche, utente, quando) "
             "VALUES (?, ?, ?, ?, ?)",
-            (prodotto, lotto, modifiche, utente, now_it().isoformat(timespec='seconds'))
+            (prodotto, lotto, modifiche, utente, datetime.now(timezone.utc).isoformat(timespec='seconds'))
         )
 
 

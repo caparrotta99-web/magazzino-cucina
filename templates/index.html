@@ -1179,6 +1179,7 @@ body.help-mode { background: #0f1f3d; }
     <div class="logo">Brigade</div>
     <div class="hdr-sub">
       <span id="hdr-date"></span>
+      &nbsp;·&nbsp;<span id="hdr-time"></span>
       {% if current_user.is_authenticated %}
       &nbsp;·&nbsp;<strong>{{ current_user.nome }}{% if current_user.reparto %} — {{ current_user.reparto }}{% endif %}</strong>
       {% endif %}
@@ -2316,7 +2317,7 @@ function _updateCategorieUI() {
 
 // ── INIT ─────────────────────────────────────────────────────────────────
 async function init() {
-  setHdrDate();
+  startHdrClock();
   animHomeCards();
   _initGiacSwipe();
   await Promise.all([loadCategorie(), loadProdottiCarico(), loadGiacenze(), loadAlerts(), loadFeed(), loadListaSpesa(), loadInUso(), loadApparecchi(), loadStoricoTemperature()]);
@@ -2328,8 +2329,28 @@ function setHdrDate() {
   const el = document.getElementById('hdr-date');
   if (!el) return;
   el.textContent = new Date().toLocaleDateString('it-IT', {
-    weekday: 'short', day: 'numeric', month: 'short'
+    weekday: 'short', day: 'numeric', month: 'short', timeZone: 'Europe/Rome',
   });
+}
+
+function setHdrTime() {
+  const el = document.getElementById('hdr-time');
+  if (!el) return;
+  el.textContent = new Date().toLocaleTimeString('it-IT', {
+    hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Rome',
+  });
+}
+
+function startHdrClock() {
+  setHdrDate();
+  setHdrTime();
+  // Allinea il primo aggiornamento al prossimo minuto esatto, poi ripete ogni 60s.
+  const msAlProssimoMinuto = 60000 - (Date.now() % 60000);
+  setTimeout(() => {
+    setHdrDate();
+    setHdrTime();
+    setInterval(() => { setHdrDate(); setHdrTime(); }, 60000);
+  }, msAlProssimoMinuto);
 }
 
 // ── TEMA ─────────────────────────────────────────────────────────────────
@@ -3239,7 +3260,7 @@ function closeLotDetail() {
 
 // ── ETICHETTA ─────────────────────────────────────────────────────────────
 function showEtichetta(d) {
-  const oggi = new Date().toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric' });
+  const oggi = new Date().toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric', timeZone: 'Europe/Rome' });
   const content = `
     <div class="eti-hdr-lbl">HACCP — Magazzino Cucina</div>
     <div class="eti-row"><span>Prodotto</span><strong>${esc(d.prodotto)}</strong></div>
@@ -3796,6 +3817,17 @@ function daysTo(iso) {
     return Math.round((new Date(iso + 'T00:00:00') - today) / 86400000);
   } catch { return null; }
 }
+// Data (YYYY-MM-DD) e ora (HH:MM) correnti nel fuso orario italiano,
+// indipendentemente dal fuso orario impostato sul dispositivo.
+function dataOraItaliana(date = new Date()) {
+  const data = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Europe/Rome', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(date);
+  const ora = new Intl.DateTimeFormat('en-GB', {
+    timeZone: 'Europe/Rome', hour: '2-digit', minute: '2-digit', hour12: false,
+  }).format(date);
+  return { data, ora };
+}
 function esc(s) {
   if (s === null || s === undefined) return '';
   return String(s)
@@ -3995,11 +4027,11 @@ async function eliminaApparecchio(id) {
 function openRegistraTempModal(apparecchioId) {
   const a = S.apparecchi.find(x => x.id === apparecchioId);
   if (!a) return;
-  const now = new Date();
+  const { data, ora } = dataOraItaliana();
   document.getElementById('rt-apparecchio-id').value = apparecchioId;
   document.getElementById('rt-titolo').textContent = `Registra temperatura — ${a.nome}`;
-  document.getElementById('rt-data').value = now.toISOString().slice(0, 10);
-  document.getElementById('rt-ora').value  = now.toTimeString().slice(0, 5);
+  document.getElementById('rt-data').value = data;
+  document.getElementById('rt-ora').value  = ora;
   document.getElementById('rt-temperatura').value = '';
   document.getElementById('rt-nota').value = '';
   document.getElementById('rt-fuori-soglia').style.display = 'none';
@@ -4147,10 +4179,13 @@ async function confermaEliminaTemperatura(id) {
 // ── CONTROLLO ────────────────────────────────────────────────────────────
 function fmtDateTime(iso) {
   if (!iso) return '—';
-  const [datePart, timePart] = iso.split('T');
-  const [y, m, d] = datePart.split('-');
-  const hm = (timePart || '').slice(0, 5);
-  return `${d}/${m}/${y}${hm ? ' ' + hm : ''}`;
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return iso;
+  return d.toLocaleString('it-IT', {
+    timeZone: 'Europe/Rome',
+    day: '2-digit', month: '2-digit', year: 'numeric',
+    hour: '2-digit', minute: '2-digit',
+  }).replace(',', '');
 }
 
 async function loadControlloLogs() {

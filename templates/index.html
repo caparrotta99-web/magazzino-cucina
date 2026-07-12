@@ -1794,6 +1794,13 @@ body.help-mode { background: #0f1f3d; }
         </div>
       </div>
       <div class="lot-info-box" id="s-lot-info"></div>
+      <div class="fgroup" id="s-qty-group" style="display:none">
+        <label class="flabel">Quantità scaricata *</label>
+        <input class="finput" type="number" id="s-qty"
+               placeholder="0" min="0.01" step="0.01" inputmode="decimal"
+               oninput="validateQtyScarico()">
+        <div class="ferror" id="s-qty-error"></div>
+      </div>
     </div>
 
     <button class="btn-primary" id="btn-scarico" onclick="submitScarico()">
@@ -2793,6 +2800,7 @@ function renderScaricoProdotti() {
     document.getElementById('s-lotto').innerHTML = '<option value="">Seleziona prima il prodotto</option>';
     document.getElementById('s-lotto').disabled = true;
     document.getElementById('s-lot-info').classList.remove('show');
+    document.getElementById('s-qty-group').style.display = 'none';
   }
 }
 
@@ -2800,6 +2808,7 @@ function onProdottoScarico() {
   const prodotto = document.getElementById('s-prodotto').value;
   const lottoSel = document.getElementById('s-lotto');
   document.getElementById('s-lot-info').classList.remove('show');
+  document.getElementById('s-qty-group').style.display = 'none';
   if (!prodotto) {
     lottoSel.innerHTML = '<option value="">Seleziona prima il prodotto</option>';
     lottoSel.disabled = true; return;
@@ -2814,11 +2823,16 @@ function onProdottoScarico() {
 }
 
 function onLottoScarico() {
-  const id   = document.getElementById('s-lotto').value;
-  const info = document.getElementById('s-lot-info');
-  if (!id) { info.classList.remove('show'); return; }
+  const id       = document.getElementById('s-lotto').value;
+  const info     = document.getElementById('s-lot-info');
+  const qtyGroup = document.getElementById('s-qty-group');
+  const qtyEl    = document.getElementById('s-qty');
+  document.getElementById('s-qty-error').textContent = '';
+  document.getElementById('s-qty-error').classList.remove('show');
+  qtyEl.classList.remove('error');
+  if (!id) { info.classList.remove('show'); qtyGroup.style.display = 'none'; return; }
   const r = S.inUso.find(x => String(x.id) === String(id));
-  if (!r)  { info.classList.remove('show'); return; }
+  if (!r)  { info.classList.remove('show'); qtyGroup.style.display = 'none'; return; }
   info.innerHTML = `
     <div class="lot-info-row"><span>Quantità</span><strong>${r.qty} ${esc(r.unita)}</strong></div>
     <div class="lot-info-row"><span>In uso dal</span><strong>${fmtDate(r.data)}</strong></div>
@@ -2826,23 +2840,46 @@ function onLottoScarico() {
     ${r.fornitore ? `<div class="lot-info-row"><span>Fornitore</span><strong>${esc(r.fornitore)}</strong></div>` : ''}
   `;
   info.classList.add('show');
+  qtyEl.value = r.qty;
+  qtyEl.max   = r.qty;
+  qtyGroup.style.display = '';
+}
+
+function validateQtyScarico() {
+  const id    = document.getElementById('s-lotto').value;
+  const qtyEl = document.getElementById('s-qty');
+  const errEl = document.getElementById('s-qty-error');
+  const qty   = parseFloat(qtyEl.value);
+  const r     = S.inUso.find(x => String(x.id) === String(id));
+  if (r && qty > 0 && qty > r.qty) {
+    errEl.textContent = `Non puoi scaricare più di ${r.qty} ${r.unita} in uso`;
+    errEl.classList.add('show'); qtyEl.classList.add('error'); return false;
+  }
+  errEl.textContent = ''; errEl.classList.remove('show'); qtyEl.classList.remove('error');
+  return true;
 }
 
 async function submitScarico() {
   const prodotto = document.getElementById('s-prodotto').value;
   const id       = document.getElementById('s-lotto').value;
-  if (!prodotto) { toast('Seleziona il prodotto', 'error'); return; }
-  if (!id)       { toast('Seleziona l\'elemento da scaricare', 'error'); return; }
+  const qty      = parseFloat(document.getElementById('s-qty').value);
+  if (!prodotto)        { toast('Seleziona il prodotto', 'error'); return; }
+  if (!id)              { toast('Seleziona l\'elemento da scaricare', 'error'); return; }
+  if (!qty || qty <= 0) { toast('Inserisci una quantità valida', 'error'); return; }
+  if (!validateQtyScarico()) return;
 
   const btn = document.getElementById('btn-scarico');
   btn.classList.add('loading'); btn.disabled = true;
 
-  const data = await api('/api/scarico', { method: 'POST', body: { id: Number(id) } });
+  const data = await api('/api/scarico', { method: 'POST', body: { id: Number(id), qty } });
 
   btn.classList.remove('loading'); btn.disabled = false;
 
   if (data.success) {
-    toast(`Scarico registrato — ${data.prodotto}`, 'success');
+    const msg = data.residuo > 0
+      ? `Scarico registrato — ${data.prodotto} (${data.residuo} ancora in uso)`
+      : `Scarico registrato — ${data.prodotto}`;
+    toast(msg, 'success');
     await Promise.all([loadInUso(), loadGiacenze(), loadAlerts(), loadFeed()]);
     renderScaricoProdotti();
     renderInUsoProdotti();

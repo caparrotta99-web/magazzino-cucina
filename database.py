@@ -467,17 +467,50 @@ def get_movimento_by_id(row_id):
         return _row(cur)
 
 
-def finalizza_in_uso(row_id, data_scarico):
-    """Aggiorna una riga IN_USO esistente a SCARICO (nessuna nuova riga creata)."""
+def finalizza_in_uso(row_id, data_scarico, qty=None, nuovo_movimento_id=None):
+    """
+    Finalizza una riga IN_USO esistente a SCARICO. Se qty è minore della
+    quantità in uso, solo quella parte viene marcata come scaricata: il
+    residuo resta "in uso" in una nuova riga con lo stesso lotto e la
+    stessa data originale (nessuna nuova riga se si finalizza l'intera
+    quantità, comportamento invariato).
+
+    Ritorna (riga_finalizzata, riga_residua) — riga_residua è None se non
+    c'è residuo. Ritorna (None, None) se la riga non viene trovata.
+    """
+    with get_conn() as conn:
+        cur = conn.execute("SELECT * FROM registro WHERE id = ? AND tipo = 'IN_USO'", (row_id,))
+        original = _row(cur)
+    if not original:
+        return None, None
+
+    if qty is None:
+        qty = original['scarico']
+    qty = round(float(qty), 4)
+    residuo = round(original['scarico'] - qty, 4)
+
     with get_conn() as conn:
         cur = conn.execute(
-            "UPDATE registro SET tipo = 'SCARICO', data_scarico = ? "
+            "UPDATE registro SET scarico = ?, tipo = 'SCARICO', data_scarico = ? "
             "WHERE id = ? AND tipo = 'IN_USO'",
-            (data_scarico, row_id)
+            (qty, data_scarico, row_id)
         )
         if cur.rowcount == 0:
-            return None
-    return get_movimento_by_id(row_id)
+            return None, None
+
+    riga_residua = None
+    if residuo > 0:
+        nuovo_id = insert_movimento({
+            'data': original['data'], 'fornitore': original['fornitore'],
+            'prodotto': original['prodotto'], 'lotto': original['lotto'],
+            'scadenza': original['scadenza'], 'carico': 0, 'scarico': residuo,
+            'unita': original['unita'], 'etichetta': '', 'movimento_id': nuovo_movimento_id or '',
+            'rimanenza': original['rimanenza'], 'operatore': original['operatore'],
+            'reparto': original['reparto'], 'tipo': 'IN_USO', 'data_scarico': '',
+        })
+        riga_residua = get_movimento_by_id(nuovo_id)
+
+    return get_movimento_by_id(row_id), riga_residua
 
 
 def get_in_uso_attivi(prodotto=None):

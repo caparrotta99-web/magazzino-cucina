@@ -329,11 +329,13 @@ def append_registro(row_data):
     ws.append_row(new_row, value_input_option='USER_ENTERED')
 
 
-def aggiorna_tipo_movimento(movimento_id, nuovo_tipo):
+def aggiorna_tipo_movimento(movimento_id, nuovo_tipo, nuovo_scarico=None):
     """
     Trova la riga del REGISTRO con questo movimento_id (colonna 'ID') e
     aggiorna la colonna 'Tipo movimento' — es. da 'IN USO' a 'SCARICO'
-    quando un prelievo in uso viene finalizzato. Non crea nuove righe.
+    quando un prelievo in uso viene finalizzato. Se nuovo_scarico non è
+    None, aggiorna anche la colonna 'Scarico' (usato quando si finalizza
+    solo una parte della quantità in uso). Non crea nuove righe.
     Solleva ValueError se la riga non viene trovata, così il chiamante non
     finalizza il movimento solo in locale credendo che la scrittura su
     Sheets sia andata a buon fine.
@@ -345,9 +347,10 @@ def aggiorna_tipo_movimento(movimento_id, nuovo_tipo):
     if len(all_values) < 2:
         raise ValueError(f"Foglio REGISTRO vuoto: movimento '{movimento_id}' non trovato")
 
-    headers  = [h.strip() for h in all_values[0]]
-    col_id   = _detect(headers, 'movimento_id')
-    col_tipo = _detect(headers, 'tipo_movimento')
+    headers     = [h.strip() for h in all_values[0]]
+    col_id      = _detect(headers, 'movimento_id')
+    col_tipo    = _detect(headers, 'tipo_movimento')
+    col_scarico = _detect(headers, 'scarico') if nuovo_scarico is not None else None
     if col_id is None or col_tipo is None:
         raise ValueError(f"Colonna 'ID' o 'Tipo movimento' non trovata nel REGISTRO. Header: {headers}")
 
@@ -355,6 +358,8 @@ def aggiorna_tipo_movimento(movimento_id, nuovo_tipo):
         val = row[col_id].strip() if col_id < len(row) else ''
         if val == movimento_id:
             ws.update_cell(i, col_tipo + 1, _TIPO_DISPLAY.get(nuovo_tipo, nuovo_tipo))
+            if col_scarico is not None:
+                ws.update_cell(i, col_scarico + 1, nuovo_scarico)
             return True
 
     raise ValueError(f"Movimento '{movimento_id}' non trovato nel foglio REGISTRO")

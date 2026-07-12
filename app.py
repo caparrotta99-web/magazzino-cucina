@@ -756,8 +756,9 @@ def api_in_uso_crea():
 @app.route('/api/scarico', methods=['POST'])
 @login_required
 def api_scarico():
-    """Finalizza una riga IN_USO esistente: la marca come SCARICO con la data
-    odierna. Non crea una nuova riga nel registro (né localmente né su Sheets)."""
+    """Finalizza (in tutto o in parte) una riga IN_USO esistente. Se la
+    quantità scaricata è minore di quella in uso, il residuo resta "in uso"
+    in una nuova riga con lo stesso lotto e la stessa data originale."""
     d = request.get_json(force=True)
     try:
         row_id = int(d.get('id', 0))
@@ -772,12 +773,34 @@ def api_scarico():
         return jsonify({'success': False, 'error': 'Elemento non trovato o già scaricato'}), 400
 
     try:
-        aggiorna_tipo_movimento(row['movimento_id'], 'SCARICO')
+        qty = float(d.get('qty', row['scarico']))
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'Quantità non valida'}), 400
+
+    if qty <= 0:
+        return jsonify({'success': False, 'error': 'Inserisci una quantità valida'}), 400
+    if qty > row['scarico'] + 1e-9:
+        return jsonify({'success': False, 'error': f"Non puoi scaricare più di {row['scarico']} {row['unita']} in uso"}), 400
+
+    qty       = round(qty, 4)
+    residuo   = round(row['scarico'] - qty, 4)
+    nuovo_mov_id = _gen_id() if residuo > 0 else None
+
+    try:
+        aggiorna_tipo_movimento(row['movimento_id'], 'SCARICO', nuovo_scarico=qty)
+        if residuo > 0:
+            append_registro({
+                'data': row['data'], 'fornitore': row['fornitore'], 'prodotto': row['prodotto'],
+                'lotto': row['lotto'], 'scadenza': row['scadenza'], 'carico': 0, 'scarico': residuo,
+                'unita': row['unita'], 'etichetta': '', 'movimento_id': nuovo_mov_id,
+                'rimanenza': row['rimanenza'], 'operatore': row['operatore'], 'reparto': row['reparto'],
+                'tipo': 'IN_USO',
+            })
     except Exception as e:
         return jsonify({'success': False, 'error': f'Errore Google Sheets: {e}'}), 500
 
-    oggi     = now_it().strftime('%Y-%m-%d')
-    finalized = finalizza_in_uso(row_id, oggi)
+    oggi = now_it().strftime('%Y-%m-%d')
+    finalized, residua = finalizza_in_uso(row_id, oggi, qty, nuovo_mov_id)
 
     if not finalized:
         return jsonify({'success': False, 'error': 'Elemento non trovato o già scaricato'}), 400
@@ -789,6 +812,7 @@ def api_scarico():
         'qty':          finalized['scarico'],
         'unita':        finalized['unita'],
         'data_scarico': finalized['data_scarico'],
+        'residuo':      residua['scarico'] if residua else 0,
     })
 
 

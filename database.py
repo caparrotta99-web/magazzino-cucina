@@ -198,6 +198,20 @@ def db_init():
                 utente    TEXT NOT NULL DEFAULT '',
                 quando    TEXT NOT NULL DEFAULT ''
             )""",
+            f"""CREATE TABLE IF NOT EXISTS log_eliminazioni_registro (
+                id                  {pk},
+                prodotto            TEXT NOT NULL DEFAULT '',
+                lotto               TEXT NOT NULL DEFAULT '',
+                scadenza            TEXT NOT NULL DEFAULT '',
+                carico              REAL NOT NULL DEFAULT 0,
+                scarico             REAL NOT NULL DEFAULT 0,
+                unita               TEXT NOT NULL DEFAULT '',
+                tipo                TEXT NOT NULL DEFAULT '',
+                operatore_originale TEXT NOT NULL DEFAULT '',
+                data_originale      TEXT NOT NULL DEFAULT '',
+                eliminato_da        TEXT NOT NULL DEFAULT '',
+                eliminato_il        TEXT NOT NULL DEFAULT ''
+            )""",
             f"""CREATE TABLE IF NOT EXISTS reset_tokens (
                 id         {pk},
                 user_id    INTEGER NOT NULL,
@@ -266,6 +280,7 @@ def db_init():
         ('users',    'tema',      "TEXT NOT NULL DEFAULT 'chiaro'"),
         ('users',    'stato',     "TEXT NOT NULL DEFAULT 'attivo'"),
         ('users',    'puo_vedere_controllo', "INTEGER NOT NULL DEFAULT 0"),
+        ('users',    'puo_eliminare_carichi', "INTEGER NOT NULL DEFAULT 0"),
         ('apparecchi', 'reparto', "TEXT NOT NULL DEFAULT 'Cucina'"),
         ('apparecchi', 'marca',   "TEXT NOT NULL DEFAULT ''"),
         ('apparecchi', 'modello', "TEXT NOT NULL DEFAULT ''"),
@@ -747,7 +762,7 @@ def get_all_users():
     with get_conn() as conn:
         cur = conn.execute(
             "SELECT id, nome, email, telefono, reparto, role, gestisce_apparecchi, "
-            "stato, puo_vedere_controllo FROM users ORDER BY "
+            "stato, puo_vedere_controllo, puo_eliminare_carichi FROM users ORDER BY "
             "CASE WHEN stato = 'in_attesa' THEN 0 ELSE 1 END, nome"
         )
         return _rows(cur)
@@ -761,6 +776,12 @@ def update_user_role(user_id, role):
 def update_user_controllo_permesso(user_id, permesso):
     with get_conn() as conn:
         conn.execute("UPDATE users SET puo_vedere_controllo = ? WHERE id = ?",
+                     (1 if permesso else 0, user_id))
+
+
+def update_user_eliminazione_carichi_permesso(user_id, permesso):
+    with get_conn() as conn:
+        conn.execute("UPDATE users SET puo_eliminare_carichi = ? WHERE id = ?",
                      (1 if permesso else 0, user_id))
 
 
@@ -1153,6 +1174,34 @@ def get_log_modifiche_registro(limit=200):
     with get_conn() as conn:
         cur = conn.execute(
             "SELECT * FROM log_modifiche_registro ORDER BY id DESC LIMIT ?",
+            (limit,)
+        )
+        return _rows(cur)
+
+
+def delete_registro_row(row_id):
+    with get_conn() as conn:
+        conn.execute("DELETE FROM registro WHERE id = ?", (row_id,))
+
+
+def log_eliminazione_carico(row, eliminato_da):
+    # Timestamp di log in UTC esplicito, vedi nota in log_eliminazione_temperatura.
+    with get_conn() as conn:
+        conn.execute(
+            """INSERT INTO log_eliminazioni_registro
+               (prodotto, lotto, scadenza, carico, scarico, unita, tipo,
+                operatore_originale, data_originale, eliminato_da, eliminato_il)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (row['prodotto'], row['lotto'], row['scadenza'], row['carico'], row['scarico'],
+             row['unita'], row.get('tipo', ''), row.get('operatore', ''), row['data'],
+             eliminato_da, datetime.now(timezone.utc).isoformat(timespec='seconds'))
+        )
+
+
+def get_log_eliminazioni_registro(limit=200):
+    with get_conn() as conn:
+        cur = conn.execute(
+            "SELECT * FROM log_eliminazioni_registro ORDER BY id DESC LIMIT ?",
             (limit,)
         )
         return _rows(cur)

@@ -279,6 +279,7 @@ main {
             {% if u.reparto %}<span class="badge reparto">{{ u.reparto }}</span>{% endif %}
             {% if u.role == 'staff' and u.gestisce_apparecchi %}<span class="badge reparto">Gestisce apparecchi</span>{% endif %}
             {% if u.role == 'staff' and u.puo_vedere_controllo %}<span class="badge controllo">Accesso Controllo</span>{% endif %}
+            {% if u.role == 'staff' and u.puo_eliminare_carichi %}<span class="badge controllo">Elimina carichi</span>{% endif %}
           </div>
         </div>
       </div>
@@ -329,6 +330,17 @@ main {
             <input type="hidden" name="permesso" value="{{ '0' if u.gestisce_apparecchi else '1' }}">
             <button type="submit" class="btn-action">
               {% if u.gestisce_apparecchi %}✕ Revoca gestione{% else %}+ Abilita gestione{% endif %}
+            </button>
+          </form>
+        </div>
+
+        <div class="settings-row">
+          <span class="settings-label">Eliminazione carichi da Giacenze</span>
+          <form method="post" action="/admin/eliminazione-carichi-permesso">
+            <input type="hidden" name="user_id" value="{{ u.id }}">
+            <input type="hidden" name="permesso" value="{{ '0' if u.puo_eliminare_carichi else '1' }}">
+            <button type="submit" class="btn-action">
+              {% if u.puo_eliminare_carichi %}✕ Revoca permesso{% else %}+ Abilita permesso{% endif %}
             </button>
           </form>
         </div>

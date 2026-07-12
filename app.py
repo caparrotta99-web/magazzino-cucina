@@ -44,11 +44,13 @@ from database import (
     log_lista_spesa_azione, get_log_lista_spesa,
     update_registro_lotto, log_modifica_registro, get_log_modifiche_registro,
     get_registro_by_mese, get_temperature_by_mese, get_report_mensile_anno,
+    update_user_eliminazione_carichi_permesso,
+    delete_registro_row, log_eliminazione_carico, get_log_eliminazioni_registro,
 )
 from sheets import (
     load_listino, load_registro, append_registro, append_listino, aggiorna_tipo_movimento,
     load_temperatura, append_temperatura, elimina_temperatura_foglio,
-    aggiorna_riga_registro,
+    aggiorna_riga_registro, elimina_riga_registro,
 )
 from pdf_export import (
     genera_pdf_registro, genera_pdf_temperature, genera_pdf_report_mensile,
@@ -74,6 +76,7 @@ class User(UserMixin):
         self.tema     = data.get('tema') or 'chiaro'
         self.stato    = data.get('stato') or 'attivo'
         self.puo_vedere_controllo = bool(data.get('puo_vedere_controllo'))
+        self.puo_eliminare_carichi_raw = bool(data.get('puo_eliminare_carichi'))
 
     @property
     def puo_gestire_apparecchi(self):
@@ -82,6 +85,10 @@ class User(UserMixin):
     @property
     def puo_accedere_controllo(self):
         return self.role == 'admin' or self.puo_vedere_controllo
+
+    @property
+    def puo_eliminare_carichi(self):
+        return self.role == 'admin' or self.puo_eliminare_carichi_raw
 
 
 @login_manager.user_loader
@@ -119,6 +126,15 @@ def controllo_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         if not current_user.is_authenticated or not current_user.puo_accedere_controllo:
+            abort(403)
+        return f(*args, **kwargs)
+    return decorated
+
+
+def eliminazione_carichi_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not current_user.is_authenticated or not current_user.puo_eliminare_carichi:
             abort(403)
         return f(*args, **kwargs)
     return decorated
@@ -399,6 +415,18 @@ def admin_set_controllo_permesso():
     if not user_id:
         abort(400)
     update_user_controllo_permesso(user_id, permesso)
+    return redirect(url_for('admin_page'))
+
+
+@app.route('/admin/eliminazione-carichi-permesso', methods=['POST'])
+@login_required
+@admin_required
+def admin_set_eliminazione_carichi_permesso():
+    user_id  = request.form.get('user_id', type=int)
+    permesso = request.form.get('permesso') == '1'
+    if not user_id:
+        abort(400)
+    update_user_eliminazione_carichi_permesso(user_id, permesso)
     return redirect(url_for('admin_page'))
 
 
@@ -808,6 +836,28 @@ def api_registro_modifica(row_id):
     return jsonify({'success': True, 'lotto': lotto, 'scadenza': scadenza, 'rimanenza': rimanenza})
 
 
+@app.route('/api/registro/<int:row_id>', methods=['DELETE'])
+@login_required
+@eliminazione_carichi_required
+def api_registro_elimina(row_id):
+    """Elimina un carico registrato per errore (sezione 'In magazzino' di
+    Giacenze). Rimuove la riga da DB e REGISTRO Google Sheets, e registra
+    l'eliminazione nel log visibile dal pannello Controllo."""
+    row = get_movimento_by_id(row_id)
+    if not row:
+        return jsonify({'success': False, 'error': 'Movimento non trovato'}), 404
+
+    try:
+        elimina_riga_registro(row['movimento_id'])
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Errore Google Sheets: {e}'}), 500
+
+    delete_registro_row(row_id)
+    log_eliminazione_carico(row, current_user.nome)
+
+    return jsonify({'success': True})
+
+
 # ─── TEMPERATURE ──────────────────────────────────────────────────────────────
 
 @app.route('/api/apparecchi', methods=['GET'])
@@ -989,6 +1039,13 @@ def api_controllo_log_lista_spesa():
 @controllo_required
 def api_controllo_log_modifiche_registro():
     return jsonify({'success': True, 'log': get_log_modifiche_registro()})
+
+
+@app.route('/api/controllo/log-eliminazioni-registro')
+@login_required
+@controllo_required
+def api_controllo_log_eliminazioni_registro():
+    return jsonify({'success': True, 'log': get_log_eliminazioni_registro()})
 
 
 @app.route('/api/sync', methods=['POST'])

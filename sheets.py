@@ -397,6 +397,34 @@ def aggiorna_riga_registro(movimento_id, lotto, scadenza, rimanenza):
     raise ValueError(f"Movimento '{movimento_id}' non trovato nel foglio REGISTRO")
 
 
+def elimina_riga_registro(movimento_id):
+    """
+    Elimina dal foglio REGISTRO la riga con questo movimento_id (usato per
+    cancellare un carico registrato per errore). Solleva ValueError se la
+    riga non viene trovata, così il chiamante non elimina il carico solo in
+    locale credendo che la scrittura su Sheets sia andata a buon fine.
+    """
+    gc = _get_client()
+    ws = gc.open_by_key(SPREADSHEET_ID).worksheet(SHEET_REGISTRO)
+
+    all_values = ws.get_all_values()
+    if len(all_values) < 2:
+        raise ValueError(f"Foglio REGISTRO vuoto: movimento '{movimento_id}' non trovato")
+
+    headers = [h.strip() for h in all_values[0]]
+    col_id = _detect(headers, 'movimento_id')
+    if col_id is None:
+        raise ValueError(f"Colonna 'ID' non trovata nel REGISTRO. Header: {headers}")
+
+    for i, row in enumerate(all_values[1:], start=2):
+        val = row[col_id].strip() if col_id < len(row) else ''
+        if val == movimento_id:
+            ws.delete_rows(i)
+            return True
+
+    raise ValueError(f"Movimento '{movimento_id}' non trovato nel foglio REGISTRO")
+
+
 def append_listino(row_data):
     """Appende una nuova riga al foglio LISTINO, rilevando dinamicamente le
     colonne dall'header (nessun indice fisso). La colonna 'nome' (SORT/FILTER

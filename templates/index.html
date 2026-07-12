@@ -849,8 +849,17 @@ main {
 .lot-detail-row {
   display: flex; align-items: center; justify-content: space-between;
   padding: 14px 20px; border-bottom: 1px solid var(--surface-2); gap: 12px;
+  position: relative; z-index: 1; background: var(--card);
+  transition: transform .2s ease; touch-action: pan-y;
 }
 .lot-detail-row:last-child { border-bottom: none; }
+.lot-swipe { position: relative; overflow: hidden; }
+.lot-swipe-delete {
+  position: absolute; top: 0; right: 0; bottom: 0; width: 84px;
+  background: var(--red); color: #fff;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  font-size: 11px; font-weight: 700; cursor: pointer; z-index: 0;
+}
 .lot-detail-lotto { font-size: 13px; font-weight: 600; color: var(--text); }
 .lot-detail-meta  { font-size: 12px; color: var(--muted); margin-top: 2px; }
 .lot-scad-pill {
@@ -1536,6 +1545,9 @@ body.help-mode { background: #0f1f3d; }
 
     <div class="pg-title" style="margin-top:24px">Modifiche lotti</div>
     <div id="controllo-log-modifiche-registro"></div>
+
+    <div class="pg-title" style="margin-top:24px">Eliminazioni carichi</div>
+    <div id="controllo-log-eliminazioni-registro"></div>
   </section>
 
   <!-- EXPORT -->
@@ -2216,6 +2228,7 @@ body.help-mode { background: #0f1f3d; }
 
 <script>
 const REPARTI = ['cucina', 'sala', 'pizzeria'];
+const CAN_DELETE_CARICHI = {{ 'true' if current_user.is_authenticated and current_user.puo_eliminare_carichi else 'false' }};
 
 // ── STATE ────────────────────────────────────────────────────────────────
 const S = {
@@ -3218,7 +3231,7 @@ function showLotDetail(g) {
     const giorni = l.scadenza ? daysTo(l.scadenza) : null;
     const cls    = giorni===null ? 'scad-ok' : giorni<0 ? 'scad-danger' : giorni<=7 ? 'scad-warn' : 'scad-ok';
     const etData = esc(JSON.stringify({ prodotto: g.prodotto, lotto: l.lotto, scadenza: l.scadenza }));
-    return `<div class="lot-detail-row">
+    const riga = `<div class="lot-detail-row">
       <div>
         <div class="lot-detail-lotto">${esc(l.lotto)}</div>
         <div class="lot-detail-meta">${l.rimanenza}&nbsp;${esc(g.unita)}</div>
@@ -3228,6 +3241,14 @@ function showLotDetail(g) {
         <button type="button" class="lot-print-btn" onclick="event.stopPropagation(); openModificaLotto(${l.id}, ${etData})" aria-label="Modifica lotto">${_ICON_MATITA}</button>
         <button type="button" class="lot-print-btn" onclick="event.stopPropagation(); printLotLabel(${etData})" aria-label="Stampa etichetta">${_ICON_STAMPA}</button>
       </div>
+    </div>`;
+    if (!CAN_DELETE_CARICHI) return riga;
+    return `<div class="lot-swipe">
+      <div class="lot-swipe-delete" onclick="event.stopPropagation(); confermaEliminaCarico(${l.id})">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        Elimina
+      </div>
+      ${riga}
     </div>`;
   }).join('') : `<div class="lot-detail-row"><span style="font-size:13px;color:var(--muted)">Nessun lotto in magazzino</span></div>`;
 
@@ -3250,9 +3271,55 @@ function showLotDetail(g) {
     `<div class="spesa-group-hdr" style="margin:14px 4px 8px">In magazzino</div>` + magazzinoHtml +
     `<div class="spesa-group-hdr" style="margin:18px 4px 8px">In uso</div>` + inUsoHtml;
   document.getElementById('lot-detail-overlay').classList.add('open');
+  _initSwipeLotti();
 }
 function closeLotDetail() {
   document.getElementById('lot-detail-overlay').classList.remove('open');
+}
+
+// ── ELIMINAZIONE CARICO (swipe, sezione "In magazzino") ─────────────────────
+function _initSwipeLotti() {
+  const list = document.getElementById('lot-detail-body');
+  if (!list || list.dataset.swipeInit) return;
+  list.dataset.swipeInit = '1';
+  let state = null;
+
+  list.addEventListener('touchstart', e => {
+    const row = e.target.closest('.lot-swipe .lot-detail-row');
+    if (!row) return;
+    if (state && state.row !== row) _closeSwipeLottoRow(state.row);
+    list.querySelectorAll('.lot-swipe .lot-detail-row.open').forEach(r => { if (r !== row) _closeSwipeLottoRow(r); });
+    state = { row, startX: e.touches[0].clientX, startedOpen: row.classList.contains('open') };
+  }, { passive: true });
+
+  list.addEventListener('touchmove', e => {
+    if (!state) return;
+    const dx = e.touches[0].clientX - state.startX;
+    const base = state.startedOpen ? -84 : 0;
+    state.lastX = Math.max(-84, Math.min(0, base + dx));
+    state.row.style.transform = `translateX(${state.lastX}px)`;
+  }, { passive: true });
+
+  list.addEventListener('touchend', () => {
+    if (!state) return;
+    const open = (state.lastX ?? (state.startedOpen ? -84 : 0)) < -42;
+    state.row.style.transform = open ? 'translateX(-84px)' : 'translateX(0)';
+    state.row.classList.toggle('open', open);
+    state = null;
+  });
+}
+function _closeSwipeLottoRow(row) {
+  row.style.transform = 'translateX(0)';
+  row.classList.remove('open');
+}
+
+async function confermaEliminaCarico(rowId) {
+  if (!confirm('Sei sicuro di voler eliminare questo carico?')) return;
+  const result = await api(`/api/registro/${rowId}`, { method: 'DELETE' });
+  if (!result.success) { toast(result.error || 'Errore', 'error'); return; }
+  toast('Carico eliminato', 'success');
+  closeLotDetail();
+  await Promise.all([loadGiacenze(), loadAlerts(), loadFeed()]);
 }
 
 // ── ETICHETTA ─────────────────────────────────────────────────────────────
@@ -4186,14 +4253,16 @@ function fmtDateTime(iso) {
 }
 
 async function loadControlloLogs() {
-  const [dataTemp, dataSpesa, dataRegistro] = await Promise.all([
+  const [dataTemp, dataSpesa, dataRegistro, dataElimReg] = await Promise.all([
     api('/api/controllo/log-temperature'),
     api('/api/controllo/log-lista-spesa'),
     api('/api/controllo/log-modifiche-registro'),
+    api('/api/controllo/log-eliminazioni-registro'),
   ]);
   renderLogEliminazioniTemperature(dataTemp.log || []);
   renderLogListaSpesa(dataSpesa.log || []);
   renderLogModificheRegistro(dataRegistro.log || []);
+  renderLogEliminazioniRegistro(dataElimReg.log || []);
 }
 
 function renderLogEliminazioniTemperature(log) {
@@ -4258,6 +4327,34 @@ function renderLogModificheRegistro(log) {
       </div>
     </div>
   `).join('');
+}
+
+function renderLogEliminazioniRegistro(log) {
+  const el = document.getElementById('controllo-log-eliminazioni-registro');
+  if (!el) return;
+  if (!log.length) {
+    el.innerHTML = `<div class="empty-state"><p>Nessuna eliminazione registrata</p></div>`;
+    return;
+  }
+  const TIPO_LBL = { CARICO: 'Carico', IN_USO: 'In uso', SCARICO: 'Scarico' };
+  el.innerHTML = log.map(l => {
+    const tipo = l.tipo || 'CARICO';
+    const qty  = tipo === 'CARICO' ? l.carico : l.scarico;
+    return `
+    <div class="log-row">
+      <div class="log-row-top">
+        <div class="log-row-title">${esc(l.prodotto)}${l.lotto ? ' · lotto ' + esc(l.lotto) : ''}</div>
+        <span class="log-row-tag eliminato">Eliminato</span>
+      </div>
+      <div class="log-row-meta">
+        ${TIPO_LBL[tipo] || tipo}: ${qty}&nbsp;${esc(l.unita||'')} · ${fmtDate(l.data_originale)} · operatore ${esc(l.operatore_originale||'—')}
+      </div>
+      <div class="log-row-meta">
+        Eliminato da <strong>${esc(l.eliminato_da)}</strong> il ${fmtDateTime(l.eliminato_il)}
+      </div>
+    </div>
+  `;
+  }).join('');
 }
 
 // ── EXPORT PDF ────────────────────────────────────────────────────────────

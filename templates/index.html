@@ -46,6 +46,7 @@ body {
   --orange:  #f97316;
   --violet:  #8b5cf6;
   --teal:    #0d9488;
+  --amber:   #b45309;
   --success: #16a34a;
   --warning: #f97316;
   --error:   #ef4444;
@@ -286,6 +287,7 @@ main {
 .hcard-giacenze .hcard-icon { background: var(--blue); }
 .hcard-alert    .hcard-icon { background: var(--orange); }
 .hcard-temperature .hcard-icon { background: var(--teal); }
+.hcard-preparazioni .hcard-icon { background: var(--amber); }
 .hcard-spesa {
   background: var(--card);
   border: none;
@@ -613,6 +615,39 @@ main {
   padding: 2px 8px; border-radius: 100px;
   background: var(--surface-2); color: var(--muted);
 }
+
+/* ─── PREPARAZIONI ──────────────────────────────────────────────────────── */
+.prep-card {
+  background: var(--card);
+  border-radius: 16px; padding: 16px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+  cursor: pointer; transition: scale .15s;
+  margin-bottom: 10px;
+}
+.prep-card:active { scale: .99; }
+.prep-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.prep-nome { font-size: 15px; font-weight: 600; color: var(--text); }
+.prep-meta { font-size: 12px; color: var(--muted); margin-top: 3px; }
+.prep-stato-badge {
+  font-size: 11px; font-weight: 600; padding: 3px 10px;
+  border-radius: 100px; white-space: nowrap; flex-shrink: 0;
+}
+.prep-stato-badge.in_corso   { background: rgba(59,130,246,.12); color: var(--blue); }
+.prep-stato-badge.completata { background: var(--surface-2); color: var(--muted); }
+
+.ingr-row {
+  border: 1px solid var(--border); border-radius: 14px;
+  padding: 14px; margin-bottom: 10px; background: var(--surface-3);
+}
+.ingr-row-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.ingr-row-num { font-size: 11px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+.ingr-remove-btn {
+  width: 26px; height: 26px; border-radius: 8px; border: none;
+  background: rgba(239,68,68,.1); color: var(--red); cursor: pointer;
+  display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700;
+}
+.ingr-remove-btn:active { background: rgba(239,68,68,.2); }
 
 /* ─── TEMPERATURE ───────────────────────────────────────────────────────── */
 .temp-app-card {
@@ -1261,6 +1296,11 @@ body.help-mode { background: #0f1f3d; }
       <span class="drw-badge" id="drw-alert-badge"></span>
     </button>
 
+    <button class="drw-item" data-page="preparazioni" onclick="navTo('preparazioni')">
+      <span style="font-size:17px;line-height:1;width:17px;text-align:center">🍲</span>
+      <span class="lbl">Preparazioni</span>
+    </button>
+
     <button class="drw-item" data-page="lista-spesa" onclick="navTo('lista-spesa')">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
       <span class="lbl">Lista spesa</span>
@@ -1373,6 +1413,14 @@ body.help-mode { background: #0f1f3d; }
         </div>
       </div>
 
+      <div class="hcard hcard-preparazioni" onclick="navTo('preparazioni')">
+        <div class="hcard-icon" style="font-size:22px;line-height:1">🍲</div>
+        <div>
+          <div class="hcard-label">Preparazioni</div>
+          <div class="hcard-sub">Piatti preparati</div>
+        </div>
+      </div>
+
     </div>
 
     <div class="home-grid" style="margin-top:20px">
@@ -1447,6 +1495,14 @@ body.help-mode { background: #0f1f3d; }
       <div>
         <div class="help-card-title">Alert</div>
         <div class="help-card-text">Mostra i prodotti in scadenza entro 7 giorni e quelli sotto la scorta minima. Puoi aggiungere direttamente i prodotti alla Lista Spesa toccando il carrello.</div>
+      </div>
+    </div>
+
+    <div class="help-card">
+      <div class="help-card-icon" style="font-size:20px;line-height:1">🍲</div>
+      <div>
+        <div class="help-card-title">Preparazioni</div>
+        <div class="help-card-text">Registra i piatti preparati in anticipo tracciando tutti gli ingredienti usati con i relativi lotti. Genera l'etichetta con data di preparazione e scadenza.</div>
       </div>
     </div>
 
@@ -1891,6 +1947,43 @@ body.help-mode { background: #0f1f3d; }
     </div>
   </section>
 
+  <!-- PREPARAZIONI -->
+  <section class="page" id="page-preparazioni">
+    <div class="back-bar" onclick="navTo('home')">
+      <div class="back-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+      <span class="back-label">Preparazioni</span>
+    </div>
+
+    <div class="spesa-topbar">
+      <div class="spesa-counter" id="prep-counter"><strong>—</strong> preparazioni</div>
+      <button class="btn-spesa-add" onclick="openNuovaPreparazione()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Nuova
+      </button>
+    </div>
+
+    <div class="filter-row">
+      <select class="fselect-pill" id="prep-filter-reparto" onchange="renderPreparazioni()">
+        <option value="">Reparto</option>
+        <option value="Cucina">Cucina</option>
+        <option value="Sala">Sala</option>
+        <option value="Pizzeria">Pizzeria</option>
+      </select>
+      <select class="fselect-pill" id="prep-filter-stato" onchange="renderPreparazioni()">
+        <option value="">Tutti gli stati</option>
+        <option value="in_corso">In corso</option>
+        <option value="completata">Completata</option>
+      </select>
+    </div>
+
+    <div id="prep-list">
+      <div class="empty-state">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <p>Caricamento…</p>
+      </div>
+    </div>
+  </section>
+
   <!-- LISTA SPESA -->
   <section class="page" id="page-lista-spesa">
     <div class="back-bar" onclick="navTo('home')">
@@ -2220,6 +2313,103 @@ body.help-mode { background: #0f1f3d; }
   </div>
 </div>
 
+<!-- ── MODAL NUOVA PREPARAZIONE ────────────────────────────────────────────── -->
+<div class="modal-backdrop" id="modal-nuova-preparazione" onclick="bgClosePrepForm(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Nuova preparazione</div>
+    <div class="modal-body">
+
+      <div class="fgroup">
+        <label class="flabel">Nome preparazione *</label>
+        <input class="finput" type="text" id="prep-nome" placeholder="es. Insalata di mare" autocomplete="off">
+      </div>
+
+      <div class="fgroup">
+        <label class="flabel">Reparto *</label>
+        <div class="fselect-wrap">
+          <select class="fselect" id="prep-reparto">
+            <option value="" disabled selected>Seleziona reparto…</option>
+            <option value="Cucina">Cucina</option>
+            <option value="Sala">Sala</option>
+            <option value="Pizzeria">Pizzeria</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="fgroup">
+        <label class="flabel">Data preparazione</label>
+        <input class="finput" type="date" id="prep-data">
+      </div>
+
+      <div class="fgroup">
+        <label class="flabel">Ora preparazione</label>
+        <input class="finput" type="time" id="prep-ora">
+      </div>
+
+      <div class="fgroup">
+        <label class="flabel">Operatore</label>
+        <div class="freadonly has-val">{{ current_user.nome if current_user.is_authenticated else '—' }}</div>
+      </div>
+
+      <div class="fgroup">
+        <label class="flabel">Quantità prodotta *</label>
+        <input class="finput" type="number" id="prep-quantita" placeholder="0" min="0.01" step="0.01" inputmode="decimal">
+      </div>
+
+      <div class="fgroup">
+        <label class="flabel">Unità di misura *</label>
+        <div class="fselect-wrap">
+          <select class="fselect" id="prep-unita">
+            <option value="kg">kg</option>
+            <option value="g">g</option>
+            <option value="L">L</option>
+            <option value="pz">pz</option>
+            <option value="bt">bt</option>
+            <option value="conf">conf</option>
+            <option value="vasch">vasch</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="fgroup">
+        <label class="flabel">Scadenza preparazione</label>
+        <input class="finput" type="date" id="prep-scadenza">
+      </div>
+
+      <div class="fgroup" style="margin-bottom:8px">
+        <label class="flabel">Ingredienti *</label>
+      </div>
+      <div id="prep-ingredienti-list"></div>
+      <button type="button" class="btn-scan" style="margin:6px 0 14px" onclick="addIngredienteRow()">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Aggiungi ingrediente
+      </button>
+
+      <div class="fgroup" style="margin-bottom:0">
+        <label class="flabel">Note</label>
+        <textarea class="ftextarea" id="prep-note" placeholder="Note opzionali…"></textarea>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-close-modal" onclick="closeNuovaPreparazione()">Annulla</button>
+      <button class="btn-print" id="btn-prep-salva" onclick="submitPreparazione()" style="color:#10b981;font-weight:700">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL ETICHETTA PREPARAZIONE ───────────────────────────────────────── -->
+<div class="modal-backdrop" id="modal-eti-preparazione" onclick="bgClosePrepEti(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-body" id="prep-eti-content"></div>
+    <div class="modal-actions">
+      <button class="btn-print" onclick="window.print()">Stampa</button>
+      <button class="btn-close-modal" onclick="closePrepEtichetta()">Chiudi</button>
+    </div>
+  </div>
+</div>
+
 <!-- ── LOT DETAIL SHEET ─────────────────────────────────────────────────── -->
 <div class="lot-detail-overlay" id="lot-detail-overlay"
      onclick="if(event.target===this) closeLotDetail()">
@@ -2265,6 +2455,7 @@ const S = {
   puoGestireApparecchi:  false,
   rangeRiferimento:      {},
   temperatureStorico:    [],
+  preparazioni:          [],
 };
 
 // ── FILTRI REPARTO + CATEGORIA (Carico / In uso / Scarico) ────────────────
@@ -2422,6 +2613,7 @@ function navTo(page) {
   if (page === 'temperature') { loadApparecchi(); loadStoricoTemperature(); }
   if (page === 'controllo')  loadControlloLogs();
   if (page === 'export')    initExportPage();
+  if (page === 'preparazioni') loadPreparazioni();
 }
 // alias for backward compat
 function switchTab(t) { navTo(t); }
@@ -4373,7 +4565,7 @@ function renderLogEliminazioniRegistro(log) {
     el.innerHTML = `<div class="empty-state"><p>Nessuna eliminazione registrata</p></div>`;
     return;
   }
-  const TIPO_LBL = { CARICO: 'Carico', IN_USO: 'In uso', SCARICO: 'Scarico' };
+  const TIPO_LBL = { CARICO: 'Carico', IN_USO: 'In uso', SCARICO: 'Scarico', PREPARAZIONE: 'Preparazione' };
   el.innerHTML = log.map(l => {
     const tipo = l.tipo || 'CARICO';
     const qty  = tipo === 'CARICO' ? l.carico : l.scarico;
@@ -4393,6 +4585,202 @@ function renderLogEliminazioniRegistro(log) {
   `;
   }).join('');
 }
+
+// ── PREPARAZIONI ─────────────────────────────────────────────────────────
+let prepIngredienti = [];
+let prepIngredienteSeq = 0;
+
+function fmtDataOra(str) {
+  if (!str) return '—';
+  const [datePart, timePart] = str.split(' ');
+  return `${fmtDate(datePart)}${timePart ? ' ' + timePart : ''}`;
+}
+
+async function loadPreparazioni() {
+  const data = await api('/api/preparazioni');
+  S.preparazioni = data.preparazioni || [];
+  renderPreparazioni();
+}
+
+function renderPreparazioni() {
+  const el      = document.getElementById('prep-list');
+  const reparto = document.getElementById('prep-filter-reparto').value;
+  const stato   = document.getElementById('prep-filter-stato').value;
+  let list = [...S.preparazioni];
+  if (reparto) list = list.filter(p => p.reparto === reparto);
+  if (stato)   list = list.filter(p => p.stato === stato);
+
+  document.getElementById('prep-counter').innerHTML = `<strong>${list.length}</strong> preparazioni`;
+
+  if (!list.length) {
+    el.innerHTML = `<div class="empty-state">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <p>Nessuna preparazione trovata</p>
+    </div>`;
+    return;
+  }
+
+  el.innerHTML = list.map(p => {
+    const giorni = p.scadenza ? daysTo(p.scadenza) : null;
+    const cls    = giorni === null ? '' : giorni < 0 ? 'scad-danger' : giorni <= 1 ? 'scad-warn' : 'scad-ok';
+    return `<div class="prep-card" onclick="showPreparazioneDetail(${p.id})">
+      <div class="prep-top">
+        <div>
+          <div class="prep-nome">${esc(p.nome)}</div>
+          <div class="prep-meta">${esc(p.reparto)} · ${fmtDataOra(p.data_preparazione)} · ${esc(p.operatore)}</div>
+        </div>
+        <div style="text-align:right;flex-shrink:0">
+          ${p.scadenza ? `<span class="scad-badge ${cls}">${fmtDate(p.scadenza)}</span>` : ''}
+          <div class="prep-stato-badge ${p.stato}" style="margin-top:6px">${p.stato === 'in_corso' ? 'In corso' : 'Completata'}</div>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function openNuovaPreparazione() {
+  document.getElementById('prep-nome').value     = '';
+  document.getElementById('prep-reparto').value  = '';
+  document.getElementById('prep-quantita').value = '';
+  document.getElementById('prep-unita').value    = 'kg';
+  document.getElementById('prep-scadenza').value = '';
+  document.getElementById('prep-note').value     = '';
+  const { data, ora } = dataOraItaliana();
+  document.getElementById('prep-data').value = data;
+  document.getElementById('prep-ora').value  = ora;
+  prepIngredienti = [];
+  prepIngredienteSeq = 0;
+  addIngredienteRow();
+  document.getElementById('modal-nuova-preparazione').classList.add('open');
+}
+function closeNuovaPreparazione() { document.getElementById('modal-nuova-preparazione').classList.remove('open'); }
+function bgClosePrepForm(e) { if (e.target === document.getElementById('modal-nuova-preparazione')) closeNuovaPreparazione(); }
+
+function addIngredienteRow() {
+  prepIngredienti.push({ seq: prepIngredienteSeq++, prodotto: '', lotto: '', qty: '', lotti: [] });
+  renderIngredientiRows();
+}
+function removeIngredienteRow(seq) {
+  if (prepIngredienti.length <= 1) { toast('Serve almeno un ingrediente', 'error'); return; }
+  prepIngredienti = prepIngredienti.filter(r => r.seq !== seq);
+  renderIngredientiRows();
+}
+
+function renderIngredientiRows() {
+  const container = document.getElementById('prep-ingredienti-list');
+  container.innerHTML = prepIngredienti.map((r, idx) => `
+    <div class="ingr-row">
+      <div class="ingr-row-top">
+        <span class="ingr-row-num">Ingrediente ${idx + 1}</span>
+        ${prepIngredienti.length > 1 ? `<button type="button" class="ingr-remove-btn" onclick="removeIngredienteRow(${r.seq})">✕</button>` : ''}
+      </div>
+      <div class="fselect-wrap" style="margin-bottom:8px">
+        <select class="fselect" onchange="onIngredienteProdotto(${r.seq}, this.value)">
+          <option value="">Seleziona prodotto…</option>
+          ${S.prodotti.map(p => `<option value="${esc(p.prodotto)}" ${r.prodotto===p.prodotto?'selected':''}>${esc(p.prodotto)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="fselect-wrap" style="margin-bottom:8px">
+        <select class="fselect" ${r.lotti.length ? '' : 'disabled'} onchange="onIngredienteLotto(${r.seq}, this.value)">
+          <option value="">${r.prodotto ? 'Seleziona lotto…' : 'Seleziona prima il prodotto'}</option>
+          ${r.lotti.map(l => `<option value="${esc(l.lotto)}" ${r.lotto===l.lotto?'selected':''}>${esc(l.lotto)} — ${l.rimanenza}&nbsp;${esc(l.unita)}${l.scadenza?` · scade ${fmtDate(l.scadenza)}`:''}</option>`).join('')}
+        </select>
+      </div>
+      <input class="finput" type="number" min="0.01" step="0.01" inputmode="decimal"
+             placeholder="Quantità usata" value="${r.qty}"
+             oninput="onIngredienteQty(${r.seq}, this.value)">
+    </div>
+  `).join('');
+}
+
+async function onIngredienteProdotto(seq, prodotto) {
+  const r = prepIngredienti.find(x => x.seq === seq);
+  if (!r) return;
+  r.prodotto = prodotto; r.lotto = ''; r.qty = ''; r.lotti = [];
+  renderIngredientiRows();
+  if (!prodotto) return;
+  const data = await api(`/api/lotti?prodotto=${encodeURIComponent(prodotto)}`);
+  const r2 = prepIngredienti.find(x => x.seq === seq);
+  if (!r2) return; // rimosso nel frattempo
+  r2.lotti = data.lotti || [];
+  renderIngredientiRows();
+}
+
+function onIngredienteLotto(seq, lotto) {
+  const r = prepIngredienti.find(x => x.seq === seq);
+  if (r) { r.lotto = lotto; renderIngredientiRows(); }
+}
+
+function onIngredienteQty(seq, val) {
+  const r = prepIngredienti.find(x => x.seq === seq);
+  if (r) r.qty = val;
+}
+
+async function submitPreparazione() {
+  const nome     = document.getElementById('prep-nome').value.trim();
+  const reparto  = document.getElementById('prep-reparto').value;
+  const quantita = parseFloat(document.getElementById('prep-quantita').value);
+  const unita    = document.getElementById('prep-unita').value;
+  const scadenza = document.getElementById('prep-scadenza').value;
+  const note     = document.getElementById('prep-note').value.trim();
+  const dataVal  = document.getElementById('prep-data').value;
+  const oraVal   = document.getElementById('prep-ora').value;
+
+  if (!nome)    { toast('Inserisci il nome della preparazione', 'error'); return; }
+  if (!reparto) { toast('Seleziona il reparto', 'error'); return; }
+  if (!quantita || quantita <= 0) { toast('Inserisci una quantità prodotta valida', 'error'); return; }
+
+  const ingredienti = prepIngredienti
+    .filter(r => r.prodotto && r.lotto && r.qty)
+    .map(r => ({ prodotto: r.prodotto, lotto: r.lotto, quantita: parseFloat(r.qty) }));
+
+  if (!ingredienti.length) { toast('Aggiungi almeno un ingrediente completo', 'error'); return; }
+
+  const btn = document.getElementById('btn-prep-salva');
+  btn.disabled = true;
+
+  const result = await api('/api/preparazioni', {
+    method: 'POST',
+    body: { nome, reparto, quantita, unita, scadenza, note, ingredienti, data: dataVal, ora: oraVal },
+  });
+
+  btn.disabled = false;
+
+  if (!result.success) { toast(result.error || 'Errore', 'error'); return; }
+  closeNuovaPreparazione();
+  toast('Preparazione registrata', 'success');
+  await Promise.all([loadPreparazioni(), loadGiacenze(), loadAlerts(), loadFeed()]);
+}
+
+async function showPreparazioneDetail(id) {
+  const data = await api(`/api/preparazioni/${id}`);
+  if (!data.success) { toast(data.error || 'Errore', 'error'); return; }
+  const p = data.preparazione;
+  const ingredienti = data.ingredienti || [];
+
+  const content = `
+    <div class="eti-lotto-label">
+      <div class="eti-lotto-prodotto">${esc(p.nome)}</div>
+      <div class="eti-lotto-row"><span>Data preparazione</span><strong>${fmtDataOra(p.data_preparazione)}</strong></div>
+    </div>
+    <div style="margin-top:18px">
+      <div class="spesa-group-hdr">Ingredienti</div>
+      ${ingredienti.map(i => `
+        <div class="lot-detail-row">
+          <div>
+            <div class="lot-detail-lotto">${esc(i.prodotto)}</div>
+            <div class="lot-detail-meta">Lotto ${esc(i.lotto || '—')}</div>
+          </div>
+          <span style="font-size:13px;font-weight:600">${i.quantita}&nbsp;${esc(i.unita)}</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
+  document.getElementById('prep-eti-content').innerHTML = content;
+  document.getElementById('modal-eti-preparazione').classList.add('open');
+}
+function closePrepEtichetta() { document.getElementById('modal-eti-preparazione').classList.remove('open'); }
+function bgClosePrepEti(e) { if (e.target === document.getElementById('modal-eti-preparazione')) closePrepEtichetta(); }
 
 // ── EXPORT PDF ────────────────────────────────────────────────────────────
 function initExportPage() {
@@ -4462,7 +4850,7 @@ async function generaExportPdf() {
 }
 
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeModal(); closeLotDetail(); closeModificaLotto(); closeDrawer(); closeApparecchioModal(); closeRegistraTempModal(); }
+  if (e.key === 'Escape') { closeModal(); closeLotDetail(); closeModificaLotto(); closeDrawer(); closeApparecchioModal(); closeRegistraTempModal(); closeNuovaPreparazione(); closePrepEtichetta(); }
 });
 
 // ── BOOT ─────────────────────────────────────────────────────────────────

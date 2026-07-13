@@ -46,6 +46,8 @@ from database import (
     get_registro_by_mese, get_temperature_by_mese, get_report_mensile_anno,
     update_user_eliminazione_carichi_permesso,
     delete_registro_row, log_eliminazione_carico, get_log_eliminazioni_registro,
+    insert_preparazione, insert_preparazione_ingrediente,
+    get_preparazioni, get_preparazione_by_id, get_preparazione_ingredienti,
 )
 from sheets import (
     load_listino, load_registro, append_registro, append_listino, aggiorna_tipo_movimento,
@@ -1090,6 +1092,143 @@ def api_sync():
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ─── PREPARAZIONI ─────────────────────────────────────────────────────────────
+
+@app.route('/api/preparazioni', methods=['GET'])
+@login_required
+def api_preparazioni_list():
+    oggi = now_it().strftime('%Y-%m-%d')
+    preparazioni = get_preparazioni()
+    for p in preparazioni:
+        scad = (p.get('scadenza') or '')[:10]
+        p['stato'] = 'completata' if scad and scad < oggi else 'in_corso'
+    return jsonify({'success': True, 'preparazioni': preparazioni})
+
+
+@app.route('/api/preparazioni/<int:prep_id>', methods=['GET'])
+@login_required
+def api_preparazione_detail(prep_id):
+    prep = get_preparazione_by_id(prep_id)
+    if not prep:
+        return jsonify({'success': False, 'error': 'Preparazione non trovata'}), 404
+    ingredienti = get_preparazione_ingredienti(prep_id)
+    return jsonify({'success': True, 'preparazione': prep, 'ingredienti': ingredienti})
+
+
+@app.route('/api/preparazioni', methods=['POST'])
+@login_required
+def api_preparazione_crea():
+    """Registra una nuova preparazione: scala ogni ingrediente dalle
+    giacenze (una riga REGISTRO con tipo 'PREPARAZIONE' per ingrediente,
+    come un 'in uso' ma non reversibile) e salva la ricetta con i lotti
+    usati per l'etichetta."""
+    d        = request.get_json(force=True)
+    nome     = (d.get('nome') or '').strip()
+    reparto  = (d.get('reparto') or '').strip()
+    scadenza = (d.get('scadenza') or '').strip()
+    unita    = (d.get('unita') or '').strip()
+    note     = (d.get('note') or '').strip()
+    ingredienti_in = d.get('ingredienti') or []
+
+    try:
+        quantita = float(d.get('quantita', 0))
+    except (TypeError, ValueError):
+        quantita = 0
+
+    if not nome:
+        return jsonify({'success': False, 'error': 'Nome preparazione obbligatorio'}), 400
+    if reparto not in ('Cucina', 'Sala', 'Pizzeria'):
+        return jsonify({'success': False, 'error': 'Seleziona il reparto'}), 400
+    if quantita <= 0:
+        return jsonify({'success': False, 'error': 'Inserisci una quantità prodotta valida'}), 400
+    if not unita:
+        return jsonify({'success': False, 'error': "Seleziona l'unità di misura"}), 400
+    if not ingredienti_in:
+        return jsonify({'success': False, 'error': 'Aggiungi almeno un ingrediente'}), 400
+
+    # Valida tutti gli ingredienti PRIMA di scrivere qualsiasi cosa, tenendo
+    # conto di eventuali usi ripetuti dello stesso lotto nella stessa richiesta.
+    allocato = {}
+    ingredienti = []
+    for ing in ingredienti_in:
+        prodotto = (ing.get('prodotto') or '').strip()
+        lotto    = (ing.get('lotto') or '').strip()
+        try:
+            ing_qty = round(float(ing.get('quantita', 0)), 4)
+        except (TypeError, ValueError):
+            ing_qty = 0
+
+        if not prodotto or not lotto:
+            return jsonify({'success': False, 'error': 'Seleziona prodotto e lotto per ogni ingrediente'}), 400
+        if ing_qty <= 0:
+            return jsonify({'success': False, 'error': f'Quantità non valida per {prodotto}'}), 400
+
+        lotti_info = get_lotti_attivi(prodotto)
+        info = next((l for l in lotti_info if l['lotto'] == lotto), None)
+        if not info:
+            return jsonify({'success': False, 'error': f"Lotto '{lotto}' non trovato per {prodotto}"}), 400
+
+        key = (prodotto, lotto)
+        disponibile = round(float(info['rimanenza']) - allocato.get(key, 0), 4)
+        if ing_qty > disponibile + 1e-9:
+            return jsonify({
+                'success': False,
+                'error': f"Non puoi usare più di {disponibile} {info['unita']} di {prodotto} (lotto {lotto}) disponibili",
+            }), 400
+        allocato[key] = allocato.get(key, 0) + ing_qty
+
+        ingredienti.append({
+            'prodotto': prodotto, 'lotto': lotto, 'qty': ing_qty, 'unita': info['unita'],
+            'fornitore': info.get('fornitore', ''), 'scadenza': info.get('scadenza', ''),
+            'nuova_rimanenza': round(disponibile - ing_qty, 4),
+        })
+
+    data_val = (d.get('data') or now_it().strftime('%Y-%m-%d')).strip()
+    ora_val  = (d.get('ora')  or now_it().strftime('%H:%M')).strip()
+    oggi      = data_val
+    data_prep = f'{data_val} {ora_val}'
+
+    righe_registro = []
+    for ing in ingredienti:
+        righe_registro.append({
+            'data': oggi, 'fornitore': ing['fornitore'], 'prodotto': ing['prodotto'],
+            'lotto': ing['lotto'], 'scadenza': ing['scadenza'], 'carico': 0, 'scarico': ing['qty'],
+            'unita': ing['unita'], 'etichetta': '', 'movimento_id': _gen_id(),
+            'rimanenza': ing['nuova_rimanenza'], 'operatore': current_user.nome,
+            'reparto': reparto, 'tipo': 'PREPARAZIONE',
+        })
+
+    try:
+        for row in righe_registro:
+            append_registro(row)
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Errore Google Sheets: {e}'}), 500
+
+    for row in righe_registro:
+        insert_movimento(row)
+
+    prep_id = insert_preparazione(nome, reparto, data_prep, scadenza, quantita, unita,
+                                   int(current_user.id), note)
+    for ing in ingredienti:
+        insert_preparazione_ingrediente(prep_id, ing['prodotto'], ing['lotto'], ing['qty'], ing['unita'])
+
+    return jsonify({
+        'success':           True,
+        'id':                prep_id,
+        'nome':              nome,
+        'reparto':           reparto,
+        'data_preparazione': data_prep,
+        'scadenza':          scadenza,
+        'quantita':          quantita,
+        'unita':             unita,
+        'operatore':         current_user.nome,
+        'ingredienti': [
+            {'prodotto': i['prodotto'], 'lotto': i['lotto'], 'quantita': i['qty'], 'unita': i['unita']}
+            for i in ingredienti
+        ],
+    })
 
 
 # ─── EXPORT PDF ───────────────────────────────────────────────────────────────

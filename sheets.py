@@ -39,12 +39,16 @@ REGISTRO_COLS = [
 ]
 
 # Valore da scrivere nella colonna "Tipo movimento" per ciascun tipo interno
-_TIPO_DISPLAY = {'CARICO': 'CARICO', 'IN_USO': 'IN USO', 'SCARICO': 'SCARICO'}
+_TIPO_DISPLAY = {
+    'CARICO': 'CARICO', 'IN_USO': 'IN USO', 'SCARICO': 'SCARICO',
+    'PREPARAZIONE': 'PREPARAZIONE',
+}
 
 
 def _normalizza_tipo(raw):
     """Converte il testo della colonna 'Tipo movimento' nel codice interno
-    usato dall'app ('CARICO' | 'IN_USO' | 'SCARICO'). None se non riconosciuto."""
+    usato dall'app ('CARICO' | 'IN_USO' | 'SCARICO' | 'PREPARAZIONE'). None
+    se non riconosciuto."""
     t = (raw or '').strip().upper()
     if t in ('IN USO', 'IN_USO', 'INUSO'):
         return 'IN_USO'
@@ -52,6 +56,8 @@ def _normalizza_tipo(raw):
         return 'SCARICO'
     if t == 'CARICO':
         return 'CARICO'
+    if t == 'PREPARAZIONE':
+        return 'PREPARAZIONE'
     return None
 
 # Sinonimi per il rilevamento automatico delle colonne

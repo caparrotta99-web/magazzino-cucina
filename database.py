@@ -255,9 +255,29 @@ def db_init():
                 nota        TEXT NOT NULL DEFAULT '',
                 operatore   TEXT NOT NULL DEFAULT ''
             )""",
+            f"""CREATE TABLE IF NOT EXISTS preparazioni (
+                id                {pk},
+                nome              TEXT NOT NULL,
+                reparto           TEXT NOT NULL DEFAULT 'Cucina',
+                data_preparazione TEXT NOT NULL,
+                scadenza          TEXT NOT NULL DEFAULT '',
+                quantita          REAL NOT NULL DEFAULT 0,
+                unita             TEXT NOT NULL DEFAULT '',
+                operatore_id      INTEGER,
+                note              TEXT NOT NULL DEFAULT ''
+            )""",
+            f"""CREATE TABLE IF NOT EXISTS preparazione_ingredienti (
+                id               {pk},
+                preparazione_id  INTEGER NOT NULL,
+                prodotto         TEXT NOT NULL,
+                lotto            TEXT NOT NULL DEFAULT '',
+                quantita         REAL NOT NULL DEFAULT 0,
+                unita            TEXT NOT NULL DEFAULT ''
+            )""",
             "CREATE INDEX IF NOT EXISTS idx_reg_prod_lotto ON registro(prodotto, lotto)",
             "CREATE INDEX IF NOT EXISTS idx_reg_mov_id     ON registro(movimento_id)",
             "CREATE INDEX IF NOT EXISTS idx_temp_data      ON temperature(data)",
+            "CREATE INDEX IF NOT EXISTS idx_prep_ingr_prep ON preparazione_ingredienti(preparazione_id)",
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email    ON users(email)",
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_telefono ON users(telefono)",
         ]:
@@ -1335,3 +1355,62 @@ def get_report_mensile_anno(anno):
             per_prodotto[p][mese] = round(float(r['tot'] or 0), 3)
 
     return [{'prodotto': p, 'mesi': mesi} for p, mesi in per_prodotto.items()]
+
+
+# ─── PREPARAZIONI ─────────────────────────────────────────────────────────────
+
+def insert_preparazione(nome, reparto, data_preparazione, scadenza, quantita, unita, operatore_id, note):
+    with get_conn() as conn:
+        return conn.execute_insert(
+            "INSERT INTO preparazioni (nome, reparto, data_preparazione, scadenza, "
+            "quantita, unita, operatore_id, note) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+            (nome, reparto, data_preparazione, scadenza or '', float(quantita or 0),
+             unita or '', operatore_id, note or '')
+        )
+
+
+def insert_preparazione_ingrediente(preparazione_id, prodotto, lotto, quantita, unita):
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO preparazione_ingredienti (preparazione_id, prodotto, lotto, quantita, unita) "
+            "VALUES (?, ?, ?, ?, ?)",
+            (preparazione_id, prodotto, lotto or '', float(quantita or 0), unita or '')
+        )
+
+
+def get_preparazioni(limit=200):
+    """Elenco preparazioni (senza ingredienti), più recenti prima, con il
+    nome dell'operatore risolto da users.id."""
+    with get_conn() as conn:
+        cur = conn.execute(
+            "SELECT p.id, p.nome, p.reparto, p.data_preparazione, p.scadenza, "
+            "p.quantita, p.unita, p.note, p.operatore_id, "
+            "COALESCE(u.nome, '—') AS operatore "
+            "FROM preparazioni p LEFT JOIN users u ON u.id = p.operatore_id "
+            "ORDER BY p.id DESC LIMIT ?",
+            (limit,)
+        )
+        return _rows(cur)
+
+
+def get_preparazione_by_id(prep_id):
+    with get_conn() as conn:
+        cur = conn.execute(
+            "SELECT p.id, p.nome, p.reparto, p.data_preparazione, p.scadenza, "
+            "p.quantita, p.unita, p.note, p.operatore_id, "
+            "COALESCE(u.nome, '—') AS operatore "
+            "FROM preparazioni p LEFT JOIN users u ON u.id = p.operatore_id "
+            "WHERE p.id = ?",
+            (prep_id,)
+        )
+        return _row(cur)
+
+
+def get_preparazione_ingredienti(preparazione_id):
+    with get_conn() as conn:
+        cur = conn.execute(
+            "SELECT id, prodotto, lotto, quantita, unita FROM preparazione_ingredienti "
+            "WHERE preparazione_id = ? ORDER BY id",
+            (preparazione_id,)
+        )
+        return _rows(cur)

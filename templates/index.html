@@ -601,7 +601,9 @@ main {
 .giac-sec-title:not(:first-child) { margin-top: 26px; }
 .giac-lots { border-top: 1px solid var(--border); padding-top: 10px; display: flex; flex-direction: column; gap: 6px; }
 .giac-lot-row  { display: flex; align-items: center; gap: 8px; font-size: 13px; }
-.giac-lot-code { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12px; }
+.giac-lot-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.giac-lot-code { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12px; }
+.giac-lot-carico { font-size: 10px; color: var(--muted-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .giac-lot-qty  { font-size: 12px; font-weight: 600; color: var(--text); white-space: nowrap; }
 .scad-badge {
   font-size: 11px; font-weight: 600; padding: 2px 10px;
@@ -635,6 +637,14 @@ main {
 }
 .prep-stato-badge.in_corso   { background: rgba(59,130,246,.12); color: var(--blue); }
 .prep-stato-badge.completata { background: var(--surface-2); color: var(--muted); }
+.btn-prep-finita {
+  width: 100%; height: 38px; margin-top: 12px;
+  background: rgba(34,197,94,.1); color: var(--green);
+  border: 1px solid rgba(34,197,94,.3); border-radius: 10px;
+  font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600;
+  cursor: pointer; transition: background .15s;
+}
+.btn-prep-finita:active { background: rgba(34,197,94,.2); }
 
 .ingr-row {
   border: 1px solid var(--border); border-radius: 14px;
@@ -2379,6 +2389,14 @@ body.help-mode { background: #0f1f3d; }
 
       <div class="fgroup" style="margin-bottom:8px">
         <label class="flabel">Ingredienti *</label>
+        <div class="fselect-wrap">
+          <select class="fselect" id="prep-ing-filter-reparto" onchange="onPrepIngRepartoChange(this)">
+            <option value="">Tutti i reparti</option>
+            <option value="Cucina">Cucina</option>
+            <option value="Sala">Sala</option>
+            <option value="Pizzeria">Pizzeria</option>
+          </select>
+        </div>
       </div>
       <div id="prep-ingredienti-list"></div>
       <button type="button" class="btn-scan" style="margin:6px 0 14px" onclick="addIngredienteRow()">
@@ -2451,6 +2469,7 @@ const S = {
   caricoReparto:   '', caricoCategoria:   '',   // '' = Tutti/Tutte
   inUsoReparto:    '', inUsoCategoria:    '',
   scaricoReparto:  '', scaricoCategoria:  '',
+  prepIngReparto:  '',
   apparecchi:            [],
   puoGestireApparecchi:  false,
   rangeRiferimento:      {},
@@ -2642,8 +2661,8 @@ function renderFeed() {
     return;
   }
 
-  const TIPO_CLASS = { CARICO: 'carico', IN_USO: 'in-uso', SCARICO: 'scarico' };
-  const TIPO_LABEL = { CARICO: 'CARICO', IN_USO: 'IN USO', SCARICO: 'SCARICO' };
+  const TIPO_CLASS = { CARICO: 'carico', IN_USO: 'in-uso', SCARICO: 'scarico', PREPARAZIONE: 'scarico', SCARICO_PREPARAZIONE: 'scarico' };
+  const TIPO_LABEL = { CARICO: 'CARICO', IN_USO: 'IN USO', SCARICO: 'SCARICO', PREPARAZIONE: 'PREPARAZIONE', SCARICO_PREPARAZIONE: 'FINE PREPARAZIONE' };
 
   const rows = S.feed.slice(0, 20).map(m => {
     const tipoKey = m.tipo || ((m.carico || 0) > 0 ? 'CARICO' : 'SCARICO');
@@ -2905,7 +2924,7 @@ async function onProdottoInUso() {
   lottoSel.innerHTML = '<option value="">Seleziona lotto…</option>' +
     S.lottiInUso.map(l => {
       const sc = l.scadenza ? ` · scade ${fmtDate(l.scadenza)}` : '';
-      return `<option value="${esc(l.lotto)}">${esc(l.lotto)} — ${l.rimanenza} ${l.unita}${sc}</option>`;
+      return `<option value="${esc(l.lotto)}">${esc(l.lotto)} — ${l.rimanenza} ${l.unita}${sc} · carico ${fmtDate(l.data_carico)}</option>`;
     }).join('');
   lottoSel.disabled = false;
 }
@@ -2925,6 +2944,7 @@ function onLottoInUso() {
   const scadCls = giorni === null ? '' : giorni < 0 ? 'c-red' : giorni <= 7 ? 'c-orange' : 'c-green';
   info.innerHTML = `
     <div class="lot-info-row"><span>Disponibile</span><strong>${l.rimanenza} ${l.unita}</strong></div>
+    <div class="lot-info-row"><span>Data carico</span><strong>${fmtDate(l.data_carico)}</strong></div>
     <div class="lot-info-row"><span>Scadenza</span><strong class="${scadCls}">${scadTxt}</strong></div>
     ${l.fornitore ? `<div class="lot-info-row"><span>Fornitore</span><strong>${esc(l.fornitore)}</strong></div>` : ''}
   `;
@@ -3008,7 +3028,7 @@ function onProdottoScarico() {
   const entries = S.inUso.filter(r => r.prodotto === prodotto);
   lottoSel.innerHTML = '<option value="">Seleziona…</option>' +
     entries.map(r => {
-      const sub = [r.lotto ? `Lotto ${r.lotto}` : null, fmtDate(r.data)].filter(Boolean).join(' · ');
+      const sub = [r.lotto ? `Lotto ${r.lotto}` : null, `carico ${fmtDate(r.data_carico)}`, `in uso dal ${fmtDate(r.data)}`].filter(Boolean).join(' · ');
       return `<option value="${r.id}">${r.qty}&nbsp;${esc(r.unita)} — ${esc(sub)}</option>`;
     }).join('');
   lottoSel.disabled = false;
@@ -3028,6 +3048,7 @@ function onLottoScarico() {
   info.innerHTML = `
     <div class="lot-info-row"><span>Quantità</span><strong>${r.qty} ${esc(r.unita)}</strong></div>
     <div class="lot-info-row"><span>In uso dal</span><strong>${fmtDate(r.data)}</strong></div>
+    <div class="lot-info-row"><span>Data carico</span><strong>${fmtDate(r.data_carico)}</strong></div>
     ${r.lotto     ? `<div class="lot-info-row"><span>Lotto</span><strong>${esc(r.lotto)}</strong></div>`     : ''}
     ${r.fornitore ? `<div class="lot-info-row"><span>Fornitore</span><strong>${esc(r.fornitore)}</strong></div>` : ''}
   `;
@@ -3129,7 +3150,10 @@ function renderGiacenze() {
     const lotsHtml = g.lotti.map(l => {
       const etData = esc(JSON.stringify({ prodotto: g.prodotto, lotto: l.lotto, scadenza: l.scadenza }));
       return `<div class="giac-lot-row">
-        <span class="giac-lot-code">${esc(l.lotto)}</span>
+        <div class="giac-lot-info">
+          <span class="giac-lot-code">${esc(l.lotto)}</span>
+          <span class="giac-lot-carico">Carico ${fmtDate(l.data_carico)}</span>
+        </div>
         ${l.scadenza ? `<span class="scad-badge ${scadCls(l.scadenza)}">${fmtDate(l.scadenza)}</span>` : ''}
         <span class="giac-lot-qty">${l.rimanenza}&nbsp;${esc(g.unita)}</span>
         <button type="button" class="lot-print-btn" onclick="event.stopPropagation(); openModificaLotto(${l.id}, ${etData})" aria-label="Modifica lotto">${_ICON_MATITA}</button>
@@ -3154,7 +3178,10 @@ function renderGiacenze() {
     const idx      = S.giacenze.indexOf(g);
     const lotsHtml = S.inUso.filter(r => r.prodotto === g.prodotto).map(l => {
       return `<div class="giac-lot-row">
-        <span class="giac-lot-code">${esc(l.lotto)}</span>
+        <div class="giac-lot-info">
+          <span class="giac-lot-code">${esc(l.lotto)}</span>
+          <span class="giac-lot-carico">Carico ${fmtDate(l.data_carico)}</span>
+        </div>
         ${l.scadenza ? `<span class="scad-badge ${scadCls(l.scadenza)}">${fmtDate(l.scadenza)}</span>` : ''}
         <span class="giac-lot-qty">${l.qty}&nbsp;${esc(l.unita)}</span>
       </div>`;
@@ -3392,7 +3419,7 @@ function _renderAlertCard(a) {
       <div class="alert-info">
         <div class="alert-prodotto">${esc(a.prodotto)}</div>
         <div class="alert-sub">
-          ${a.lotto ? `Lotto <strong>${esc(a.lotto)}</strong> · ` : ''}${a.scadenza ? fmtDate(a.scadenza) : '—'}${a.fornitore ? ` · ${esc(a.fornitore)}` : ''}
+          ${a.lotto ? `Lotto <strong>${esc(a.lotto)}</strong> · ` : ''}${a.scadenza ? fmtDate(a.scadenza) : '—'}${a.fornitore ? ` · ${esc(a.fornitore)}` : ''} · Carico ${fmtDate(a.data_carico)}
         </div>
       </div>
       <div class="alert-right">
@@ -3463,7 +3490,7 @@ function showLotDetail(g) {
     const riga = `<div class="lot-detail-row">
       <div>
         <div class="lot-detail-lotto">${esc(l.lotto)}</div>
-        <div class="lot-detail-meta">${l.rimanenza}&nbsp;${esc(g.unita)}</div>
+        <div class="lot-detail-meta">${l.rimanenza}&nbsp;${esc(g.unita)} · Carico ${fmtDate(l.data_carico)}</div>
       </div>
       ${l.scadenza ? `<span class="lot-scad-pill ${cls}">${fmtDate(l.scadenza)}</span>` : ''}
       <div style="display:flex;gap:6px;flex-shrink:0">
@@ -3489,7 +3516,7 @@ function showLotDetail(g) {
     return `<div class="lot-detail-row">
       <div>
         <div class="lot-detail-lotto">${esc(l.lotto)}</div>
-        <div class="lot-detail-meta">${l.qty}&nbsp;${esc(l.unita)}</div>
+        <div class="lot-detail-meta">${l.qty}&nbsp;${esc(l.unita)} · Carico ${fmtDate(l.data_carico)}</div>
       </div>
       ${l.scadenza ? `<span class="lot-scad-pill ${cls}">${fmtDate(l.scadenza)}</span>` : ''}
       <button type="button" class="lot-print-btn" onclick="event.stopPropagation(); printLotLabel(${etData})" aria-label="Stampa etichetta">${_ICON_STAMPA}</button>
@@ -4623,8 +4650,8 @@ function renderPreparazioni() {
   el.innerHTML = list.map(p => {
     const giorni = p.scadenza ? daysTo(p.scadenza) : null;
     const cls    = giorni === null ? '' : giorni < 0 ? 'scad-danger' : giorni <= 1 ? 'scad-warn' : 'scad-ok';
-    return `<div class="prep-card" onclick="showPreparazioneDetail(${p.id})">
-      <div class="prep-top">
+    return `<div class="prep-card">
+      <div class="prep-top" onclick="showPreparazioneDetail(${p.id})">
         <div>
           <div class="prep-nome">${esc(p.nome)}</div>
           <div class="prep-meta">${esc(p.reparto)} · ${fmtDataOra(p.data_preparazione)} · ${esc(p.operatore)}</div>
@@ -4634,8 +4661,17 @@ function renderPreparazioni() {
           <div class="prep-stato-badge ${p.stato}" style="margin-top:6px">${p.stato === 'in_corso' ? 'In corso' : 'Completata'}</div>
         </div>
       </div>
+      ${p.stato === 'in_corso' ? `<button type="button" class="btn-prep-finita" onclick="event.stopPropagation(); confermaCompletaPreparazione(${p.id})">Finita</button>` : ''}
     </div>`;
   }).join('');
+}
+
+async function confermaCompletaPreparazione(id) {
+  if (!confirm('La preparazione è stata completamente consumata?')) return;
+  const result = await api(`/api/preparazioni/${id}/completa`, { method: 'POST' });
+  if (!result.success) { toast(result.error || 'Errore', 'error'); return; }
+  toast('Preparazione completata', 'success');
+  await Promise.all([loadPreparazioni(), loadFeed()]);
 }
 
 function openNuovaPreparazione() {
@@ -4648,16 +4684,23 @@ function openNuovaPreparazione() {
   const { data, ora } = dataOraItaliana();
   document.getElementById('prep-data').value = data;
   document.getElementById('prep-ora').value  = ora;
+  S.prepIngReparto = '';
+  document.getElementById('prep-ing-filter-reparto').value = '';
   prepIngredienti = [];
   prepIngredienteSeq = 0;
   addIngredienteRow();
   document.getElementById('modal-nuova-preparazione').classList.add('open');
 }
+
+function onPrepIngRepartoChange(sel) {
+  S.prepIngReparto = sel.value;
+  renderIngredientiRows();
+}
 function closeNuovaPreparazione() { document.getElementById('modal-nuova-preparazione').classList.remove('open'); }
 function bgClosePrepForm(e) { if (e.target === document.getElementById('modal-nuova-preparazione')) closeNuovaPreparazione(); }
 
 function addIngredienteRow() {
-  prepIngredienti.push({ seq: prepIngredienteSeq++, prodotto: '', lotto: '', qty: '', lotti: [] });
+  prepIngredienti.push({ seq: prepIngredienteSeq++, prodotto: '', fonte: 'magazzino', selected: null, qty: '', lotti: [] });
   renderIngredientiRows();
 }
 function removeIngredienteRow(seq) {
@@ -4668,6 +4711,7 @@ function removeIngredienteRow(seq) {
 
 function renderIngredientiRows() {
   const container = document.getElementById('prep-ingredienti-list');
+  const prodottiFiltrati = filterProdotti(S.prodotti, S.prepIngReparto, '');
   container.innerHTML = prepIngredienti.map((r, idx) => `
     <div class="ingr-row">
       <div class="ingr-row-top">
@@ -4677,13 +4721,19 @@ function renderIngredientiRows() {
       <div class="fselect-wrap" style="margin-bottom:8px">
         <select class="fselect" onchange="onIngredienteProdotto(${r.seq}, this.value)">
           <option value="">Seleziona prodotto…</option>
-          ${S.prodotti.map(p => `<option value="${esc(p.prodotto)}" ${r.prodotto===p.prodotto?'selected':''}>${esc(p.prodotto)}</option>`).join('')}
+          ${prodottiFiltrati.map(p => `<option value="${esc(p.prodotto)}" ${r.prodotto===p.prodotto?'selected':''}>${esc(p.prodotto)}</option>`).join('')}
+        </select>
+      </div>
+      <div class="fselect-wrap" style="margin-bottom:8px">
+        <select class="fselect" onchange="onIngredienteFonte(${r.seq}, this.value)">
+          <option value="magazzino" ${r.fonte==='magazzino'?'selected':''}>In magazzino</option>
+          <option value="in_uso" ${r.fonte==='in_uso'?'selected':''}>In uso</option>
         </select>
       </div>
       <div class="fselect-wrap" style="margin-bottom:8px">
         <select class="fselect" ${r.lotti.length ? '' : 'disabled'} onchange="onIngredienteLotto(${r.seq}, this.value)">
           <option value="">${r.prodotto ? 'Seleziona lotto…' : 'Seleziona prima il prodotto'}</option>
-          ${r.lotti.map(l => `<option value="${esc(l.lotto)}" ${r.lotto===l.lotto?'selected':''}>${esc(l.lotto)} — ${l.rimanenza}&nbsp;${esc(l.unita)}${l.scadenza?` · scade ${fmtDate(l.scadenza)}`:''}</option>`).join('')}
+          ${r.lotti.map((l, i) => `<option value="${i}" ${r.selected===l?'selected':''}>${esc(l.lotto)} — ${l.disponibile}&nbsp;${esc(l.unita)}${l.scadenza?` · scade ${fmtDate(l.scadenza)}`:''} · carico ${fmtDate(l.data_carico)}</option>`).join('')}
         </select>
       </div>
       <input class="finput" type="number" min="0.01" step="0.01" inputmode="decimal"
@@ -4693,22 +4743,52 @@ function renderIngredientiRows() {
   `).join('');
 }
 
+async function _caricaLottiIngrediente(r) {
+  if (r.fonte === 'in_uso') {
+    const data = await api(`/api/in-uso?prodotto=${encodeURIComponent(r.prodotto)}`);
+    r.lotti = (data.in_uso || []).map(x => ({
+      lotto: x.lotto, disponibile: x.qty, unita: x.unita, scadenza: x.scadenza,
+      data_carico: x.data_carico, in_uso_id: x.id,
+    }));
+  } else {
+    const data = await api(`/api/lotti?prodotto=${encodeURIComponent(r.prodotto)}`);
+    r.lotti = (data.lotti || []).map(x => ({
+      lotto: x.lotto, disponibile: x.rimanenza, unita: x.unita, scadenza: x.scadenza,
+      data_carico: x.data_carico, in_uso_id: null,
+    }));
+  }
+}
+
 async function onIngredienteProdotto(seq, prodotto) {
   const r = prepIngredienti.find(x => x.seq === seq);
   if (!r) return;
-  r.prodotto = prodotto; r.lotto = ''; r.qty = ''; r.lotti = [];
+  r.prodotto = prodotto; r.selected = null; r.qty = ''; r.lotti = [];
   renderIngredientiRows();
   if (!prodotto) return;
-  const data = await api(`/api/lotti?prodotto=${encodeURIComponent(prodotto)}`);
+  await _caricaLottiIngrediente(r);
   const r2 = prepIngredienti.find(x => x.seq === seq);
   if (!r2) return; // rimosso nel frattempo
-  r2.lotti = data.lotti || [];
   renderIngredientiRows();
 }
 
-function onIngredienteLotto(seq, lotto) {
+async function onIngredienteFonte(seq, fonte) {
   const r = prepIngredienti.find(x => x.seq === seq);
-  if (r) { r.lotto = lotto; renderIngredientiRows(); }
+  if (!r) return;
+  r.fonte = fonte; r.selected = null; r.qty = ''; r.lotti = [];
+  renderIngredientiRows();
+  if (!r.prodotto) return;
+  await _caricaLottiIngrediente(r);
+  const r2 = prepIngredienti.find(x => x.seq === seq);
+  if (!r2) return; // rimosso nel frattempo
+  renderIngredientiRows();
+}
+
+function onIngredienteLotto(seq, idxStr) {
+  const r = prepIngredienti.find(x => x.seq === seq);
+  if (!r) return;
+  const idx = idxStr === '' ? -1 : Number(idxStr);
+  r.selected = idx >= 0 ? r.lotti[idx] : null;
+  renderIngredientiRows();
 }
 
 function onIngredienteQty(seq, val) {
@@ -4731,8 +4811,10 @@ async function submitPreparazione() {
   if (!quantita || quantita <= 0) { toast('Inserisci una quantità prodotta valida', 'error'); return; }
 
   const ingredienti = prepIngredienti
-    .filter(r => r.prodotto && r.lotto && r.qty)
-    .map(r => ({ prodotto: r.prodotto, lotto: r.lotto, quantita: parseFloat(r.qty) }));
+    .filter(r => r.prodotto && r.selected && r.qty)
+    .map(r => r.fonte === 'in_uso'
+      ? { prodotto: r.prodotto, fonte: 'in_uso', in_uso_id: r.selected.in_uso_id, quantita: parseFloat(r.qty) }
+      : { prodotto: r.prodotto, fonte: 'magazzino', lotto: r.selected.lotto, quantita: parseFloat(r.qty) });
 
   if (!ingredienti.length) { toast('Aggiungi almeno un ingrediente completo', 'error'); return; }
 

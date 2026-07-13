@@ -48,6 +48,7 @@ from database import (
     delete_registro_row, log_eliminazione_carico, get_log_eliminazioni_registro,
     insert_preparazione, insert_preparazione_ingrediente,
     get_preparazioni, get_preparazione_by_id, get_preparazione_ingredienti,
+    completa_preparazione,
 )
 from sheets import (
     load_listino, load_registro, append_registro, append_listino, aggiorna_tipo_movimento,
@@ -1103,7 +1104,8 @@ def api_preparazioni_list():
     preparazioni = get_preparazioni()
     for p in preparazioni:
         scad = (p.get('scadenza') or '')[:10]
-        p['stato'] = 'completata' if scad and scad < oggi else 'in_corso'
+        scaduta = bool(scad and scad < oggi)
+        p['stato'] = 'completata' if (p.get('completata') or scaduta) else 'in_corso'
     return jsonify({'success': True, 'preparazioni': preparazioni})
 
 
@@ -1148,50 +1150,88 @@ def api_preparazione_crea():
     if not ingredienti_in:
         return jsonify({'success': False, 'error': 'Aggiungi almeno un ingrediente'}), 400
 
-    # Valida tutti gli ingredienti PRIMA di scrivere qualsiasi cosa, tenendo
-    # conto di eventuali usi ripetuti dello stesso lotto nella stessa richiesta.
-    allocato = {}
+    # Valida tutti gli ingredienti PRIMA di scrivere qualsiasi cosa. Ogni
+    # ingrediente può arrivare da due pool distinti (fonte 'magazzino' o
+    # 'in_uso'), tenendo conto di eventuali usi ripetuti dello stesso
+    # lotto/riga in-uso nella stessa richiesta.
+    allocato        = {}   # (prodotto, lotto) -> qty allocata, per fonte magazzino
+    allocato_in_uso = {}   # id riga in_uso    -> qty allocata, per fonte in_uso
     ingredienti = []
     for ing in ingredienti_in:
         prodotto = (ing.get('prodotto') or '').strip()
-        lotto    = (ing.get('lotto') or '').strip()
+        fonte    = (ing.get('fonte') or 'magazzino').strip()
         try:
             ing_qty = round(float(ing.get('quantita', 0)), 4)
         except (TypeError, ValueError):
             ing_qty = 0
 
-        if not prodotto or not lotto:
-            return jsonify({'success': False, 'error': 'Seleziona prodotto e lotto per ogni ingrediente'}), 400
+        if not prodotto:
+            return jsonify({'success': False, 'error': 'Seleziona il prodotto per ogni ingrediente'}), 400
         if ing_qty <= 0:
             return jsonify({'success': False, 'error': f'Quantità non valida per {prodotto}'}), 400
 
-        lotti_info = get_lotti_attivi(prodotto)
-        info = next((l for l in lotti_info if l['lotto'] == lotto), None)
-        if not info:
-            return jsonify({'success': False, 'error': f"Lotto '{lotto}' non trovato per {prodotto}"}), 400
+        if fonte == 'in_uso':
+            try:
+                in_uso_id = int(ing.get('in_uso_id', 0))
+            except (TypeError, ValueError):
+                in_uso_id = 0
+            if not in_uso_id:
+                return jsonify({'success': False, 'error': f'Seleziona un elemento in uso per {prodotto}'}), 400
 
-        key = (prodotto, lotto)
-        disponibile = round(float(info['rimanenza']) - allocato.get(key, 0), 4)
-        if ing_qty > disponibile + 1e-9:
-            return jsonify({
-                'success': False,
-                'error': f"Non puoi usare più di {disponibile} {info['unita']} di {prodotto} (lotto {lotto}) disponibili",
-            }), 400
-        allocato[key] = allocato.get(key, 0) + ing_qty
+            righe_in_uso = get_in_uso_attivi(prodotto)
+            info = next((r for r in righe_in_uso if r['id'] == in_uso_id), None)
+            if not info:
+                return jsonify({'success': False, 'error': f"Elemento in uso non trovato per {prodotto}"}), 400
 
-        ingredienti.append({
-            'prodotto': prodotto, 'lotto': lotto, 'qty': ing_qty, 'unita': info['unita'],
-            'fornitore': info.get('fornitore', ''), 'scadenza': info.get('scadenza', ''),
-            'nuova_rimanenza': round(disponibile - ing_qty, 4),
-        })
+            disponibile = round(float(info['qty']) - allocato_in_uso.get(in_uso_id, 0), 4)
+            if ing_qty > disponibile + 1e-9:
+                return jsonify({
+                    'success': False,
+                    'error': f"Non puoi usare più di {disponibile} {info['unita']} di {prodotto} (in uso) disponibili",
+                }), 400
+            allocato_in_uso[in_uso_id] = allocato_in_uso.get(in_uso_id, 0) + ing_qty
+
+            ingredienti.append({
+                'prodotto': prodotto, 'lotto': info['lotto'], 'qty': ing_qty, 'unita': info['unita'],
+                'fonte': 'in_uso', 'in_uso_id': in_uso_id,
+            })
+        else:
+            lotto = (ing.get('lotto') or '').strip()
+            if not lotto:
+                return jsonify({'success': False, 'error': 'Seleziona prodotto e lotto per ogni ingrediente'}), 400
+
+            lotti_info = get_lotti_attivi(prodotto)
+            info = next((l for l in lotti_info if l['lotto'] == lotto), None)
+            if not info:
+                return jsonify({'success': False, 'error': f"Lotto '{lotto}' non trovato per {prodotto}"}), 400
+
+            key = (prodotto, lotto)
+            disponibile = round(float(info['rimanenza']) - allocato.get(key, 0), 4)
+            if ing_qty > disponibile + 1e-9:
+                return jsonify({
+                    'success': False,
+                    'error': f"Non puoi usare più di {disponibile} {info['unita']} di {prodotto} (lotto {lotto}) disponibili",
+                }), 400
+            allocato[key] = allocato.get(key, 0) + ing_qty
+
+            ingredienti.append({
+                'prodotto': prodotto, 'lotto': lotto, 'qty': ing_qty, 'unita': info['unita'],
+                'fornitore': info.get('fornitore', ''), 'scadenza': info.get('scadenza', ''),
+                'nuova_rimanenza': round(disponibile - ing_qty, 4),
+                'fonte': 'magazzino',
+            })
 
     data_val = (d.get('data') or now_it().strftime('%Y-%m-%d')).strip()
     ora_val  = (d.get('ora')  or now_it().strftime('%H:%M')).strip()
     oggi      = data_val
     data_prep = f'{data_val} {ora_val}'
 
+    # Ingredienti da magazzino: una nuova riga REGISTRO (tipo PREPARAZIONE)
+    # per ingrediente, che scala la rimanenza del lotto — come oggi.
     righe_registro = []
     for ing in ingredienti:
+        if ing['fonte'] != 'magazzino':
+            continue
         righe_registro.append({
             'data': oggi, 'fornitore': ing['fornitore'], 'prodotto': ing['prodotto'],
             'lotto': ing['lotto'], 'scadenza': ing['scadenza'], 'carico': 0, 'scarico': ing['qty'],
@@ -1200,14 +1240,39 @@ def api_preparazione_crea():
             'reparto': reparto, 'tipo': 'PREPARAZIONE',
         })
 
+    # Ingredienti da "in uso": la quantità era già stata tolta dal magazzino
+    # al momento del prelievo, quindi qui si finalizza (in tutto o in parte)
+    # la riga IN_USO esistente invece di scalare di nuovo il magazzino —
+    # altrimenti la stessa quantità verrebbe contata due volte.
+    in_uso_da_finalizzare = []  # (in_uso_id, qty_totale, nuovo_movimento_id_o_None)
+    for in_uso_id, tot_qty in allocato_in_uso.items():
+        original = get_movimento_by_id(in_uso_id)
+        if not original or original.get('tipo') != 'IN_USO':
+            return jsonify({'success': False, 'error': 'Elemento in uso non più disponibile'}), 400
+        residuo  = round(original['scarico'] - tot_qty, 4)
+        nuovo_mov_id = _gen_id() if residuo > 0 else None
+        in_uso_da_finalizzare.append((original, tot_qty, residuo, nuovo_mov_id))
+
     try:
         for row in righe_registro:
             append_registro(row)
+        for original, tot_qty, residuo, nuovo_mov_id in in_uso_da_finalizzare:
+            aggiorna_tipo_movimento(original['movimento_id'], 'PREPARAZIONE', nuovo_scarico=tot_qty)
+            if residuo > 0:
+                append_registro({
+                    'data': original['data'], 'fornitore': original['fornitore'], 'prodotto': original['prodotto'],
+                    'lotto': original['lotto'], 'scadenza': original['scadenza'], 'carico': 0, 'scarico': residuo,
+                    'unita': original['unita'], 'etichetta': '', 'movimento_id': nuovo_mov_id,
+                    'rimanenza': original['rimanenza'], 'operatore': original['operatore'],
+                    'reparto': original['reparto'], 'tipo': 'IN_USO',
+                })
     except Exception as e:
         return jsonify({'success': False, 'error': f'Errore Google Sheets: {e}'}), 500
 
     for row in righe_registro:
         insert_movimento(row)
+    for original, tot_qty, residuo, nuovo_mov_id in in_uso_da_finalizzare:
+        finalizza_in_uso(original['id'], oggi, tot_qty, nuovo_mov_id, tipo_finale='PREPARAZIONE')
 
     prep_id = insert_preparazione(nome, reparto, data_prep, scadenza, quantita, unita,
                                    int(current_user.id), note)
@@ -1229,6 +1294,49 @@ def api_preparazione_crea():
             for i in ingredienti
         ],
     })
+
+
+@app.route('/api/preparazioni/<int:prep_id>/completa', methods=['POST'])
+@login_required
+def api_preparazione_completa(prep_id):
+    """Segna una preparazione come completamente consumata: registra una
+    riga di scarico nel REGISTRO (tipo 'SCARICO PREPARAZIONE', quantità
+    prodotta) e marca la preparazione come completata."""
+    prep = get_preparazione_by_id(prep_id)
+    if not prep:
+        return jsonify({'success': False, 'error': 'Preparazione non trovata'}), 404
+    if prep.get('completata'):
+        return jsonify({'success': False, 'error': 'Preparazione già completata'}), 400
+
+    oggi = now_it().strftime('%Y-%m-%d')
+    ora  = now_it().strftime('%H:%M')
+
+    row = {
+        'data':         oggi,
+        'fornitore':    '',
+        'prodotto':     prep['nome'],
+        'lotto':        '',
+        'scadenza':     '',
+        'carico':       0,
+        'scarico':      prep['quantita'],
+        'unita':        prep['unita'],
+        'etichetta':    f'Preparazione completata — ore {ora}',
+        'movimento_id': _gen_id(),
+        'rimanenza':    0,
+        'operatore':    current_user.nome,
+        'reparto':      prep['reparto'],
+        'tipo':         'SCARICO_PREPARAZIONE',
+    }
+
+    try:
+        append_registro(row)
+    except Exception as e:
+        return jsonify({'success': False, 'error': f'Errore Google Sheets: {e}'}), 500
+
+    insert_movimento(row)
+    completa_preparazione(prep_id)
+
+    return jsonify({'success': True})
 
 
 # ─── EXPORT PDF ───────────────────────────────────────────────────────────────

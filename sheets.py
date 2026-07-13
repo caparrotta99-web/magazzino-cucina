@@ -41,7 +41,7 @@ REGISTRO_COLS = [
 # Valore da scrivere nella colonna "Tipo movimento" per ciascun tipo interno
 _TIPO_DISPLAY = {
     'CARICO': 'CARICO', 'IN_USO': 'IN USO', 'SCARICO': 'SCARICO',
-    'PREPARAZIONE': 'PREPARAZIONE',
+    'PREPARAZIONE': 'PREPARAZIONE', 'SCARICO_PREPARAZIONE': 'SCARICO PREPARAZIONE',
 }
 
 
@@ -52,6 +52,8 @@ def _normalizza_tipo(raw):
     t = (raw or '').strip().upper()
     if t in ('IN USO', 'IN_USO', 'INUSO'):
         return 'IN_USO'
+    if t == 'SCARICO PREPARAZIONE':
+        return 'SCARICO_PREPARAZIONE'
     if t == 'SCARICO':
         return 'SCARICO'
     if t == 'CARICO':

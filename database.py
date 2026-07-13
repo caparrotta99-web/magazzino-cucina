@@ -307,6 +307,7 @@ def db_init():
         ('apparecchi', 'seriale', "TEXT NOT NULL DEFAULT ''"),
         ('apparecchi', 'ultima_mattina', "TEXT NOT NULL DEFAULT ''"),
         ('apparecchi', 'ultima_sera',    "TEXT NOT NULL DEFAULT ''"),
+        ('preparazioni', 'completata', "INTEGER NOT NULL DEFAULT 0"),
     ]
     for table, col, defn in migrations:
         if _USE_PG:
@@ -487,13 +488,15 @@ def get_movimento_by_id(row_id):
         return _row(cur)
 
 
-def finalizza_in_uso(row_id, data_scarico, qty=None, nuovo_movimento_id=None):
+def finalizza_in_uso(row_id, data_scarico, qty=None, nuovo_movimento_id=None, tipo_finale='SCARICO'):
     """
-    Finalizza una riga IN_USO esistente a SCARICO. Se qty è minore della
-    quantità in uso, solo quella parte viene marcata come scaricata: il
-    residuo resta "in uso" in una nuova riga con lo stesso lotto e la
-    stessa data originale (nessuna nuova riga se si finalizza l'intera
-    quantità, comportamento invariato).
+    Finalizza una riga IN_USO esistente (di norma a SCARICO; il chiamante può
+    passare tipo_finale='PREPARAZIONE' quando la quantità viene consumata
+    come ingrediente di una preparazione, invece che scaricata a mano).
+    Se qty è minore della quantità in uso, solo quella parte viene marcata
+    come finalizzata: il residuo resta "in uso" in una nuova riga con lo
+    stesso lotto e la stessa data originale (nessuna nuova riga se si
+    finalizza l'intera quantità, comportamento invariato).
 
     Ritorna (riga_finalizzata, riga_residua) — riga_residua è None se non
     c'è residuo. Ritorna (None, None) se la riga non viene trovata.
@@ -511,9 +514,9 @@ def finalizza_in_uso(row_id, data_scarico, qty=None, nuovo_movimento_id=None):
 
     with get_conn() as conn:
         cur = conn.execute(
-            "UPDATE registro SET scarico = ?, tipo = 'SCARICO', data_scarico = ? "
+            "UPDATE registro SET scarico = ?, tipo = ?, data_scarico = ? "
             "WHERE id = ? AND tipo = 'IN_USO'",
-            (qty, data_scarico, row_id)
+            (qty, tipo_finale, data_scarico, row_id)
         )
         if cur.rowcount == 0:
             return None, None
@@ -539,7 +542,9 @@ def get_in_uso_attivi(prodotto=None):
         base_sql = (
             """SELECT r.id, r.prodotto, r.fornitore, r.lotto, r.scadenza,
                       r.scarico AS qty, r.unita, r.data, r.reparto, r.operatore,
-                      COALESCE(l.categoria, '') AS categoria
+                      COALESCE(l.categoria, '') AS categoria,
+                      (SELECT MIN(rc.data) FROM registro rc
+                       WHERE rc.prodotto = r.prodotto AND rc.lotto = r.lotto AND rc.tipo = 'CARICO') AS data_carico
                FROM registro r
                LEFT JOIN listino l
                    ON l.prodotto = r.prodotto AND l.fornitore = r.fornitore
@@ -559,7 +564,9 @@ def get_lotti_attivi(prodotto):
     with get_conn() as conn:
         cur = conn.execute(
             """SELECT r.lotto, r.scadenza, r.rimanenza, r.unita, r.fornitore, r.etichetta,
-                      COALESCE(l.reparto, 'Cucina') AS reparto
+                      COALESCE(l.reparto, 'Cucina') AS reparto,
+                      (SELECT MIN(rc.data) FROM registro rc
+                       WHERE rc.prodotto = r.prodotto AND rc.lotto = r.lotto AND rc.tipo = 'CARICO') AS data_carico
                FROM registro r
                LEFT JOIN listino l
                    ON l.prodotto = r.prodotto AND l.fornitore = r.fornitore
@@ -582,7 +589,9 @@ def get_giacenze():
         cur = conn.execute(
             """SELECT r.id, r.prodotto, r.fornitore, r.lotto, r.scadenza,
                       r.rimanenza, r.unita, r.etichetta,
-                      l.scorta_min, l.categoria, l.reparto
+                      l.scorta_min, l.categoria, l.reparto,
+                      (SELECT MIN(rc.data) FROM registro rc
+                       WHERE rc.prodotto = r.prodotto AND rc.lotto = r.lotto AND rc.tipo = 'CARICO') AS data_carico
                FROM registro r
                LEFT JOIN listino l
                    ON l.prodotto = r.prodotto AND l.fornitore = r.fornitore
@@ -629,11 +638,12 @@ def get_giacenze():
         if scad and (not g['prossima_scadenza'] or scad < g['prossima_scadenza']):
             g['prossima_scadenza'] = scad
         g['lotti'].append({
-            'id':        r['id'],
-            'lotto':     r['lotto'],
-            'scadenza':  r['scadenza'],
-            'rimanenza': r['rimanenza'],
-            'etichetta': r['etichetta'],
+            'id':          r['id'],
+            'lotto':       r['lotto'],
+            'scadenza':    r['scadenza'],
+            'rimanenza':   r['rimanenza'],
+            'etichetta':   r['etichetta'],
+            'data_carico': r['data_carico'],
         })
 
     for r in in_uso_rows:
@@ -672,7 +682,9 @@ def get_alerts():
         scad_rows = _rows(conn.execute(
             """SELECT r.prodotto, r.lotto, r.scadenza, r.rimanenza, r.unita, r.fornitore,
                       COALESCE(l.categoria, '') AS categoria,
-                      COALESCE(l.reparto, 'Cucina') AS reparto
+                      COALESCE(l.reparto, 'Cucina') AS reparto,
+                      (SELECT MIN(rc.data) FROM registro rc
+                       WHERE rc.prodotto = r.prodotto AND rc.lotto = r.lotto AND rc.tipo = 'CARICO') AS data_carico
                FROM registro r
                LEFT JOIN listino l ON l.prodotto = r.prodotto AND l.fornitore = r.fornitore
                WHERE r.id = (
@@ -1384,7 +1396,7 @@ def get_preparazioni(limit=200):
     with get_conn() as conn:
         cur = conn.execute(
             "SELECT p.id, p.nome, p.reparto, p.data_preparazione, p.scadenza, "
-            "p.quantita, p.unita, p.note, p.operatore_id, "
+            "p.quantita, p.unita, p.note, p.operatore_id, p.completata, "
             "COALESCE(u.nome, '—') AS operatore "
             "FROM preparazioni p LEFT JOIN users u ON u.id = p.operatore_id "
             "ORDER BY p.id DESC LIMIT ?",
@@ -1397,13 +1409,19 @@ def get_preparazione_by_id(prep_id):
     with get_conn() as conn:
         cur = conn.execute(
             "SELECT p.id, p.nome, p.reparto, p.data_preparazione, p.scadenza, "
-            "p.quantita, p.unita, p.note, p.operatore_id, "
+            "p.quantita, p.unita, p.note, p.operatore_id, p.completata, "
             "COALESCE(u.nome, '—') AS operatore "
             "FROM preparazioni p LEFT JOIN users u ON u.id = p.operatore_id "
             "WHERE p.id = ?",
             (prep_id,)
         )
         return _row(cur)
+
+
+def completa_preparazione(prep_id):
+    """Segna una preparazione come completata (consumata interamente)."""
+    with get_conn() as conn:
+        conn.execute("UPDATE preparazioni SET completata = 1 WHERE id = ?", (prep_id,))
 
 
 def get_preparazione_ingredienti(preparazione_id):

@@ -288,6 +288,8 @@ main {
 .hcard-alert    .hcard-icon { background: var(--orange); }
 .hcard-temperature .hcard-icon { background: var(--teal); }
 .hcard-preparazioni .hcard-icon { background: var(--amber); }
+.hcard-prenotazioni .hcard-icon { background: var(--violet); }
+.hcard-gestione-sala .hcard-icon { background: var(--teal); }
 .hcard-spesa {
   background: var(--card);
   border: none;
@@ -658,6 +660,65 @@ main {
   display: flex; align-items: center; justify-content: center; font-size: 14px; font-weight: 700;
 }
 .ingr-remove-btn:active { background: rgba(239,68,68,.2); }
+
+/* ─── PRENOTAZIONI ──────────────────────────────────────────────────────── */
+.coperti-row { display: flex; gap: 10px; margin-bottom: 18px; }
+.coperti-stat {
+  flex: 1; background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+  padding: 12px 10px; text-align: center; box-shadow: var(--shadow);
+}
+.coperti-num { font-size: 22px; font-weight: 700; color: var(--text); line-height: 1; }
+.coperti-lbl { font-size: 10px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; margin-top: 4px; }
+
+.pren-swipe { position: relative; overflow: hidden; border-radius: 14px; margin-bottom: 8px; }
+.pren-delete {
+  position: absolute; top: 0; right: 0; bottom: 0; width: 84px;
+  background: var(--red); color: #fff;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  font-size: 11px; font-weight: 700; cursor: pointer; z-index: 0;
+}
+.pren-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+  padding: 13px 14px; position: relative; z-index: 1;
+  transition: transform .2s ease; touch-action: pan-y; cursor: pointer;
+}
+.pren-nome { font-size: 14px; font-weight: 600; color: var(--text); }
+.pren-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.pren-badge {
+  font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 100px; white-space: nowrap; flex-shrink: 0;
+}
+.pren-badge.confermata { background: rgba(34,197,94,.12); color: var(--green); }
+.pren-badge.in_attesa  { background: rgba(180,83,9,.14); color: var(--amber); }
+.pren-badge.cancellata { background: rgba(239,68,68,.12); color: var(--red); }
+
+/* ─── GESTIONE SALA ─────────────────────────────────────────────────────── */
+.sala-map-viewport {
+  overflow: auto; border-radius: 16px; border: 1px solid var(--border);
+  background: var(--surface-3); -webkit-overflow-scrolling: touch;
+  max-height: 65vh; margin-top: 4px;
+}
+.sala-map-canvas {
+  position: relative; width: 1000px; height: 700px;
+  background-image: radial-gradient(var(--border-2) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+.tavolo-box {
+  position: absolute; display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 2px;
+  color: #fff; font-weight: 700; cursor: grab;
+  box-shadow: var(--shadow); user-select: none; touch-action: none;
+  transition: box-shadow .15s;
+}
+.tavolo-box.dragging  { cursor: grabbing; box-shadow: var(--shadow-lg); z-index: 5; }
+.tavolo-box.no-drag   { cursor: pointer; }
+.tavolo-box.rettangolare { border-radius: 10px; }
+.tavolo-box.rotondo      { border-radius: 50%; }
+.tavolo-box.libero    { background: var(--green); }
+.tavolo-box.occupato  { background: var(--red); }
+.tavolo-box.prenotato { background: var(--amber); }
+.tavolo-numero { font-size: 15px; line-height: 1; }
+.tavolo-posti  { font-size: 10px; font-weight: 500; opacity: .85; }
 
 /* ─── TEMPERATURE ───────────────────────────────────────────────────────── */
 .temp-app-card {
@@ -1311,6 +1372,18 @@ body.help-mode { background: #0f1f3d; }
       <span class="lbl">Preparazioni</span>
     </button>
 
+    {% if current_user.is_authenticated and current_user.role == 'admin' %}
+    <button class="drw-item" data-page="prenotazioni" onclick="navTo('prenotazioni')">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <span class="lbl">Prenotazioni</span>
+    </button>
+
+    <button class="drw-item" data-page="gestione-sala" onclick="navTo('gestione-sala')">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><circle cx="17.5" cy="6.5" r="3.5"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+      <span class="lbl">Gestione sala</span>
+    </button>
+    {% endif %}
+
     <button class="drw-item" data-page="lista-spesa" onclick="navTo('lista-spesa')">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
       <span class="lbl">Lista spesa</span>
@@ -1432,6 +1505,33 @@ body.help-mode { background: #0f1f3d; }
       </div>
 
     </div>
+
+    {% if current_user.is_authenticated and current_user.role == 'admin' %}
+    <div class="home-group-label">Sala</div>
+    <div class="home-grid">
+
+      <div class="hcard hcard-prenotazioni" onclick="navTo('prenotazioni')">
+        <div class="hcard-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+        </div>
+        <div>
+          <div class="hcard-label">Prenotazioni</div>
+          <div class="hcard-sub">Tavoli del giorno</div>
+        </div>
+      </div>
+
+      <div class="hcard hcard-gestione-sala" onclick="navTo('gestione-sala')">
+        <div class="hcard-icon">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><circle cx="17.5" cy="6.5" r="3.5"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+        </div>
+        <div>
+          <div class="hcard-label">Gestione sala</div>
+          <div class="hcard-sub">Mappa tavoli</div>
+        </div>
+      </div>
+
+    </div>
+    {% endif %}
 
     <div class="home-grid" style="margin-top:20px">
       <div class="hcard hcard-spesa" onclick="navTo('lista-spesa')">
@@ -1994,6 +2094,77 @@ body.help-mode { background: #0f1f3d; }
     </div>
   </section>
 
+  <!-- PRENOTAZIONI -->
+  <section class="page" id="page-prenotazioni">
+    <div class="back-bar" onclick="navTo('home')">
+      <div class="back-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+      <span class="back-label">Prenotazioni</span>
+    </div>
+
+    <div class="fgroup" style="margin-bottom:14px">
+      <input class="finput" type="date" id="pren-data" onchange="onPrenDataChange()">
+    </div>
+
+    <div class="coperti-row">
+      <div class="coperti-stat">
+        <div class="coperti-num" id="coperti-totale">0</div>
+        <div class="coperti-lbl">Coperti oggi</div>
+      </div>
+      <div class="coperti-stat">
+        <div class="coperti-num" id="coperti-pranzo">0</div>
+        <div class="coperti-lbl">Rimasti pranzo</div>
+      </div>
+      <div class="coperti-stat">
+        <div class="coperti-num" id="coperti-cena">0</div>
+        <div class="coperti-lbl">Rimasti cena</div>
+      </div>
+    </div>
+
+    {% if current_user.is_authenticated and current_user.puo_gestire_sala %}
+    <div class="spesa-topbar">
+      <div></div>
+      <button class="btn-spesa-add" onclick="openNuovaPrenotazione()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        Nuova
+      </button>
+    </div>
+    {% endif %}
+
+    <div id="pren-list">
+      <div class="empty-state">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        <p>Caricamento…</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- GESTIONE SALA -->
+  <section class="page" id="page-gestione-sala">
+    <div class="back-bar" onclick="navTo('home')">
+      <div class="back-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+      <span class="back-label">Gestione sala</span>
+    </div>
+
+    <div class="filter-row" id="sala-pills-row"></div>
+
+    <div class="sala-map-viewport" id="sala-map-viewport">
+      <div class="sala-map-canvas" id="sala-map-canvas"></div>
+    </div>
+
+    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)"><span style="width:10px;height:10px;border-radius:50%;background:var(--green);display:inline-block"></span> Libero</div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)"><span style="width:10px;height:10px;border-radius:50%;background:var(--amber);display:inline-block"></span> Prenotato</div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)"><span style="width:10px;height:10px;border-radius:50%;background:var(--red);display:inline-block"></span> Occupato</div>
+    </div>
+
+    {% if current_user.is_authenticated and current_user.puo_gestire_sala %}
+    <div style="display:flex;gap:10px;margin-top:16px">
+      <button type="button" class="btn-svuota" onclick="openNuovaSala()">+ Nuova sala</button>
+      <button type="button" class="btn-svuota" onclick="openNuovoTavolo()">+ Nuovo tavolo</button>
+    </div>
+    {% endif %}
+  </section>
+
   <!-- LISTA SPESA -->
   <section class="page" id="page-lista-spesa">
     <div class="back-bar" onclick="navTo('home')">
@@ -2428,6 +2599,139 @@ body.help-mode { background: #0f1f3d; }
   </div>
 </div>
 
+<!-- ── MODAL NUOVA/MODIFICA PRENOTAZIONE ───────────────────────────────────── -->
+<div class="modal-backdrop" id="modal-prenotazione" onclick="bgClosePrenForm(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="pren-modal-title">Nuova prenotazione</div>
+    <div class="modal-body">
+
+      <div class="fgroup">
+        <label class="flabel">Nome *</label>
+        <input class="finput" type="text" id="pren-nome" placeholder="es. Mario Rossi" autocomplete="off">
+      </div>
+
+      <div class="fgroup">
+        <label class="flabel">Numero persone *</label>
+        <input class="finput" type="number" id="pren-persone" placeholder="0" min="1" step="1" inputmode="numeric">
+      </div>
+
+      <div class="fgroup">
+        <label class="flabel">Data *</label>
+        <input class="finput" type="date" id="pren-form-data">
+      </div>
+
+      <div class="fgroup">
+        <label class="flabel">Ora *</label>
+        <input class="finput" type="time" id="pren-ora">
+      </div>
+
+      <div class="fgroup">
+        <label class="flabel">Telefono</label>
+        <input class="finput" type="tel" id="pren-telefono" placeholder="es. 333 1234567" autocomplete="off">
+      </div>
+
+      <div class="fgroup" id="pren-stato-group">
+        <label class="flabel">Stato</label>
+        <div class="fselect-wrap">
+          <select class="fselect" id="pren-stato">
+            <option value="confermata">Confermata</option>
+            <option value="in_attesa">In attesa</option>
+            <option value="cancellata">Cancellata</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="fgroup" style="margin-bottom:8px">
+        <label class="flabel">Tavolo assegnato</label>
+      </div>
+      <div id="pren-tavoli-list" style="margin-bottom:16px"></div>
+
+      <div class="fgroup" style="margin-bottom:0">
+        <label class="flabel">Note</label>
+        <textarea class="ftextarea" id="pren-note" placeholder="Note opzionali…"></textarea>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-close-modal" onclick="closeNuovaPrenotazione()">Annulla</button>
+      <button class="btn-print" id="btn-pren-salva" onclick="submitPrenotazione()" style="color:#10b981;font-weight:700">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── DETTAGLIO PRENOTAZIONE ──────────────────────────────────────────────── -->
+<div class="lot-detail-overlay" id="pren-detail-overlay" onclick="if(event.target===this) closePrenDetail()">
+  <div class="lot-detail-sheet">
+    <div class="lot-detail-handle"></div>
+    <div class="lot-detail-title" id="pren-detail-title"></div>
+    <div id="pren-detail-body"></div>
+  </div>
+</div>
+
+<!-- ── MODAL NUOVA SALA ─────────────────────────────────────────────────────── -->
+<div class="modal-backdrop" id="modal-nuova-sala" onclick="bgCloseSalaForm(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Nuova sala</div>
+    <div class="modal-body">
+      <div class="fgroup" style="margin-bottom:0">
+        <label class="flabel">Nome sala *</label>
+        <input class="finput" type="text" id="sala-nome" placeholder="es. Sala interna" autocomplete="off">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-close-modal" onclick="closeNuovaSala()">Annulla</button>
+      <button class="btn-print" onclick="submitNuovaSala()" style="color:#10b981;font-weight:700">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL NUOVO/MODIFICA TAVOLO ─────────────────────────────────────────── -->
+<div class="modal-backdrop" id="modal-tavolo" onclick="bgCloseTavoloForm(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="tavolo-modal-title">Nuovo tavolo</div>
+    <div class="modal-body">
+      <div class="fgroup">
+        <label class="flabel">Numero *</label>
+        <input class="finput" type="text" id="tavolo-numero" placeholder="es. 5" autocomplete="off">
+      </div>
+      <div class="fgroup">
+        <label class="flabel">Forma *</label>
+        <div class="fselect-wrap">
+          <select class="fselect" id="tavolo-forma">
+            <option value="rettangolare">Rettangolare</option>
+            <option value="rotondo">Rotondo</option>
+          </select>
+        </div>
+      </div>
+      <div class="fgroup">
+        <label class="flabel">Posti *</label>
+        <input class="finput" type="number" id="tavolo-posti" placeholder="2" min="1" step="1" inputmode="numeric">
+      </div>
+      <div class="fgroup" style="margin-bottom:0">
+        <label class="flabel">Sala *</label>
+        <div class="fselect-wrap">
+          <select class="fselect" id="tavolo-sala"></select>
+        </div>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-close-modal" onclick="closeTavoloForm()">Annulla</button>
+      <button class="btn-print" onclick="submitTavoloForm()" style="color:#10b981;font-weight:700">Salva</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── SHEET RAPIDO TAVOLO (mappa) ─────────────────────────────────────────── -->
+<div class="lot-detail-overlay" id="tavolo-sheet-overlay" onclick="if(event.target===this) closeTavoloSheet()">
+  <div class="lot-detail-sheet">
+    <div class="lot-detail-handle"></div>
+    <div class="lot-detail-title" id="tavolo-sheet-title"></div>
+    <div id="tavolo-sheet-body" style="padding:4px 20px 20px"></div>
+  </div>
+</div>
+
 <!-- ── LOT DETAIL SHEET ─────────────────────────────────────────────────── -->
 <div class="lot-detail-overlay" id="lot-detail-overlay"
      onclick="if(event.target===this) closeLotDetail()">
@@ -2444,6 +2748,7 @@ body.help-mode { background: #0f1f3d; }
 <script>
 const REPARTI = ['cucina', 'sala', 'pizzeria'];
 const CAN_DELETE_CARICHI = {{ 'true' if current_user.is_authenticated and current_user.puo_eliminare_carichi else 'false' }};
+const CAN_GESTIRE_SALA = {{ 'true' if current_user.is_authenticated and current_user.puo_gestire_sala else 'false' }};
 
 // ── STATE ────────────────────────────────────────────────────────────────
 const S = {
@@ -2475,6 +2780,15 @@ const S = {
   rangeRiferimento:      {},
   temperatureStorico:    [],
   preparazioni:          [],
+  prenotazioni:          [],
+  coperti:               { totale: 0, pranzo: { rimasti: 0 }, cena: { rimasti: 0 } },
+  prenData:              '',
+  prenEditId:            null,      // null = nuova prenotazione, altrimenti id in modifica
+  prenTavoliSelezionati: [],        // id tavoli selezionati nel form prenotazione
+  sale:                  [],
+  tavoli:                [],
+  salaAttivaId:          null,
+  tavoloEditId:          null,      // null = nuovo tavolo, altrimenti id in modifica
 };
 
 // ── FILTRI REPARTO + CATEGORIA (Carico / In uso / Scarico) ────────────────
@@ -2633,6 +2947,8 @@ function navTo(page) {
   if (page === 'controllo')  loadControlloLogs();
   if (page === 'export')    initExportPage();
   if (page === 'preparazioni') loadPreparazioni();
+  if (page === 'prenotazioni') loadPrenotazioni();
+  if (page === 'gestione-sala') loadGestioneSala();
 }
 // alias for backward compat
 function switchTab(t) { navTo(t); }
@@ -4864,6 +5180,473 @@ async function showPreparazioneDetail(id) {
 function closePrepEtichetta() { document.getElementById('modal-eti-preparazione').classList.remove('open'); }
 function bgClosePrepEti(e) { if (e.target === document.getElementById('modal-eti-preparazione')) closePrepEtichetta(); }
 
+// ── PRENOTAZIONI ─────────────────────────────────────────────────────────
+const PRANZO_CENA_CUTOFF = '17:00';
+const PREN_STATO_LBL = { confermata: 'Confermata', in_attesa: 'In attesa', cancellata: 'Cancellata' };
+
+async function loadPrenotazioni() {
+  if (!S.prenData) S.prenData = dataOraItaliana().data;
+  document.getElementById('pren-data').value = S.prenData;
+  const data = await api(`/api/prenotazioni?data=${encodeURIComponent(S.prenData)}`);
+  S.prenotazioni = data.prenotazioni || [];
+  S.coperti = data.coperti || S.coperti;
+  renderCoperti();
+  renderPrenotazioni();
+  if (!S.sale.length) await loadSaleETavoli();
+}
+
+function onPrenDataChange() {
+  S.prenData = document.getElementById('pren-data').value;
+  loadPrenotazioni();
+}
+
+function renderCoperti() {
+  document.getElementById('coperti-totale').textContent = S.coperti.totale ?? 0;
+  document.getElementById('coperti-pranzo').textContent = S.coperti.pranzo ? S.coperti.pranzo.rimasti : 0;
+  document.getElementById('coperti-cena').textContent   = S.coperti.cena   ? S.coperti.cena.rimasti   : 0;
+}
+
+function renderPrenotazioni() {
+  const el = document.getElementById('pren-list');
+  if (!S.prenotazioni.length) {
+    el.innerHTML = `<div class="empty-state">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <p>Nessuna prenotazione per questo giorno</p>
+    </div>`;
+    return;
+  }
+
+  const pranzo = S.prenotazioni.filter(p => p.ora < PRANZO_CENA_CUTOFF);
+  const cena   = S.prenotazioni.filter(p => p.ora >= PRANZO_CENA_CUTOFF);
+
+  const rigaHtml = (p) => {
+    const tavoliTxt = p.tavoli && p.tavoli.length ? p.tavoli.map(t => t.numero).join(', ') : '—';
+    const riga = `<div class="pren-row" onclick="showPrenDetail(${p.id})">
+      <div>
+        <div class="pren-nome">${esc(p.nome)}</div>
+        <div class="pren-meta">${esc(p.ora)} · ${p.persone}&nbsp;persone${p.telefono ? ' · ' + esc(p.telefono) : ''} · Tavolo ${esc(tavoliTxt)}</div>
+      </div>
+      <span class="pren-badge ${p.stato}">${PREN_STATO_LBL[p.stato] || p.stato}</span>
+    </div>`;
+    if (!CAN_GESTIRE_SALA) return riga;
+    return `<div class="pren-swipe">
+      <div class="pren-delete" onclick="event.stopPropagation(); confermaEliminaPrenotazione(${p.id})">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+        Elimina
+      </div>
+      ${riga}
+    </div>`;
+  };
+
+  const section = (titolo, list) => list.length
+    ? `<div class="spesa-group-hdr">${titolo}</div>${list.map(rigaHtml).join('')}`
+    : '';
+
+  el.innerHTML = section('Pranzo', pranzo) + section('Cena', cena);
+  _initSwipePrenotazioni();
+}
+
+function _initSwipePrenotazioni() {
+  const list = document.getElementById('pren-list');
+  if (!list || list.dataset.swipeInit) return;
+  list.dataset.swipeInit = '1';
+  let state = null;
+
+  list.addEventListener('touchstart', e => {
+    const row = e.target.closest('.pren-swipe .pren-row');
+    if (!row) return;
+    if (state && state.row !== row) _closeSwipePren(state.row);
+    list.querySelectorAll('.pren-swipe .pren-row.open').forEach(r => { if (r !== row) _closeSwipePren(r); });
+    state = { row, startX: e.touches[0].clientX, startedOpen: row.classList.contains('open') };
+  }, { passive: true });
+
+  list.addEventListener('touchmove', e => {
+    if (!state) return;
+    const dx = e.touches[0].clientX - state.startX;
+    const base = state.startedOpen ? -84 : 0;
+    state.lastX = Math.max(-84, Math.min(0, base + dx));
+    state.row.style.transform = `translateX(${state.lastX}px)`;
+  }, { passive: true });
+
+  list.addEventListener('touchend', () => {
+    if (!state) return;
+    const open = (state.lastX ?? (state.startedOpen ? -84 : 0)) < -42;
+    state.row.style.transform = open ? 'translateX(-84px)' : 'translateX(0)';
+    state.row.classList.toggle('open', open);
+    state = null;
+  });
+}
+function _closeSwipePren(row) {
+  row.style.transform = 'translateX(0)';
+  row.classList.remove('open');
+}
+
+async function openNuovaPrenotazione() {
+  if (!S.sale.length) await loadSaleETavoli();
+  S.prenEditId = null;
+  S.prenTavoliSelezionati = [];
+  document.getElementById('pren-modal-title').textContent = 'Nuova prenotazione';
+  document.getElementById('pren-nome').value = '';
+  document.getElementById('pren-persone').value = '';
+  document.getElementById('pren-form-data').value = S.prenData || dataOraItaliana().data;
+  document.getElementById('pren-ora').value = '';
+  document.getElementById('pren-telefono').value = '';
+  document.getElementById('pren-note').value = '';
+  document.getElementById('pren-stato').value = 'confermata';
+  renderPrenTavoliCheckbox();
+  document.getElementById('modal-prenotazione').classList.add('open');
+}
+function closeNuovaPrenotazione() { document.getElementById('modal-prenotazione').classList.remove('open'); }
+function bgClosePrenForm(e) { if (e.target === document.getElementById('modal-prenotazione')) closeNuovaPrenotazione(); }
+
+async function openModificaPrenotazione(id) {
+  const p = S.prenotazioni.find(x => x.id === id);
+  if (!p) return;
+  if (!S.sale.length) await loadSaleETavoli();
+  S.prenEditId = id;
+  S.prenTavoliSelezionati = (p.tavoli || []).map(t => t.id);
+  document.getElementById('pren-modal-title').textContent = 'Modifica prenotazione';
+  document.getElementById('pren-nome').value = p.nome;
+  document.getElementById('pren-persone').value = p.persone;
+  document.getElementById('pren-form-data').value = p.data;
+  document.getElementById('pren-ora').value = p.ora;
+  document.getElementById('pren-telefono').value = p.telefono || '';
+  document.getElementById('pren-note').value = p.note || '';
+  document.getElementById('pren-stato').value = p.stato;
+  renderPrenTavoliCheckbox();
+  closePrenDetail();
+  document.getElementById('modal-prenotazione').classList.add('open');
+}
+
+function renderPrenTavoliCheckbox() {
+  const el = document.getElementById('pren-tavoli-list');
+  if (!S.tavoli.length) { el.innerHTML = `<div style="font-size:13px;color:var(--muted)">Nessun tavolo configurato</div>`; return; }
+  const bySala = {};
+  S.tavoli.forEach(t => {
+    if (!bySala[t.sala_nome]) bySala[t.sala_nome] = [];
+    bySala[t.sala_nome].push(t);
+  });
+  el.innerHTML = Object.keys(bySala).map(salaNome => `
+    <div style="margin-bottom:10px">
+      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">${esc(salaNome)}</div>
+      <div style="display:flex;flex-wrap:wrap;gap:8px">
+        ${bySala[salaNome].map(t => `
+          <label style="display:flex;align-items:center;gap:6px;padding:8px 12px;border:1.5px solid var(--border);border-radius:10px;cursor:pointer;font-size:13px">
+            <input type="checkbox" value="${t.id}" ${S.prenTavoliSelezionati.includes(t.id)?'checked':''} onchange="onPrenTavoloToggle(${t.id}, this.checked)">
+            Tavolo ${esc(t.numero)} (${t.posti})
+          </label>
+        `).join('')}
+      </div>
+    </div>
+  `).join('');
+}
+
+function onPrenTavoloToggle(id, checked) {
+  if (checked) { if (!S.prenTavoliSelezionati.includes(id)) S.prenTavoliSelezionati.push(id); }
+  else { S.prenTavoliSelezionati = S.prenTavoliSelezionati.filter(x => x !== id); }
+}
+
+async function submitPrenotazione() {
+  const nome     = document.getElementById('pren-nome').value.trim();
+  const persone  = parseInt(document.getElementById('pren-persone').value, 10);
+  const dataVal  = document.getElementById('pren-form-data').value;
+  const ora      = document.getElementById('pren-ora').value;
+  const telefono = document.getElementById('pren-telefono').value.trim();
+  const note     = document.getElementById('pren-note').value.trim();
+  const stato    = document.getElementById('pren-stato').value;
+
+  if (!nome)    { toast('Inserisci il nome', 'error'); return; }
+  if (!persone || persone <= 0) { toast('Inserisci il numero di persone', 'error'); return; }
+  if (!dataVal) { toast('Seleziona la data', 'error'); return; }
+  if (!ora)     { toast("Seleziona l'ora", 'error'); return; }
+
+  const btn = document.getElementById('btn-pren-salva');
+  btn.disabled = true;
+
+  const body   = { nome, persone, data: dataVal, ora, telefono, note, tavoli: S.prenTavoliSelezionati };
+  const result = S.prenEditId
+    ? await api(`/api/prenotazioni/${S.prenEditId}`, { method: 'PUT', body: { ...body, stato } })
+    : await api('/api/prenotazioni', { method: 'POST', body });
+
+  btn.disabled = false;
+
+  if (!result.success) { toast(result.error || 'Errore', 'error'); return; }
+  closeNuovaPrenotazione();
+  toast(S.prenEditId ? 'Prenotazione aggiornata' : 'Prenotazione registrata', 'success');
+  await loadPrenotazioni();
+  if (S.activePage === 'gestione-sala') loadTavoliMappa();
+}
+
+function showPrenDetail(id) {
+  const p = S.prenotazioni.find(x => x.id === id);
+  if (!p) return;
+  document.getElementById('pren-detail-title').textContent = p.nome;
+  const tavoliTxt = p.tavoli && p.tavoli.length ? p.tavoli.map(t => `Tavolo ${t.numero}`).join(', ') : '—';
+  const editBtn = CAN_GESTIRE_SALA
+    ? `<button type="button" class="btn-svuota" style="width:100%;margin-top:16px" onclick="openModificaPrenotazione(${p.id})">Modifica</button>`
+    : '';
+  document.getElementById('pren-detail-body').innerHTML = `
+    <div class="lot-detail-row"><span style="font-size:12px;color:var(--muted)">Data</span><span style="font-weight:600">${fmtDate(p.data)}</span></div>
+    <div class="lot-detail-row"><span style="font-size:12px;color:var(--muted)">Ora</span><span style="font-weight:600">${esc(p.ora)}</span></div>
+    <div class="lot-detail-row"><span style="font-size:12px;color:var(--muted)">Persone</span><span style="font-weight:600">${p.persone}</span></div>
+    <div class="lot-detail-row"><span style="font-size:12px;color:var(--muted)">Telefono</span><span style="font-weight:600">${esc(p.telefono || '—')}</span></div>
+    <div class="lot-detail-row"><span style="font-size:12px;color:var(--muted)">Tavolo</span><span style="font-weight:600">${esc(tavoliTxt)}</span></div>
+    <div class="lot-detail-row"><span style="font-size:12px;color:var(--muted)">Stato</span><span class="pren-badge ${p.stato}">${PREN_STATO_LBL[p.stato] || p.stato}</span></div>
+    ${p.note ? `<div class="lot-detail-row"><span style="font-size:12px;color:var(--muted)">Note</span><span style="font-weight:600;text-align:right">${esc(p.note)}</span></div>` : ''}
+    <div class="lot-detail-row"><span style="font-size:12px;color:var(--muted)">Operatore</span><span style="font-weight:600">${esc(p.operatore || '—')}</span></div>
+    ${editBtn}
+  `;
+  document.getElementById('pren-detail-overlay').classList.add('open');
+}
+function closePrenDetail() { document.getElementById('pren-detail-overlay').classList.remove('open'); }
+
+async function confermaEliminaPrenotazione(id) {
+  if (!confirm('Eliminare questa prenotazione?')) return;
+  const result = await api(`/api/prenotazioni/${id}`, { method: 'DELETE' });
+  if (!result.success) { toast(result.error || 'Errore', 'error'); return; }
+  toast('Prenotazione eliminata', 'success');
+  await loadPrenotazioni();
+  if (S.activePage === 'gestione-sala') loadTavoliMappa();
+}
+
+// ── GESTIONE SALA ────────────────────────────────────────────────────────
+const TAVOLO_BASE_SIZE     = 56;
+const TAVOLO_SIZE_PER_POSTO = 6;
+
+async function loadGestioneSala() {
+  await loadSaleETavoli();
+  renderSalaPills();
+  renderMappaSala();
+}
+
+async function loadSaleETavoli() {
+  const [saleData, tavoliData] = await Promise.all([api('/api/sale'), api('/api/tavoli')]);
+  S.sale   = saleData.sale || [];
+  S.tavoli = tavoliData.tavoli || [];
+  if (!S.salaAttivaId && S.sale.length) S.salaAttivaId = S.sale[0].id;
+}
+
+async function loadTavoliMappa() {
+  const data = await api('/api/tavoli');
+  S.tavoli = data.tavoli || [];
+  renderMappaSala();
+}
+
+function renderSalaPills() {
+  const row = document.getElementById('sala-pills-row');
+  if (!row) return;
+  if (!S.sale.length) { row.innerHTML = ''; return; }
+  row.innerHTML = S.sale.map(s =>
+    `<button class="fpill ${S.salaAttivaId === s.id ? 'active' : ''}" onclick="setSalaAttiva(${s.id})">${esc(s.nome)}</button>`
+  ).join('');
+}
+
+function setSalaAttiva(id) {
+  S.salaAttivaId = id;
+  renderSalaPills();
+  renderMappaSala();
+}
+
+function renderMappaSala() {
+  const canvas = document.getElementById('sala-map-canvas');
+  if (!canvas) return;
+  const tavoli = S.salaAttivaId ? S.tavoli.filter(t => t.sala_id === S.salaAttivaId) : S.tavoli;
+
+  canvas.innerHTML = tavoli.map(t => {
+    const size = TAVOLO_BASE_SIZE + Math.max(0, t.posti - 2) * TAVOLO_SIZE_PER_POSTO;
+    const w = t.forma === 'rettangolare' ? size * 1.4 : size;
+    return `<div class="tavolo-box ${t.forma} ${t.stato} ${CAN_GESTIRE_SALA ? '' : 'no-drag'}"
+                 data-id="${t.id}"
+                 style="left:${t.posizione_x}px;top:${t.posizione_y}px;width:${w}px;height:${size}px">
+      <span class="tavolo-numero">${esc(t.numero)}</span>
+      <span class="tavolo-posti">${t.posti}p</span>
+    </div>`;
+  }).join('');
+
+  _initTavoloDrag();
+}
+
+function _initTavoloDrag() {
+  const canvas = document.getElementById('sala-map-canvas');
+  if (!canvas || canvas.dataset.dragInit) return;
+  canvas.dataset.dragInit = '1';
+
+  let drag = null;
+  const getPoint = e => e.touches ? e.touches[0] : e;
+
+  const onDown = e => {
+    const box = e.target.closest('.tavolo-box');
+    if (!box) return;
+    const p = getPoint(e);
+    drag = {
+      el: box, id: box.dataset.id,
+      startClientX: p.clientX, startClientY: p.clientY,
+      startLeft: parseFloat(box.style.left) || 0,
+      startTop:  parseFloat(box.style.top)  || 0,
+      moved: false,
+    };
+    if (CAN_GESTIRE_SALA) box.classList.add('dragging');
+  };
+
+  const onMove = e => {
+    if (!drag) return;
+    const p  = getPoint(e);
+    const dx = p.clientX - drag.startClientX;
+    const dy = p.clientY - drag.startClientY;
+    if (Math.abs(dx) > 4 || Math.abs(dy) > 4) drag.moved = true;
+    if (!CAN_GESTIRE_SALA || !drag.moved) return;
+    if (e.cancelable) e.preventDefault();
+    drag.el.style.left = `${drag.startLeft + dx}px`;
+    drag.el.style.top  = `${drag.startTop  + dy}px`;
+  };
+
+  const onUp = () => {
+    if (!drag) return;
+    const { el, id, moved } = drag;
+    el.classList.remove('dragging');
+    if (CAN_GESTIRE_SALA && moved) {
+      const left = parseFloat(el.style.left) || 0;
+      const top  = parseFloat(el.style.top)  || 0;
+      api(`/api/tavoli/${id}`, { method: 'PATCH', body: { posizione_x: left, posizione_y: top } });
+    } else {
+      openTavoloSheet(Number(id));
+    }
+    drag = null;
+  };
+
+  canvas.addEventListener('touchstart', onDown, { passive: true });
+  canvas.addEventListener('touchmove',  onMove,  { passive: false });
+  canvas.addEventListener('touchend',   onUp);
+  canvas.addEventListener('touchcancel', () => { drag = null; });
+
+  canvas.addEventListener('mousedown', onDown);
+  window.addEventListener('mousemove', onMove);
+  window.addEventListener('mouseup', onUp);
+}
+
+function openTavoloSheet(id) {
+  const t = S.tavoli.find(x => x.id === id);
+  if (!t) return;
+  document.getElementById('tavolo-sheet-title').textContent = `Tavolo ${t.numero}`;
+
+  const statoLbl = { libero: 'Libero', occupato: 'Occupato', prenotato: 'Prenotato' };
+  const prenotazioneOggi = t.stato === 'prenotato'
+    ? S.prenotazioni.find(p => (p.tavoli || []).some(pt => pt.id === id) && p.stato !== 'cancellata')
+    : null;
+
+  let html = `
+    <div class="lot-detail-row"><span style="font-size:12px;color:var(--muted)">Sala</span><span style="font-weight:600">${esc(t.sala_nome)}</span></div>
+    <div class="lot-detail-row"><span style="font-size:12px;color:var(--muted)">Forma</span><span style="font-weight:600">${t.forma === 'rotondo' ? 'Rotondo' : 'Rettangolare'}</span></div>
+    <div class="lot-detail-row"><span style="font-size:12px;color:var(--muted)">Posti</span><span style="font-weight:600">${t.posti}</span></div>
+    <div class="lot-detail-row"><span style="font-size:12px;color:var(--muted)">Stato</span><span class="temp-badge ${t.stato === 'libero' ? 'ok' : 'danger'}">${statoLbl[t.stato]}</span></div>
+  `;
+  if (prenotazioneOggi) {
+    html += `<div class="lot-detail-row"><span style="font-size:12px;color:var(--muted)">Prenotazione</span><span style="font-weight:600">${esc(prenotazioneOggi.nome)} · ${esc(prenotazioneOggi.ora)} · ${prenotazioneOggi.persone}p</span></div>`;
+  }
+  if (CAN_GESTIRE_SALA) {
+    html += `
+      <button type="button" class="btn-svuota" style="width:100%;margin-top:14px" onclick="toggleTavoloOccupato(${t.id})">${t.occupato ? 'Segna come libero' : 'Segna come occupato'}</button>
+      <button type="button" class="btn-svuota" style="width:100%;margin-top:8px" onclick="openModificaTavolo(${t.id})">Modifica tavolo</button>
+      <button type="button" class="btn-svuota" style="width:100%;margin-top:8px;color:var(--red);border-color:rgba(239,68,68,.3)" onclick="confermaEliminaTavolo(${t.id})">Elimina tavolo</button>
+    `;
+  }
+
+  document.getElementById('tavolo-sheet-body').innerHTML = html;
+  document.getElementById('tavolo-sheet-overlay').classList.add('open');
+}
+function closeTavoloSheet() { document.getElementById('tavolo-sheet-overlay').classList.remove('open'); }
+
+async function toggleTavoloOccupato(id) {
+  const t = S.tavoli.find(x => x.id === id);
+  if (!t) return;
+  const result = await api(`/api/tavoli/${id}`, { method: 'PATCH', body: { occupato: t.occupato ? 0 : 1 } });
+  if (!result.success) { toast(result.error || 'Errore', 'error'); return; }
+  closeTavoloSheet();
+  await loadTavoliMappa();
+}
+
+async function confermaEliminaTavolo(id) {
+  if (!confirm('Eliminare questo tavolo?')) return;
+  const result = await api(`/api/tavoli/${id}`, { method: 'DELETE' });
+  if (!result.success) { toast(result.error || 'Errore', 'error'); return; }
+  closeTavoloSheet();
+  toast('Tavolo eliminato', 'success');
+  await loadTavoliMappa();
+}
+
+function openNuovoTavolo() {
+  S.tavoloEditId = null;
+  document.getElementById('tavolo-modal-title').textContent = 'Nuovo tavolo';
+  document.getElementById('tavolo-numero').value = '';
+  document.getElementById('tavolo-forma').value = 'rettangolare';
+  document.getElementById('tavolo-posti').value = '2';
+  populateSalaSelect();
+  document.getElementById('modal-tavolo').classList.add('open');
+}
+
+function openModificaTavolo(id) {
+  const t = S.tavoli.find(x => x.id === id);
+  if (!t) return;
+  S.tavoloEditId = id;
+  document.getElementById('tavolo-modal-title').textContent = 'Modifica tavolo';
+  document.getElementById('tavolo-numero').value = t.numero;
+  document.getElementById('tavolo-forma').value = t.forma;
+  document.getElementById('tavolo-posti').value = t.posti;
+  populateSalaSelect();
+  document.getElementById('tavolo-sala').value = t.sala_id;
+  closeTavoloSheet();
+  document.getElementById('modal-tavolo').classList.add('open');
+}
+
+function populateSalaSelect() {
+  const sel = document.getElementById('tavolo-sala');
+  sel.innerHTML = S.sale.map(s => `<option value="${s.id}">${esc(s.nome)}</option>`).join('');
+  if (S.salaAttivaId) sel.value = S.salaAttivaId;
+}
+
+function closeTavoloForm() { document.getElementById('modal-tavolo').classList.remove('open'); }
+function bgCloseTavoloForm(e) { if (e.target === document.getElementById('modal-tavolo')) closeTavoloForm(); }
+
+async function submitTavoloForm() {
+  const numero = document.getElementById('tavolo-numero').value.trim();
+  const forma  = document.getElementById('tavolo-forma').value;
+  const posti  = parseInt(document.getElementById('tavolo-posti').value, 10);
+  const salaId = document.getElementById('tavolo-sala').value;
+
+  if (!numero) { toast('Inserisci il numero del tavolo', 'error'); return; }
+  if (!posti || posti <= 0) { toast('Inserisci il numero di posti', 'error'); return; }
+  if (!salaId) { toast('Seleziona la sala', 'error'); return; }
+
+  const result = S.tavoloEditId
+    ? await api(`/api/tavoli/${S.tavoloEditId}`, { method: 'PATCH', body: { numero, forma, posti, sala_id: Number(salaId) } })
+    : await api('/api/tavoli', { method: 'POST', body: { numero, forma, posti, sala_id: Number(salaId), posizione_x: 40, posizione_y: 40 } });
+
+  if (!result.success) { toast(result.error || 'Errore', 'error'); return; }
+  closeTavoloForm();
+  toast(S.tavoloEditId ? 'Tavolo aggiornato' : 'Tavolo creato', 'success');
+  await loadTavoliMappa();
+}
+
+function openNuovaSala() {
+  document.getElementById('sala-nome').value = '';
+  document.getElementById('modal-nuova-sala').classList.add('open');
+}
+function closeNuovaSala() { document.getElementById('modal-nuova-sala').classList.remove('open'); }
+function bgCloseSalaForm(e) { if (e.target === document.getElementById('modal-nuova-sala')) closeNuovaSala(); }
+
+async function submitNuovaSala() {
+  const nome = document.getElementById('sala-nome').value.trim();
+  if (!nome) { toast('Inserisci il nome della sala', 'error'); return; }
+  const result = await api('/api/sale', { method: 'POST', body: { nome } });
+  if (!result.success) { toast(result.error || 'Errore', 'error'); return; }
+  closeNuovaSala();
+  toast('Sala creata', 'success');
+  S.salaAttivaId = result.id;
+  await loadSaleETavoli();
+  renderSalaPills();
+  renderMappaSala();
+}
+
 // ── EXPORT PDF ────────────────────────────────────────────────────────────
 function initExportPage() {
   const selAnno = document.getElementById('exp-anno');
@@ -4932,7 +5715,7 @@ async function generaExportPdf() {
 }
 
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeModal(); closeLotDetail(); closeModificaLotto(); closeDrawer(); closeApparecchioModal(); closeRegistraTempModal(); closeNuovaPreparazione(); closePrepEtichetta(); }
+  if (e.key === 'Escape') { closeModal(); closeLotDetail(); closeModificaLotto(); closeDrawer(); closeApparecchioModal(); closeRegistraTempModal(); closeNuovaPreparazione(); closePrepEtichetta(); closeNuovaPrenotazione(); closePrenDetail(); closeNuovaSala(); closeTavoloForm(); closeTavoloSheet(); }
 });
 
 // ── BOOT ─────────────────────────────────────────────────────────────────

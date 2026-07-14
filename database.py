@@ -35,6 +35,10 @@ if _USE_PG:
 _data_dir = '/data' if os.path.isdir('/data') else os.path.dirname(__file__)
 DB_PATH = os.path.join(_data_dir, 'haccp.db')
 
+# Orario di confine tra Pranzo e Cena per raggruppare le prenotazioni e
+# calcolare i coperti (HH:MM, confronto lessicografico su stringa).
+PRANZO_CENA_CUTOFF = '17:00'
+
 if _USE_PG:
     import psycopg2
     import psycopg2.extras
@@ -274,10 +278,55 @@ def db_init():
                 quantita         REAL NOT NULL DEFAULT 0,
                 unita            TEXT NOT NULL DEFAULT ''
             )""",
+            f"""CREATE TABLE IF NOT EXISTS sale (
+                id   {pk},
+                nome TEXT NOT NULL
+            )""",
+            f"""CREATE TABLE IF NOT EXISTS tavoli (
+                id          {pk},
+                numero      TEXT NOT NULL,
+                forma       TEXT NOT NULL DEFAULT 'rettangolare',
+                posti       INTEGER NOT NULL DEFAULT 2,
+                sala_id     INTEGER NOT NULL,
+                posizione_x REAL NOT NULL DEFAULT 40,
+                posizione_y REAL NOT NULL DEFAULT 40,
+                occupato    INTEGER NOT NULL DEFAULT 0,
+                attivo      INTEGER NOT NULL DEFAULT 1
+            )""",
+            f"""CREATE TABLE IF NOT EXISTS prenotazioni (
+                id           {pk},
+                nome         TEXT NOT NULL,
+                persone      INTEGER NOT NULL DEFAULT 1,
+                data         TEXT NOT NULL,
+                ora          TEXT NOT NULL,
+                telefono     TEXT NOT NULL DEFAULT '',
+                note         TEXT NOT NULL DEFAULT '',
+                stato        TEXT NOT NULL DEFAULT 'confermata',
+                operatore_id INTEGER
+            )""",
+            f"""CREATE TABLE IF NOT EXISTS combinazioni_tavoli (
+                id              {pk},
+                prenotazione_id INTEGER NOT NULL,
+                tavolo_id       INTEGER NOT NULL
+            )""",
+            f"""CREATE TABLE IF NOT EXISTS log_eliminazioni_prenotazioni (
+                id             {pk},
+                nome           TEXT NOT NULL DEFAULT '',
+                persone        INTEGER NOT NULL DEFAULT 0,
+                data_prenot    TEXT NOT NULL DEFAULT '',
+                ora            TEXT NOT NULL DEFAULT '',
+                operatore_orig TEXT NOT NULL DEFAULT '',
+                eliminato_da   TEXT NOT NULL DEFAULT '',
+                eliminato_il   TEXT NOT NULL DEFAULT ''
+            )""",
             "CREATE INDEX IF NOT EXISTS idx_reg_prod_lotto ON registro(prodotto, lotto)",
             "CREATE INDEX IF NOT EXISTS idx_reg_mov_id     ON registro(movimento_id)",
             "CREATE INDEX IF NOT EXISTS idx_temp_data      ON temperature(data)",
             "CREATE INDEX IF NOT EXISTS idx_prep_ingr_prep ON preparazione_ingredienti(preparazione_id)",
+            "CREATE INDEX IF NOT EXISTS idx_tavoli_sala    ON tavoli(sala_id)",
+            "CREATE INDEX IF NOT EXISTS idx_prenot_data    ON prenotazioni(data)",
+            "CREATE INDEX IF NOT EXISTS idx_combi_prenot   ON combinazioni_tavoli(prenotazione_id)",
+            "CREATE INDEX IF NOT EXISTS idx_combi_tavolo   ON combinazioni_tavoli(tavolo_id)",
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email    ON users(email)",
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_telefono ON users(telefono)",
         ]:
@@ -1430,5 +1479,260 @@ def get_preparazione_ingredienti(preparazione_id):
             "SELECT id, prodotto, lotto, quantita, unita FROM preparazione_ingredienti "
             "WHERE preparazione_id = ? ORDER BY id",
             (preparazione_id,)
+        )
+        return _rows(cur)
+
+
+# ─── SALE ──────────────────────────────────────────────────────────────────
+
+def get_sale():
+    with get_conn() as conn:
+        cur = conn.execute("SELECT id, nome FROM sale ORDER BY LOWER(nome)")
+        return _rows(cur)
+
+
+def create_sala(nome):
+    with get_conn() as conn:
+        return conn.execute_insert("INSERT INTO sale (nome) VALUES (?)", (nome,))
+
+
+def update_sala(sala_id, nome):
+    with get_conn() as conn:
+        conn.execute("UPDATE sale SET nome = ? WHERE id = ?", (nome, sala_id))
+
+
+def delete_sala(sala_id):
+    """Ritorna False (senza eliminare nulla) se la sala ha ancora tavoli
+    attivi — il chiamante deve bloccare l'operazione in quel caso."""
+    with get_conn() as conn:
+        cur = conn.execute(
+            "SELECT COUNT(*) AS n FROM tavoli WHERE sala_id = ? AND attivo = 1", (sala_id,)
+        )
+        if _row(cur)['n'] > 0:
+            return False
+        conn.execute("DELETE FROM sale WHERE id = ?", (sala_id,))
+        return True
+
+
+# ─── TAVOLI ────────────────────────────────────────────────────────────────
+
+def get_tavoli(sala_id=None):
+    """Elenco tavoli attivi con stato calcolato in tempo reale:
+    'occupato' (toggle manuale del cameriere) > 'prenotato' (c'è una
+    prenotazione oggi non cancellata collegata) > 'libero'."""
+    with get_conn() as conn:
+        sql = ("SELECT t.id, t.numero, t.forma, t.posti, t.sala_id, "
+               "t.posizione_x, t.posizione_y, t.occupato, s.nome AS sala_nome "
+               "FROM tavoli t JOIN sale s ON s.id = t.sala_id WHERE t.attivo = 1")
+        params = []
+        if sala_id:
+            sql += " AND t.sala_id = ?"
+            params.append(sala_id)
+        sql += " ORDER BY t.numero"
+        tavoli = _rows(conn.execute(sql, tuple(params)))
+
+        oggi = today_it().isoformat()
+        prenotati_rows = _rows(conn.execute(
+            "SELECT DISTINCT ct.tavolo_id FROM combinazioni_tavoli ct "
+            "JOIN prenotazioni p ON p.id = ct.prenotazione_id "
+            "WHERE p.data = ? AND p.stato != 'cancellata'",
+            (oggi,)
+        ))
+    prenotati_ids = {r['tavolo_id'] for r in prenotati_rows}
+
+    for t in tavoli:
+        if t['occupato']:
+            t['stato'] = 'occupato'
+        elif t['id'] in prenotati_ids:
+            t['stato'] = 'prenotato'
+        else:
+            t['stato'] = 'libero'
+    return tavoli
+
+
+def get_tavolo_by_id(tavolo_id):
+    with get_conn() as conn:
+        cur = conn.execute(
+            "SELECT id, numero, forma, posti, sala_id, posizione_x, posizione_y, "
+            "occupato, attivo FROM tavoli WHERE id = ?",
+            (tavolo_id,)
+        )
+        return _row(cur)
+
+
+def create_tavolo(numero, forma, posti, sala_id, posizione_x=40, posizione_y=40):
+    with get_conn() as conn:
+        return conn.execute_insert(
+            "INSERT INTO tavoli (numero, forma, posti, sala_id, posizione_x, posizione_y) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (numero, forma, posti, sala_id, posizione_x, posizione_y)
+        )
+
+
+_TAVOLO_CAMPI = ('numero', 'forma', 'posti', 'sala_id', 'posizione_x', 'posizione_y', 'occupato')
+
+
+def update_tavolo(tavolo_id, **campi):
+    """Update parziale: passa solo i campi da modificare, es.
+    update_tavolo(5, posizione_x=120, posizione_y=80) oppure
+    update_tavolo(5, occupato=1)."""
+    sets, params = [], []
+    for k, v in campi.items():
+        if k not in _TAVOLO_CAMPI:
+            continue
+        sets.append(f"{k} = ?")
+        params.append(v)
+    if not sets:
+        return
+    params.append(tavolo_id)
+    with get_conn() as conn:
+        conn.execute(f"UPDATE tavoli SET {', '.join(sets)} WHERE id = ?", tuple(params))
+
+
+def delete_tavolo(tavolo_id):
+    """Soft delete (le prenotazioni storiche restano intatte) + rimuove le
+    combinazioni tavolo↔prenotazione collegate a questo tavolo."""
+    with get_conn() as conn:
+        conn.execute("UPDATE tavoli SET attivo = 0 WHERE id = ?", (tavolo_id,))
+        conn.execute("DELETE FROM combinazioni_tavoli WHERE tavolo_id = ?", (tavolo_id,))
+
+
+# ─── PRENOTAZIONI ──────────────────────────────────────────────────────────
+
+def get_prenotazioni(data):
+    with get_conn() as conn:
+        prenotazioni = _rows(conn.execute(
+            "SELECT p.id, p.nome, p.persone, p.data, p.ora, p.telefono, p.note, "
+            "p.stato, p.operatore_id, COALESCE(u.nome, '—') AS operatore "
+            "FROM prenotazioni p LEFT JOIN users u ON u.id = p.operatore_id "
+            "WHERE p.data = ? ORDER BY p.ora, p.id",
+            (data,)
+        ))
+        if prenotazioni:
+            ids = [p['id'] for p in prenotazioni]
+            placeholders = ','.join('?' * len(ids))
+            tavoli_rows = _rows(conn.execute(
+                f"SELECT ct.prenotazione_id, t.id, t.numero, t.sala_id "
+                f"FROM combinazioni_tavoli ct JOIN tavoli t ON t.id = ct.tavolo_id "
+                f"WHERE ct.prenotazione_id IN ({placeholders})",
+                tuple(ids)
+            ))
+        else:
+            tavoli_rows = []
+
+    tavoli_per_prenot = {}
+    for r in tavoli_rows:
+        tavoli_per_prenot.setdefault(r['prenotazione_id'], []).append(
+            {'id': r['id'], 'numero': r['numero'], 'sala_id': r['sala_id']}
+        )
+    for p in prenotazioni:
+        p['tavoli'] = tavoli_per_prenot.get(p['id'], [])
+    return prenotazioni
+
+
+def get_prenotazione_by_id(prenotazione_id):
+    with get_conn() as conn:
+        cur = conn.execute(
+            "SELECT p.id, p.nome, p.persone, p.data, p.ora, p.telefono, p.note, "
+            "p.stato, p.operatore_id, COALESCE(u.nome, '—') AS operatore "
+            "FROM prenotazioni p LEFT JOIN users u ON u.id = p.operatore_id "
+            "WHERE p.id = ?",
+            (prenotazione_id,)
+        )
+        prenotazione = _row(cur)
+        if not prenotazione:
+            return None
+        tavoli = _rows(conn.execute(
+            "SELECT t.id, t.numero, t.sala_id FROM combinazioni_tavoli ct "
+            "JOIN tavoli t ON t.id = ct.tavolo_id WHERE ct.prenotazione_id = ?",
+            (prenotazione_id,)
+        ))
+    prenotazione['tavoli'] = tavoli
+    return prenotazione
+
+
+def create_prenotazione(nome, persone, data, ora, telefono, note, operatore_id, tavoli_ids):
+    with get_conn() as conn:
+        prenotazione_id = conn.execute_insert(
+            "INSERT INTO prenotazioni (nome, persone, data, ora, telefono, note, stato, operatore_id) "
+            "VALUES (?, ?, ?, ?, ?, ?, 'confermata', ?)",
+            (nome, persone, data, ora, telefono, note, operatore_id)
+        )
+        for tavolo_id in tavoli_ids:
+            conn.execute(
+                "INSERT INTO combinazioni_tavoli (prenotazione_id, tavolo_id) VALUES (?, ?)",
+                (prenotazione_id, tavolo_id)
+            )
+    return prenotazione_id
+
+
+def update_prenotazione(prenotazione_id, nome, persone, data, ora, telefono, note, stato, tavoli_ids):
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE prenotazioni SET nome = ?, persone = ?, data = ?, ora = ?, "
+            "telefono = ?, note = ?, stato = ? WHERE id = ?",
+            (nome, persone, data, ora, telefono, note, stato, prenotazione_id)
+        )
+        conn.execute("DELETE FROM combinazioni_tavoli WHERE prenotazione_id = ?", (prenotazione_id,))
+        for tavolo_id in tavoli_ids:
+            conn.execute(
+                "INSERT INTO combinazioni_tavoli (prenotazione_id, tavolo_id) VALUES (?, ?)",
+                (prenotazione_id, tavolo_id)
+            )
+
+
+def delete_prenotazione(prenotazione_id):
+    with get_conn() as conn:
+        conn.execute("DELETE FROM combinazioni_tavoli WHERE prenotazione_id = ?", (prenotazione_id,))
+        conn.execute("DELETE FROM prenotazioni WHERE id = ?", (prenotazione_id,))
+
+
+def get_coperti_giorno(data):
+    """Coperti totali/pranzo/cena per la data indicata (esclude le
+    prenotazioni cancellate) e coperti rimasti rispetto alla capienza
+    totale della sala (somma posti di tutti i tavoli attivi)."""
+    with get_conn() as conn:
+        rows = _rows(conn.execute(
+            "SELECT persone, ora FROM prenotazioni WHERE data = ? AND stato != 'cancellata'",
+            (data,)
+        ))
+        capienza_row = _row(conn.execute(
+            "SELECT COALESCE(SUM(posti), 0) AS tot FROM tavoli WHERE attivo = 1"
+        ))
+
+    pranzo, cena = 0, 0
+    for r in rows:
+        if (r['ora'] or '') < PRANZO_CENA_CUTOFF:
+            pranzo += r['persone']
+        else:
+            cena += r['persone']
+
+    capienza = capienza_row['tot'] if capienza_row else 0
+    return {
+        'totale':          pranzo + cena,
+        'pranzo':          {'prenotati': pranzo, 'rimasti': max(0, capienza - pranzo)},
+        'cena':            {'prenotati': cena,   'rimasti': max(0, capienza - cena)},
+        'capienza_totale': capienza,
+    }
+
+
+def log_eliminazione_prenotazione(prenotazione, eliminato_da):
+    # Timestamp di log in UTC esplicito, vedi nota in log_eliminazione_temperatura.
+    with get_conn() as conn:
+        conn.execute(
+            """INSERT INTO log_eliminazioni_prenotazioni
+               (nome, persone, data_prenot, ora, operatore_orig, eliminato_da, eliminato_il)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (prenotazione['nome'], prenotazione['persone'], prenotazione['data'], prenotazione['ora'],
+             prenotazione.get('operatore', ''), eliminato_da,
+             datetime.now(timezone.utc).isoformat(timespec='seconds'))
+        )
+
+
+def get_log_eliminazioni_prenotazioni(limit=200):
+    with get_conn() as conn:
+        cur = conn.execute(
+            "SELECT * FROM log_eliminazioni_prenotazioni ORDER BY id DESC LIMIT ?",
+            (limit,)
         )
         return _rows(cur)

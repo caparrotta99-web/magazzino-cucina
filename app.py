@@ -49,6 +49,11 @@ from database import (
     insert_preparazione, insert_preparazione_ingrediente,
     get_preparazioni, get_preparazione_by_id, get_preparazione_ingredienti,
     completa_preparazione,
+    get_sale, create_sala, update_sala, delete_sala,
+    get_tavoli, get_tavolo_by_id, create_tavolo, update_tavolo, delete_tavolo,
+    get_prenotazioni, get_prenotazione_by_id, create_prenotazione, update_prenotazione,
+    delete_prenotazione, get_coperti_giorno,
+    log_eliminazione_prenotazione, get_log_eliminazioni_prenotazioni,
 )
 from sheets import (
     load_listino, load_registro, append_registro, append_listino, aggiorna_tipo_movimento,
@@ -92,6 +97,10 @@ class User(UserMixin):
     @property
     def puo_eliminare_carichi(self):
         return self.role == 'admin' or self.puo_eliminare_carichi_raw
+
+    @property
+    def puo_gestire_sala(self):
+        return self.role == 'admin' or self.reparto == 'Sala'
 
 
 @login_manager.user_loader
@@ -138,6 +147,15 @@ def eliminazione_carichi_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         if not current_user.is_authenticated or not current_user.puo_eliminare_carichi:
+            abort(403)
+        return f(*args, **kwargs)
+    return decorated
+
+
+def gestione_sala_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not current_user.is_authenticated or not current_user.puo_gestire_sala:
             abort(403)
         return f(*args, **kwargs)
     return decorated
@@ -1337,6 +1355,273 @@ def api_preparazione_completa(prep_id):
     completa_preparazione(prep_id)
 
     return jsonify({'success': True})
+
+
+# ─── SALE ──────────────────────────────────────────────────────────────────
+
+@app.route('/api/sale', methods=['GET'])
+@login_required
+@admin_required  # TODO: rimuovere quando Prenotazioni/Gestione Sala escono dalla fase admin-only
+def api_sale_list():
+    return jsonify({'success': True, 'sale': get_sale(), 'puo_gestire': current_user.puo_gestire_sala})
+
+
+@app.route('/api/sale', methods=['POST'])
+@login_required
+@admin_required  # TODO: rimuovere quando Prenotazioni/Gestione Sala escono dalla fase admin-only
+@gestione_sala_required
+def api_sale_crea():
+    d    = request.get_json(force=True)
+    nome = (d.get('nome') or '').strip()
+    if not nome:
+        return jsonify({'success': False, 'error': 'Nome sala obbligatorio'}), 400
+    sala_id = create_sala(nome)
+    return jsonify({'success': True, 'id': sala_id, 'nome': nome})
+
+
+@app.route('/api/sale/<int:sala_id>', methods=['PUT'])
+@login_required
+@admin_required  # TODO: rimuovere quando Prenotazioni/Gestione Sala escono dalla fase admin-only
+@gestione_sala_required
+def api_sala_modifica(sala_id):
+    d    = request.get_json(force=True)
+    nome = (d.get('nome') or '').strip()
+    if not nome:
+        return jsonify({'success': False, 'error': 'Nome sala obbligatorio'}), 400
+    update_sala(sala_id, nome)
+    return jsonify({'success': True})
+
+
+@app.route('/api/sale/<int:sala_id>', methods=['DELETE'])
+@login_required
+@admin_required  # TODO: rimuovere quando Prenotazioni/Gestione Sala escono dalla fase admin-only
+@gestione_sala_required
+def api_sala_elimina(sala_id):
+    if not delete_sala(sala_id):
+        return jsonify({'success': False, 'error': 'Sposta o elimina prima i tavoli di questa sala'}), 400
+    return jsonify({'success': True})
+
+
+# ─── TAVOLI ────────────────────────────────────────────────────────────────
+
+@app.route('/api/tavoli', methods=['GET'])
+@login_required
+@admin_required  # TODO: rimuovere quando Prenotazioni/Gestione Sala escono dalla fase admin-only
+def api_tavoli_list():
+    sala_id = request.args.get('sala_id', type=int)
+    return jsonify({
+        'success':     True,
+        'tavoli':      get_tavoli(sala_id),
+        'puo_gestire': current_user.puo_gestire_sala,
+    })
+
+
+@app.route('/api/tavoli', methods=['POST'])
+@login_required
+@admin_required  # TODO: rimuovere quando Prenotazioni/Gestione Sala escono dalla fase admin-only
+@gestione_sala_required
+def api_tavoli_crea():
+    d      = request.get_json(force=True)
+    numero = (d.get('numero') or '').strip()
+    forma  = (d.get('forma') or '').strip()
+    try:
+        posti = int(d.get('posti', 0))
+    except (TypeError, ValueError):
+        posti = 0
+    try:
+        sala_id = int(d.get('sala_id', 0))
+    except (TypeError, ValueError):
+        sala_id = 0
+    try:
+        posizione_x = float(d.get('posizione_x', 40))
+        posizione_y = float(d.get('posizione_y', 40))
+    except (TypeError, ValueError):
+        posizione_x, posizione_y = 40, 40
+
+    if not numero:
+        return jsonify({'success': False, 'error': 'Numero tavolo obbligatorio'}), 400
+    if forma not in ('rettangolare', 'rotondo'):
+        return jsonify({'success': False, 'error': 'Seleziona la forma del tavolo'}), 400
+    if posti <= 0:
+        return jsonify({'success': False, 'error': 'Numero posti non valido'}), 400
+    if not sala_id:
+        return jsonify({'success': False, 'error': 'Seleziona la sala'}), 400
+
+    tavolo_id = create_tavolo(numero, forma, posti, sala_id, posizione_x, posizione_y)
+    return jsonify({'success': True, 'id': tavolo_id})
+
+
+@app.route('/api/tavoli/<int:tavolo_id>', methods=['PATCH'])
+@login_required
+@admin_required  # TODO: rimuovere quando Prenotazioni/Gestione Sala escono dalla fase admin-only
+@gestione_sala_required
+def api_tavoli_modifica(tavolo_id):
+    """Update parziale: posizione (drag), numero/forma/posti/sala (modifica
+    rapida) o toggle occupato — solo i campi presenti nel body vengono
+    aggiornati."""
+    if not get_tavolo_by_id(tavolo_id):
+        return jsonify({'success': False, 'error': 'Tavolo non trovato'}), 404
+
+    d     = request.get_json(force=True)
+    campi = {}
+
+    if 'numero' in d:
+        numero = (d.get('numero') or '').strip()
+        if not numero:
+            return jsonify({'success': False, 'error': 'Numero tavolo obbligatorio'}), 400
+        campi['numero'] = numero
+    if 'forma' in d:
+        forma = (d.get('forma') or '').strip()
+        if forma not in ('rettangolare', 'rotondo'):
+            return jsonify({'success': False, 'error': 'Seleziona la forma del tavolo'}), 400
+        campi['forma'] = forma
+    if 'posti' in d:
+        try:
+            posti = int(d.get('posti'))
+        except (TypeError, ValueError):
+            return jsonify({'success': False, 'error': 'Numero posti non valido'}), 400
+        if posti <= 0:
+            return jsonify({'success': False, 'error': 'Numero posti non valido'}), 400
+        campi['posti'] = posti
+    if 'sala_id' in d:
+        try:
+            campi['sala_id'] = int(d.get('sala_id'))
+        except (TypeError, ValueError):
+            return jsonify({'success': False, 'error': 'Sala non valida'}), 400
+    if 'posizione_x' in d:
+        try:
+            campi['posizione_x'] = float(d.get('posizione_x'))
+        except (TypeError, ValueError):
+            return jsonify({'success': False, 'error': 'Posizione non valida'}), 400
+    if 'posizione_y' in d:
+        try:
+            campi['posizione_y'] = float(d.get('posizione_y'))
+        except (TypeError, ValueError):
+            return jsonify({'success': False, 'error': 'Posizione non valida'}), 400
+    if 'occupato' in d:
+        campi['occupato'] = 1 if d.get('occupato') else 0
+
+    if campi:
+        update_tavolo(tavolo_id, **campi)
+    return jsonify({'success': True})
+
+
+@app.route('/api/tavoli/<int:tavolo_id>', methods=['DELETE'])
+@login_required
+@admin_required  # TODO: rimuovere quando Prenotazioni/Gestione Sala escono dalla fase admin-only
+@gestione_sala_required
+def api_tavoli_elimina(tavolo_id):
+    if not get_tavolo_by_id(tavolo_id):
+        return jsonify({'success': False, 'error': 'Tavolo non trovato'}), 404
+    delete_tavolo(tavolo_id)
+    return jsonify({'success': True})
+
+
+# ─── PRENOTAZIONI ──────────────────────────────────────────────────────────
+
+@app.route('/api/prenotazioni', methods=['GET'])
+@login_required
+@admin_required  # TODO: rimuovere quando Prenotazioni/Gestione Sala escono dalla fase admin-only
+def api_prenotazioni_list():
+    data = (request.args.get('data') or now_it().strftime('%Y-%m-%d')).strip()
+    return jsonify({
+        'success':       True,
+        'prenotazioni':  get_prenotazioni(data),
+        'coperti':       get_coperti_giorno(data),
+        'puo_gestire':   current_user.puo_gestire_sala,
+    })
+
+
+@app.route('/api/prenotazioni', methods=['POST'])
+@login_required
+@admin_required  # TODO: rimuovere quando Prenotazioni/Gestione Sala escono dalla fase admin-only
+@gestione_sala_required
+def api_prenotazioni_crea():
+    d          = request.get_json(force=True)
+    nome       = (d.get('nome') or '').strip()
+    telefono   = (d.get('telefono') or '').strip()
+    note       = (d.get('note') or '').strip()
+    data_val   = (d.get('data') or now_it().strftime('%Y-%m-%d')).strip()
+    ora        = (d.get('ora') or '').strip()
+    tavoli_ids = d.get('tavoli') or []
+    try:
+        persone = int(d.get('persone', 0))
+    except (TypeError, ValueError):
+        persone = 0
+    try:
+        tavoli_ids = [int(t) for t in tavoli_ids]
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'Tavoli selezionati non validi'}), 400
+
+    if not nome:
+        return jsonify({'success': False, 'error': 'Nome obbligatorio'}), 400
+    if persone <= 0:
+        return jsonify({'success': False, 'error': 'Numero persone non valido'}), 400
+    if not ora:
+        return jsonify({'success': False, 'error': "Seleziona l'ora"}), 400
+
+    prenotazione_id = create_prenotazione(
+        nome, persone, data_val, ora, telefono, note, int(current_user.id), tavoli_ids
+    )
+    return jsonify({'success': True, 'id': prenotazione_id})
+
+
+@app.route('/api/prenotazioni/<int:prenotazione_id>', methods=['PUT'])
+@login_required
+@admin_required  # TODO: rimuovere quando Prenotazioni/Gestione Sala escono dalla fase admin-only
+@gestione_sala_required
+def api_prenotazioni_modifica(prenotazione_id):
+    if not get_prenotazione_by_id(prenotazione_id):
+        return jsonify({'success': False, 'error': 'Prenotazione non trovata'}), 404
+
+    d          = request.get_json(force=True)
+    nome       = (d.get('nome') or '').strip()
+    telefono   = (d.get('telefono') or '').strip()
+    note       = (d.get('note') or '').strip()
+    data_val   = (d.get('data') or '').strip()
+    ora        = (d.get('ora') or '').strip()
+    stato      = (d.get('stato') or '').strip()
+    tavoli_ids = d.get('tavoli') or []
+    try:
+        persone = int(d.get('persone', 0))
+    except (TypeError, ValueError):
+        persone = 0
+    try:
+        tavoli_ids = [int(t) for t in tavoli_ids]
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'Tavoli selezionati non validi'}), 400
+
+    if not nome:
+        return jsonify({'success': False, 'error': 'Nome obbligatorio'}), 400
+    if persone <= 0:
+        return jsonify({'success': False, 'error': 'Numero persone non valido'}), 400
+    if not data_val or not ora:
+        return jsonify({'success': False, 'error': 'Data e ora obbligatorie'}), 400
+    if stato not in ('confermata', 'in_attesa', 'cancellata'):
+        return jsonify({'success': False, 'error': 'Stato non valido'}), 400
+
+    update_prenotazione(prenotazione_id, nome, persone, data_val, ora, telefono, note, stato, tavoli_ids)
+    return jsonify({'success': True})
+
+
+@app.route('/api/prenotazioni/<int:prenotazione_id>', methods=['DELETE'])
+@login_required
+@admin_required  # TODO: rimuovere quando Prenotazioni/Gestione Sala escono dalla fase admin-only
+@gestione_sala_required
+def api_prenotazioni_elimina(prenotazione_id):
+    prenotazione = get_prenotazione_by_id(prenotazione_id)
+    if not prenotazione:
+        return jsonify({'success': False, 'error': 'Prenotazione non trovata'}), 404
+    delete_prenotazione(prenotazione_id)
+    log_eliminazione_prenotazione(prenotazione, current_user.nome)
+    return jsonify({'success': True})
+
+
+@app.route('/api/controllo/log-eliminazioni-prenotazioni')
+@login_required
+@controllo_required
+def api_controllo_log_eliminazioni_prenotazioni():
+    return jsonify({'success': True, 'log': get_log_eliminazioni_prenotazioni()})
 
 
 # ─── EXPORT PDF ───────────────────────────────────────────────────────────────

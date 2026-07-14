@@ -647,15 +647,6 @@ main {
 }
 .btn-prep-finita:active { background: rgba(34,197,94,.2); }
 
-.btn-scarica-inuso {
-  width: 100%; height: 40px; margin-top: 12px;
-  background: rgba(239,68,68,.1); color: var(--red);
-  border: 1px solid rgba(239,68,68,.3); border-radius: 12px;
-  font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 600;
-  cursor: pointer;
-}
-.btn-scarica-inuso:active { background: rgba(239,68,68,.2); }
-
 .ingr-row {
   border: 1px solid var(--border); border-radius: 14px;
   padding: 14px; margin-bottom: 10px; background: var(--surface-3);
@@ -684,11 +675,15 @@ main {
   background: var(--red); color: #fff;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
   font-size: 11px; font-weight: 700; cursor: pointer; z-index: 0;
+  /* nascosto fuori dal bordo destro a riposo: con overflow:hidden sul
+     wrapper, il glassmorphism della riga sopra non può farlo trasparire */
+  transform: translateX(84px);
+  transition: transform .2s ease;
 }
 .pren-row {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   background: var(--card); border: 1px solid var(--border); border-radius: 14px;
-  padding: 13px 14px; position: relative; z-index: 1;
+  padding: 13px 14px; position: relative; z-index: 1; overflow: hidden;
   transition: transform .2s ease; touch-action: pan-y; cursor: pointer;
 }
 .pren-nome { font-size: 14px; font-weight: 600; color: var(--text); }
@@ -767,11 +762,13 @@ main {
   background: var(--red); color: #fff;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
   font-size: 11px; font-weight: 700; cursor: pointer; z-index: 0;
+  transform: translateX(84px);
+  transition: transform .2s ease;
 }
 .temp-storico-row {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   background: var(--card); border: 1px solid var(--border); border-radius: 14px;
-  padding: 12px 14px; margin-bottom: 0; position: relative; z-index: 1;
+  padding: 12px 14px; margin-bottom: 0; position: relative; z-index: 1; overflow: hidden;
   transition: transform .2s ease; touch-action: pan-y;
 }
 .temp-storico-info { min-width: 0; }
@@ -963,7 +960,7 @@ main {
 .lot-detail-row {
   display: flex; align-items: center; justify-content: space-between;
   padding: 14px 20px; border-bottom: 1px solid var(--surface-2); gap: 12px;
-  position: relative; z-index: 1; background: var(--card);
+  position: relative; z-index: 1; background: var(--card); overflow: hidden;
   transition: transform .2s ease; touch-action: pan-y;
 }
 .lot-detail-row:last-child { border-bottom: none; }
@@ -973,6 +970,8 @@ main {
   background: var(--red); color: #fff;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
   font-size: 11px; font-weight: 700; cursor: pointer; z-index: 0;
+  transform: translateX(84px);
+  transition: transform .2s ease;
 }
 .lot-detail-lotto { font-size: 13px; font-weight: 600; color: var(--text); }
 .lot-detail-meta  { font-size: 12px; color: var(--muted); margin-top: 2px; }
@@ -1563,7 +1562,7 @@ body.help-mode { background: #0f1f3d; }
       <div class="help-card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></div>
       <div>
         <div class="help-card-title">In uso</div>
-        <div class="help-card-text">Usa questa funzione quando prelevi un prodotto dal magazzino per portarlo in cucina. La quantità viene scalata dalla giacenza. Quando il prodotto finisce, tocca "Scarica" sull'elenco "In uso al momento" nella stessa pagina e inserisci la quantità utilizzata.</div>
+        <div class="help-card-text">Usa questa funzione quando prelevi un prodotto dal magazzino per portarlo in cucina. La quantità viene scalata dalla giacenza. Quando il prodotto finisce, vai in Giacenze, tab "In uso", e tocca "Scarica" sul prodotto per inserire la quantità utilizzata.</div>
       </div>
     </div>
 
@@ -1902,14 +1901,6 @@ body.help-mode { background: #0f1f3d; }
       <span class="spinner"></span>
       <span class="btn-lbl">Metti in uso</span>
     </button>
-
-    <div class="giac-sec-title" style="margin-top:28px">In uso al momento</div>
-    <div id="in-uso-attivi-list" class="giac-list">
-      <div class="empty-state">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        <p>Caricamento…</p>
-      </div>
-    </div>
   </section>
 
   <!-- GIACENZE -->
@@ -2811,7 +2802,6 @@ async function init() {
   _initGiacSwipe();
   await Promise.all([loadCategorie(), loadProdottiCarico(), loadGiacenze(), loadAlerts(), loadFeed(), loadListaSpesa(), loadInUso(), loadApparecchi(), loadStoricoTemperature()]);
   renderInUsoProdotti();
-  renderInUsoAttivi();
 }
 
 function setHdrDate() {
@@ -2888,7 +2878,6 @@ function navTo(page) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 
   if (page === 'home')        { animHomeCards(); renderFeed(); }
-  if (page === 'in-uso')      renderInUsoAttivi();
   if (page === 'giacenze')   { updateFornitoriFilter(); renderGiacenze(); _setGiacPage(0, false); }
   if (page === 'alert')      renderAlerts();
   if (page === 'lista-spesa') loadListaSpesa();
@@ -3250,44 +3239,14 @@ async function submitInUso() {
     document.getElementById('u-qty').value = '';
     await Promise.all([loadGiacenze(), loadAlerts(), loadFeed(), loadInUso()]);
     renderInUsoProdotti();
-    renderInUsoAttivi();
     await onProdottoInUso();
   } else { toast(data.error || 'Errore durante il prelievo', 'error'); }
 }
 
-// ── SCARICO (finalizza un elemento IN USO, dal pulsante "Scarica" in In uso) ─
+// ── SCARICO (finalizza un elemento IN USO, dal pulsante "Scarica" in Giacenze) ─
 async function loadInUso() {
   const data = await api('/api/in-uso');
   S.inUso = data.in_uso || [];
-  if (S.activePage === 'in-uso') renderInUsoAttivi();
-}
-
-function renderInUsoAttivi() {
-  const el = document.getElementById('in-uso-attivi-list');
-  if (!el) return;
-  if (!S.inUso.length) {
-    el.innerHTML = `<div class="empty-state">
-      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-      <p>Nessun prodotto attualmente in uso</p>
-    </div>`;
-    return;
-  }
-  el.innerHTML = S.inUso.map(r => {
-    const sub = [r.lotto ? `Lotto ${r.lotto}` : null, `in uso dal ${fmtDate(r.data)}`].filter(Boolean).join(' · ');
-    return `<div class="giac-card" style="cursor:default">
-      <div class="giac-top">
-        <div>
-          <div class="giac-name">${esc(r.prodotto)}</div>
-          <div class="giac-fornitore">${esc(sub)}</div>
-        </div>
-        <div>
-          <div class="giac-qty-big">${r.qty}</div>
-          <div class="giac-unit">${esc(r.unita)}</div>
-        </div>
-      </div>
-      <button type="button" class="btn-scarica-inuso" onclick="openScaricoModal(${r.id})">Scarica</button>
-    </div>`;
-  }).join('');
 }
 
 let _scaricoModalRowId = null;
@@ -3349,7 +3308,7 @@ async function submitScaricoModal() {
     closeScaricoModal();
     await Promise.all([loadInUso(), loadGiacenze(), loadAlerts(), loadFeed()]);
     renderInUsoProdotti();
-    renderInUsoAttivi();
+    if (S.activePage === 'giacenze') renderGiacenze();
   } else { toast(data.error || 'Errore durante lo scarico', 'error'); }
 }
 
@@ -3438,6 +3397,7 @@ function renderGiacenze() {
         </div>
         ${l.scadenza ? `<span class="scad-badge ${scadCls(l.scadenza)}">${fmtDate(l.scadenza)}</span>` : ''}
         <span class="giac-lot-qty">${l.qty}&nbsp;${esc(l.unita)}</span>
+        <button type="button" class="lot-print-btn" onclick="event.stopPropagation(); openScaricoModal(${l.id})" aria-label="Scarica">${_ICON_SCARICA}</button>
       </div>`;
     }).join('');
     return `<div class="giac-card" onclick="showLotDetail(S.giacenze[${idx}])">
@@ -3731,6 +3691,7 @@ async function addToListaFromAlert(a) {
 // ── LOT DETAIL ────────────────────────────────────────────────────────────
 const _ICON_STAMPA = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>`;
 const _ICON_MATITA = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>`;
+const _ICON_SCARICA = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>`;
 
 function showLotDetail(g) {
   document.getElementById('lot-detail-title').textContent = g.prodotto;
@@ -3799,7 +3760,8 @@ function _initSwipeLotti() {
     if (!row) return;
     if (state && state.row !== row) _closeSwipeLottoRow(state.row);
     list.querySelectorAll('.lot-swipe .lot-detail-row.open').forEach(r => { if (r !== row) _closeSwipeLottoRow(r); });
-    state = { row, startX: e.touches[0].clientX, startedOpen: row.classList.contains('open') };
+    const btn = row.parentElement.querySelector('.lot-swipe-delete');
+    state = { row, btn, startX: e.touches[0].clientX, startedOpen: row.classList.contains('open') };
   }, { passive: true });
 
   list.addEventListener('touchmove', e => {
@@ -3808,12 +3770,15 @@ function _initSwipeLotti() {
     const base = state.startedOpen ? -84 : 0;
     state.lastX = Math.max(-84, Math.min(0, base + dx));
     state.row.style.transform = `translateX(${state.lastX}px)`;
+    if (state.btn) state.btn.style.transform = `translateX(${84 + state.lastX}px)`;
   }, { passive: true });
 
   list.addEventListener('touchend', () => {
     if (!state) return;
     const open = (state.lastX ?? (state.startedOpen ? -84 : 0)) < -42;
-    state.row.style.transform = open ? 'translateX(-84px)' : 'translateX(0)';
+    const finalX = open ? -84 : 0;
+    state.row.style.transform = `translateX(${finalX}px)`;
+    if (state.btn) state.btn.style.transform = `translateX(${84 + finalX}px)`;
     state.row.classList.toggle('open', open);
     state = null;
   });
@@ -3821,6 +3786,8 @@ function _initSwipeLotti() {
 function _closeSwipeLottoRow(row) {
   row.style.transform = 'translateX(0)';
   row.classList.remove('open');
+  const btn = row.parentElement.querySelector('.lot-swipe-delete');
+  if (btn) btn.style.transform = 'translateX(84px)';
 }
 
 async function confermaEliminaCarico(rowId) {
@@ -4359,7 +4326,6 @@ async function syncAll() {
   btn.classList.remove('spinning');
   if (data.success) {
     await Promise.all([loadProdottiCarico(), loadGiacenze(), loadAlerts()]);
-    renderInUsoAttivi();
     toast(`Sincronizzato: ${data.listino} prodotti, ${data.registro} movimenti`, 'success');
   } else { toast(data.error || 'Errore sincronizzazione', 'error'); }
 }
@@ -4718,7 +4684,8 @@ function _initSwipeStoricoTemperature() {
     if (!row) return;
     if (state && state.row !== row) _closeSwipeRow(state.row);
     list.querySelectorAll('.temp-storico-row.open').forEach(r => { if (r !== row) _closeSwipeRow(r); });
-    state = { row, startX: e.touches[0].clientX, startedOpen: row.classList.contains('open') };
+    const btn = row.parentElement.querySelector('.temp-storico-delete');
+    state = { row, btn, startX: e.touches[0].clientX, startedOpen: row.classList.contains('open') };
   }, { passive: true });
 
   list.addEventListener('touchmove', e => {
@@ -4727,12 +4694,15 @@ function _initSwipeStoricoTemperature() {
     const base = state.startedOpen ? -84 : 0;
     state.lastX = Math.max(-84, Math.min(0, base + dx));
     state.row.style.transform = `translateX(${state.lastX}px)`;
+    if (state.btn) state.btn.style.transform = `translateX(${84 + state.lastX}px)`;
   }, { passive: true });
 
   list.addEventListener('touchend', () => {
     if (!state) return;
     const open = (state.lastX ?? (state.startedOpen ? -84 : 0)) < -42;
-    state.row.style.transform = open ? 'translateX(-84px)' : 'translateX(0)';
+    const finalX = open ? -84 : 0;
+    state.row.style.transform = `translateX(${finalX}px)`;
+    if (state.btn) state.btn.style.transform = `translateX(${84 + finalX}px)`;
     state.row.classList.toggle('open', open);
     state = null;
   });
@@ -4740,6 +4710,8 @@ function _initSwipeStoricoTemperature() {
 function _closeSwipeRow(row) {
   row.style.transform = 'translateX(0)';
   row.classList.remove('open');
+  const btn = row.parentElement.querySelector('.temp-storico-delete');
+  if (btn) btn.style.transform = 'translateX(84px)';
 }
 
 async function confermaEliminaTemperatura(id) {
@@ -5208,7 +5180,8 @@ function _initSwipePrenotazioni() {
     if (!row) return;
     if (state && state.row !== row) _closeSwipePren(state.row);
     list.querySelectorAll('.pren-swipe .pren-row.open').forEach(r => { if (r !== row) _closeSwipePren(r); });
-    state = { row, startX: e.touches[0].clientX, startedOpen: row.classList.contains('open') };
+    const btn = row.parentElement.querySelector('.pren-delete');
+    state = { row, btn, startX: e.touches[0].clientX, startedOpen: row.classList.contains('open') };
   }, { passive: true });
 
   list.addEventListener('touchmove', e => {
@@ -5217,12 +5190,15 @@ function _initSwipePrenotazioni() {
     const base = state.startedOpen ? -84 : 0;
     state.lastX = Math.max(-84, Math.min(0, base + dx));
     state.row.style.transform = `translateX(${state.lastX}px)`;
+    if (state.btn) state.btn.style.transform = `translateX(${84 + state.lastX}px)`;
   }, { passive: true });
 
   list.addEventListener('touchend', () => {
     if (!state) return;
     const open = (state.lastX ?? (state.startedOpen ? -84 : 0)) < -42;
-    state.row.style.transform = open ? 'translateX(-84px)' : 'translateX(0)';
+    const finalX = open ? -84 : 0;
+    state.row.style.transform = `translateX(${finalX}px)`;
+    if (state.btn) state.btn.style.transform = `translateX(${84 + finalX}px)`;
     state.row.classList.toggle('open', open);
     state = null;
   });
@@ -5230,6 +5206,8 @@ function _initSwipePrenotazioni() {
 function _closeSwipePren(row) {
   row.style.transform = 'translateX(0)';
   row.classList.remove('open');
+  const btn = row.parentElement.querySelector('.pren-delete');
+  if (btn) btn.style.transform = 'translateX(84px)';
 }
 
 async function openNuovaPrenotazione() {

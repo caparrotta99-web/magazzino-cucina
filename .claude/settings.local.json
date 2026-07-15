@@ -6,7 +6,21 @@
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
       "Bash(git push *)",
-      "Bash(python3 -c ' *)"
+      "Bash(python3 -c ' *)",
+      "Bash(python3 -m py_compile app.py database.py sheets.py)",
+      "Bash(sqlite3 haccp.db \"INSERT INTO preparazioni \\(nome, reparto, data_preparazione, scadenza, quantita, unita, operatore_id, note, completata\\) VALUES \\('TEST_PREP_TEMP', 'Cucina', '2026-07-13 20:00', '2026-07-20', 2, 'kg', 1, '', 0\\);\")",
+      "Bash(sqlite3 haccp.db \"SELECT id, nome, completata FROM preparazioni WHERE nome='TEST_PREP_TEMP';\")",
+      "Bash(sqlite3 haccp.db \"SELECT id, movimento_id, prodotto, lotto, tipo, scarico, rimanenza, data, operatore, reparto FROM registro WHERE id=7266;\")",
+      "Bash(sqlite3 haccp.db \"SELECT id, username, role FROM users LIMIT 5;\")",
+      "Bash(python3 /private/tmp/claude-501/-Users-simonecaparrotta-magazzino-cucina/94d0535e-01e2-417a-bc98-67cb864d7b37/scratchpad/test_prep_source.py)",
+      "Bash(sqlite3 haccp.db \"UPDATE registro SET tipo='IN_USO', scarico=3.0, data_scarico='' WHERE id=7266;\")",
+      "Bash(sqlite3 haccp.db \"DELETE FROM registro WHERE id=7325;\")",
+      "Bash(sqlite3 haccp.db \"DELETE FROM preparazione_ingredienti WHERE preparazione_id=\\(SELECT id FROM preparazioni WHERE nome='TEST_PREP_DUAL_SOURCE'\\);\")",
+      "Bash(sqlite3 haccp.db \"DELETE FROM preparazioni WHERE nome='TEST_PREP_DUAL_SOURCE';\")",
+      "Bash(sqlite3 haccp.db \"SELECT id, tipo, scarico, data_scarico FROM registro WHERE id=7266;\")",
+      "Bash(python3 /private/tmp/claude-501/-Users-simonecaparrotta-magazzino-cucina/94d0535e-01e2-417a-bc98-67cb864d7b37/scratchpad/test_prep_full_and_fail.py)",
+      "Bash(sqlite3 haccp.db \"SELECT COUNT\\(*\\) FROM registro WHERE prodotto LIKE 'TEST%';\")",
+      "Bash(sqlite3 haccp.db \"SELECT COUNT\\(*\\) FROM preparazioni WHERE nome LIKE 'TEST%';\")"
     ]
   }
 }

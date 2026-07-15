@@ -3,6 +3,16 @@ from google.oauth2.service_account import Credentials
 import os
 import re
 
+
+class SheetsUnavailableError(Exception):
+    """Sollevata da tutte le funzioni di scrittura quando Google Sheets non è
+    raggiungibile (rete, quota, credenziali) — distingue questo caso da un
+    ValueError applicativo (es. riga non trovata), che invece segnala un
+    problema di dati reale e va sempre propagato così com'è, mai
+    trasformato in un fallback "salva solo in locale"."""
+    pass
+
+
 SPREADSHEET_ID   = '1Dg0J181wAEUctJCWrNI1pmtOb7YlF_msOqTsqRPDILw'
 CREDENTIALS_FILE = os.path.join(os.path.dirname(__file__), 'credentials.json')
 SCOPES           = ['https://www.googleapis.com/auth/spreadsheets']
@@ -292,49 +302,56 @@ def append_registro(row_data):
     """
     Appende una riga al foglio REGISTRO.
     L'ordine delle colonne segue REGISTRO_COLS (fisso, come da schema utente).
+
+    Solleva SheetsUnavailableError se Sheets non è raggiungibile (rete,
+    quota, credenziali) — il chiamante può intercettarla per decidere di
+    salvare comunque il movimento solo in locale, da risincronizzare più tardi.
     """
-    gc = _get_client()
-    ws = gc.open_by_key(SPREADSHEET_ID).worksheet(SHEET_REGISTRO)
+    try:
+        gc = _get_client()
+        ws = gc.open_by_key(SPREADSHEET_ID).worksheet(SHEET_REGISTRO)
 
-    # Rileva l'ordine delle colonne dall'header per costruire la riga correttamente
-    headers = [h.strip() for h in ws.row_values(1)]
-    col = {k: _detect(headers, k) for k in REGISTRO_COLS}
+        # Rileva l'ordine delle colonne dall'header per costruire la riga correttamente
+        headers = [h.strip() for h in ws.row_values(1)]
+        col = {k: _detect(headers, k) for k in REGISTRO_COLS}
 
-    n_cols = len(headers) if headers else len(REGISTRO_COLS)
-    new_row = [''] * n_cols
+        n_cols = len(headers) if headers else len(REGISTRO_COLS)
+        new_row = [''] * n_cols
 
-    # Carico e Scarico sono mutualmente esclusivi: solo uno dei due può
-    # avere un valore in una stessa riga.
-    carico_val  = row_data.get('carico',  0) or 0
-    scarico_val = row_data.get('scarico', 0) or 0
-    if carico_val:
-        scarico_val = ''   # riga di carico → scarico vuoto
-    elif scarico_val:
-        carico_val  = ''   # riga di scarico → carico vuoto
+        # Carico e Scarico sono mutualmente esclusivi: solo uno dei due può
+        # avere un valore in una stessa riga.
+        carico_val  = row_data.get('carico',  0) or 0
+        scarico_val = row_data.get('scarico', 0) or 0
+        if carico_val:
+            scarico_val = ''   # riga di carico → scarico vuoto
+        elif scarico_val:
+            carico_val  = ''   # riga di scarico → carico vuoto
 
-    field_vals = {
-        'data':         _to_sheet_date(row_data.get('data', '')),
-        'fornitore':    row_data.get('fornitore', ''),
-        'prodotto':     row_data.get('prodotto', ''),
-        'lotto':        row_data.get('lotto', ''),
-        'scadenza':     _to_sheet_date(row_data.get('scadenza', '')),
-        'carico':       carico_val,
-        'scarico':      scarico_val,
-        'unita':        row_data.get('unita', ''),
-        'etichetta':    row_data.get('etichetta', ''),
-        'movimento_id': row_data.get('movimento_id', ''),
-        'rimanenza':    row_data.get('rimanenza', 0),
-        'operatore':    row_data.get('operatore', ''),
-        'reparto':      row_data.get('reparto', ''),
-        'tipo_movimento': _TIPO_DISPLAY.get(row_data.get('tipo', 'CARICO'), 'CARICO'),
-    }
+        field_vals = {
+            'data':         _to_sheet_date(row_data.get('data', '')),
+            'fornitore':    row_data.get('fornitore', ''),
+            'prodotto':     row_data.get('prodotto', ''),
+            'lotto':        row_data.get('lotto', ''),
+            'scadenza':     _to_sheet_date(row_data.get('scadenza', '')),
+            'carico':       carico_val,
+            'scarico':      scarico_val,
+            'unita':        row_data.get('unita', ''),
+            'etichetta':    row_data.get('etichetta', ''),
+            'movimento_id': row_data.get('movimento_id', ''),
+            'rimanenza':    row_data.get('rimanenza', 0),
+            'operatore':    row_data.get('operatore', ''),
+            'reparto':      row_data.get('reparto', ''),
+            'tipo_movimento': _TIPO_DISPLAY.get(row_data.get('tipo', 'CARICO'), 'CARICO'),
+        }
 
-    for key, val in field_vals.items():
-        idx = col.get(key)
-        if idx is not None and idx < n_cols:
-            new_row[idx] = val
+        for key, val in field_vals.items():
+            idx = col.get(key)
+            if idx is not None and idx < n_cols:
+                new_row[idx] = val
 
-    ws.append_row(new_row, value_input_option='USER_ENTERED')
+        ws.append_row(new_row, value_input_option='USER_ENTERED')
+    except Exception as e:
+        raise SheetsUnavailableError(str(e)) from e
 
 
 def aggiorna_tipo_movimento(movimento_id, nuovo_tipo, nuovo_scarico=None):
@@ -346,31 +363,37 @@ def aggiorna_tipo_movimento(movimento_id, nuovo_tipo, nuovo_scarico=None):
     solo una parte della quantità in uso). Non crea nuove righe.
     Solleva ValueError se la riga non viene trovata, così il chiamante non
     finalizza il movimento solo in locale credendo che la scrittura su
-    Sheets sia andata a buon fine.
+    Sheets sia andata a buon fine. Solleva SheetsUnavailableError se invece
+    è Sheets stesso a non essere raggiungibile.
     """
-    gc = _get_client()
-    ws = gc.open_by_key(SPREADSHEET_ID).worksheet(SHEET_REGISTRO)
+    try:
+        gc = _get_client()
+        ws = gc.open_by_key(SPREADSHEET_ID).worksheet(SHEET_REGISTRO)
 
-    all_values = ws.get_all_values()
-    if len(all_values) < 2:
-        raise ValueError(f"Foglio REGISTRO vuoto: movimento '{movimento_id}' non trovato")
+        all_values = ws.get_all_values()
+        if len(all_values) < 2:
+            raise ValueError(f"Foglio REGISTRO vuoto: movimento '{movimento_id}' non trovato")
 
-    headers     = [h.strip() for h in all_values[0]]
-    col_id      = _detect(headers, 'movimento_id')
-    col_tipo    = _detect(headers, 'tipo_movimento')
-    col_scarico = _detect(headers, 'scarico') if nuovo_scarico is not None else None
-    if col_id is None or col_tipo is None:
-        raise ValueError(f"Colonna 'ID' o 'Tipo movimento' non trovata nel REGISTRO. Header: {headers}")
+        headers     = [h.strip() for h in all_values[0]]
+        col_id      = _detect(headers, 'movimento_id')
+        col_tipo    = _detect(headers, 'tipo_movimento')
+        col_scarico = _detect(headers, 'scarico') if nuovo_scarico is not None else None
+        if col_id is None or col_tipo is None:
+            raise ValueError(f"Colonna 'ID' o 'Tipo movimento' non trovata nel REGISTRO. Header: {headers}")
 
-    for i, row in enumerate(all_values[1:], start=2):
-        val = row[col_id].strip() if col_id < len(row) else ''
-        if val == movimento_id:
-            ws.update_cell(i, col_tipo + 1, _TIPO_DISPLAY.get(nuovo_tipo, nuovo_tipo))
-            if col_scarico is not None:
-                ws.update_cell(i, col_scarico + 1, nuovo_scarico)
-            return True
+        for i, row in enumerate(all_values[1:], start=2):
+            val = row[col_id].strip() if col_id < len(row) else ''
+            if val == movimento_id:
+                ws.update_cell(i, col_tipo + 1, _TIPO_DISPLAY.get(nuovo_tipo, nuovo_tipo))
+                if col_scarico is not None:
+                    ws.update_cell(i, col_scarico + 1, nuovo_scarico)
+                return True
 
-    raise ValueError(f"Movimento '{movimento_id}' non trovato nel foglio REGISTRO")
+        raise ValueError(f"Movimento '{movimento_id}' non trovato nel foglio REGISTRO")
+    except ValueError:
+        raise
+    except Exception as e:
+        raise SheetsUnavailableError(str(e)) from e
 
 
 def aggiorna_riga_registro(movimento_id, lotto, scadenza, rimanenza):
@@ -379,35 +402,41 @@ def aggiorna_riga_registro(movimento_id, lotto, scadenza, rimanenza):
     Scadenza e Rimanenza lotto (usato per correggere un carico esistente).
     Non crea nuove righe. Solleva ValueError se la riga non viene trovata,
     così il chiamante non salva la modifica solo in locale credendo che la
-    scrittura su Sheets sia andata a buon fine.
+    scrittura su Sheets sia andata a buon fine. Solleva SheetsUnavailableError
+    se invece è Sheets stesso a non essere raggiungibile.
     """
-    gc = _get_client()
-    ws = gc.open_by_key(SPREADSHEET_ID).worksheet(SHEET_REGISTRO)
+    try:
+        gc = _get_client()
+        ws = gc.open_by_key(SPREADSHEET_ID).worksheet(SHEET_REGISTRO)
 
-    all_values = ws.get_all_values()
-    if len(all_values) < 2:
-        raise ValueError(f"Foglio REGISTRO vuoto: movimento '{movimento_id}' non trovato")
+        all_values = ws.get_all_values()
+        if len(all_values) < 2:
+            raise ValueError(f"Foglio REGISTRO vuoto: movimento '{movimento_id}' non trovato")
 
-    headers = [h.strip() for h in all_values[0]]
-    col_id        = _detect(headers, 'movimento_id')
-    col_lotto     = _detect(headers, 'lotto')
-    col_scadenza  = _detect(headers, 'scadenza')
-    col_rimanenza = _detect(headers, 'rimanenza')
-    if col_id is None:
-        raise ValueError(f"Colonna 'ID' non trovata nel REGISTRO. Header: {headers}")
+        headers = [h.strip() for h in all_values[0]]
+        col_id        = _detect(headers, 'movimento_id')
+        col_lotto     = _detect(headers, 'lotto')
+        col_scadenza  = _detect(headers, 'scadenza')
+        col_rimanenza = _detect(headers, 'rimanenza')
+        if col_id is None:
+            raise ValueError(f"Colonna 'ID' non trovata nel REGISTRO. Header: {headers}")
 
-    for i, row in enumerate(all_values[1:], start=2):
-        val = row[col_id].strip() if col_id < len(row) else ''
-        if val == movimento_id:
-            if col_lotto is not None:
-                ws.update_cell(i, col_lotto + 1, lotto)
-            if col_scadenza is not None:
-                ws.update_cell(i, col_scadenza + 1, _to_sheet_date(scadenza))
-            if col_rimanenza is not None:
-                ws.update_cell(i, col_rimanenza + 1, rimanenza)
-            return True
+        for i, row in enumerate(all_values[1:], start=2):
+            val = row[col_id].strip() if col_id < len(row) else ''
+            if val == movimento_id:
+                if col_lotto is not None:
+                    ws.update_cell(i, col_lotto + 1, lotto)
+                if col_scadenza is not None:
+                    ws.update_cell(i, col_scadenza + 1, _to_sheet_date(scadenza))
+                if col_rimanenza is not None:
+                    ws.update_cell(i, col_rimanenza + 1, rimanenza)
+                return True
 
-    raise ValueError(f"Movimento '{movimento_id}' non trovato nel foglio REGISTRO")
+        raise ValueError(f"Movimento '{movimento_id}' non trovato nel foglio REGISTRO")
+    except ValueError:
+        raise
+    except Exception as e:
+        raise SheetsUnavailableError(str(e)) from e
 
 
 def elimina_riga_registro(movimento_id):
@@ -416,65 +445,77 @@ def elimina_riga_registro(movimento_id):
     cancellare un carico registrato per errore). Solleva ValueError se la
     riga non viene trovata, così il chiamante non elimina il carico solo in
     locale credendo che la scrittura su Sheets sia andata a buon fine.
+    Solleva SheetsUnavailableError se invece è Sheets stesso a non essere
+    raggiungibile.
     """
-    gc = _get_client()
-    ws = gc.open_by_key(SPREADSHEET_ID).worksheet(SHEET_REGISTRO)
+    try:
+        gc = _get_client()
+        ws = gc.open_by_key(SPREADSHEET_ID).worksheet(SHEET_REGISTRO)
 
-    all_values = ws.get_all_values()
-    if len(all_values) < 2:
-        raise ValueError(f"Foglio REGISTRO vuoto: movimento '{movimento_id}' non trovato")
+        all_values = ws.get_all_values()
+        if len(all_values) < 2:
+            raise ValueError(f"Foglio REGISTRO vuoto: movimento '{movimento_id}' non trovato")
 
-    headers = [h.strip() for h in all_values[0]]
-    col_id = _detect(headers, 'movimento_id')
-    if col_id is None:
-        raise ValueError(f"Colonna 'ID' non trovata nel REGISTRO. Header: {headers}")
+        headers = [h.strip() for h in all_values[0]]
+        col_id = _detect(headers, 'movimento_id')
+        if col_id is None:
+            raise ValueError(f"Colonna 'ID' non trovata nel REGISTRO. Header: {headers}")
 
-    for i, row in enumerate(all_values[1:], start=2):
-        val = row[col_id].strip() if col_id < len(row) else ''
-        if val == movimento_id:
-            ws.delete_rows(i)
-            return True
+        for i, row in enumerate(all_values[1:], start=2):
+            val = row[col_id].strip() if col_id < len(row) else ''
+            if val == movimento_id:
+                ws.delete_rows(i)
+                return True
 
-    raise ValueError(f"Movimento '{movimento_id}' non trovato nel foglio REGISTRO")
+        raise ValueError(f"Movimento '{movimento_id}' non trovato nel foglio REGISTRO")
+    except ValueError:
+        raise
+    except Exception as e:
+        raise SheetsUnavailableError(str(e)) from e
 
 
 def append_listino(row_data):
     """Appende una nuova riga al foglio LISTINO, rilevando dinamicamente le
     colonne dall'header (nessun indice fisso). La colonna 'nome' (SORT/FILTER
-    su A) non viene mai scritta: si aggiorna da sola."""
-    gc = _get_client()
-    ws = gc.open_by_key(SPREADSHEET_ID).worksheet(SHEET_LISTINO)
+    su A) non viene mai scritta: si aggiorna da sola.
 
-    prodotto   = row_data.get('prodotto', '')
-    fornitore  = row_data.get('fornitore', '')
-    unita      = row_data.get('unita', 'kg')
-    scorta_min = row_data.get('scorta_min', 0)
-    categoria  = row_data.get('categoria', '')
-    reparto    = row_data.get('reparto') or 'Cucina'
+    Solleva SheetsUnavailableError se Sheets non è raggiungibile."""
+    try:
+        gc = _get_client()
+        ws = gc.open_by_key(SPREADSHEET_ID).worksheet(SHEET_LISTINO)
 
-    all_values = ws.get_all_values()
-    headers = [h.strip() for h in all_values[0]] if all_values else []
+        prodotto   = row_data.get('prodotto', '')
+        fornitore  = row_data.get('fornitore', '')
+        unita      = row_data.get('unita', 'kg')
+        scorta_min = row_data.get('scorta_min', 0)
+        categoria  = row_data.get('categoria', '')
+        reparto    = row_data.get('reparto') or 'Cucina'
 
-    # Indici fissi di fallback (struttura attuale: A-D base, F formula, G Categoria, I Reparto)
-    _FIXED = {'prodotto': 0, 'fornitore': 1, 'unita': 2, 'scorta_min': 3,
-              'categoria': 6, 'reparto_prodotto': 8}
-    col = {}
-    for k in ('prodotto', 'fornitore', 'unita', 'scorta_min', 'categoria', 'reparto_prodotto'):
-        detected = _detect(headers, k)
-        col[k] = detected if detected is not None else _FIXED[k]
+        all_values = ws.get_all_values()
+        headers = [h.strip() for h in all_values[0]] if all_values else []
 
-    next_row = 2
-    for i, row in enumerate(all_values[1:], start=2):
-        idx = col['prodotto']
-        if idx < len(row) and row[idx].strip():
-            next_row = i + 1
+        # Indici fissi di fallback (struttura attuale: A-D base, F formula, G Categoria, I Reparto)
+        _FIXED = {'prodotto': 0, 'fornitore': 1, 'unita': 2, 'scorta_min': 3,
+                  'categoria': 6, 'reparto_prodotto': 8}
+        col = {}
+        for k in ('prodotto', 'fornitore', 'unita', 'scorta_min', 'categoria', 'reparto_prodotto'):
+            detected = _detect(headers, k)
+            col[k] = detected if detected is not None else _FIXED[k]
 
-    field_vals = {
-        'prodotto': prodotto, 'fornitore': fornitore, 'unita': unita,
-        'scorta_min': scorta_min, 'categoria': categoria, 'reparto_prodotto': reparto,
-    }
-    for key, val in field_vals.items():
-        ws.update_cell(next_row, col[key] + 1, val)
+        next_row = 2
+        for i, row in enumerate(all_values[1:], start=2):
+            idx = col['prodotto']
+            if idx < len(row) and row[idx].strip():
+                next_row = i + 1
+
+        field_vals = {
+            'prodotto': prodotto, 'fornitore': fornitore, 'unita': unita,
+            'scorta_min': scorta_min, 'categoria': categoria, 'reparto_prodotto': reparto,
+        }
+        for key, val in field_vals.items():
+            ws.update_cell(next_row, col[key] + 1, val)
+    except Exception as e:
+        raise SheetsUnavailableError(str(e)) from e
 
 
 # ─── TEMPERATURE ─────────────────────────────────────────────────────────────
@@ -491,67 +532,78 @@ def _fascia_oraria(ora):
 def append_temperatura(row_data):
     """Appende una rilevazione al foglio TEMPERATURE esistente, rilevando
     dinamicamente le colonne dall'header (Data, Ora, Fascia oraria,
-    Apparecchio, Temp. rilevata, Temp. limite, Esito, Operatore, Note)."""
-    gc = _get_client()
-    ws = gc.open_by_key(SPREADSHEET_ID).worksheet(SHEET_TEMPERATURE)
+    Apparecchio, Temp. rilevata, Temp. limite, Esito, Operatore, Note).
 
-    headers = [h.strip() for h in ws.row_values(1)]
-    col = {k: _detect(headers, k) for k in TEMPERATURE_COLS}
+    Solleva SheetsUnavailableError se Sheets non è raggiungibile."""
+    try:
+        gc = _get_client()
+        ws = gc.open_by_key(SPREADSHEET_ID).worksheet(SHEET_TEMPERATURE)
 
-    n_cols = len(headers) if headers else len(TEMPERATURE_COLS)
-    new_row = [''] * n_cols
+        headers = [h.strip() for h in ws.row_values(1)]
+        col = {k: _detect(headers, k) for k in TEMPERATURE_COLS}
 
-    ora      = row_data.get('ora', '')
-    data_str = _to_sheet_date(row_data.get('data', ''))
+        n_cols = len(headers) if headers else len(TEMPERATURE_COLS)
+        new_row = [''] * n_cols
 
-    temp_min = row_data.get('temp_min', 0)
-    temp_max = row_data.get('temp_max', 0)
-    limite   = f"{temp_min:g} / {temp_max:g}"
+        ora      = row_data.get('ora', '')
+        data_str = _to_sheet_date(row_data.get('data', ''))
 
-    field_vals = {
-        'data':          data_str,
-        'ora':           ora,
-        'fascia_oraria': _fascia_oraria(ora),
-        'apparecchio':   row_data.get('apparecchio', ''),
-        'temp_rilevata': row_data.get('temperatura', ''),
-        'temp_limite':   limite,
-        'esito':         _ESITO_DISPLAY.get(row_data.get('esito', 'OK'), 'OK'),
-        'operatore':     row_data.get('operatore', ''),
-        'nota':          row_data.get('nota', ''),
-    }
-    for key, val in field_vals.items():
-        idx = col.get(key)
-        if idx is not None and idx < n_cols:
-            new_row[idx] = val
+        temp_min = row_data.get('temp_min', 0)
+        temp_max = row_data.get('temp_max', 0)
+        limite   = f"{temp_min:g} / {temp_max:g}"
 
-    ws.append_row(new_row, value_input_option='USER_ENTERED')
+        field_vals = {
+            'data':          data_str,
+            'ora':           ora,
+            'fascia_oraria': _fascia_oraria(ora),
+            'apparecchio':   row_data.get('apparecchio', ''),
+            'temp_rilevata': row_data.get('temperatura', ''),
+            'temp_limite':   limite,
+            'esito':         _ESITO_DISPLAY.get(row_data.get('esito', 'OK'), 'OK'),
+            'operatore':     row_data.get('operatore', ''),
+            'nota':          row_data.get('nota', ''),
+        }
+        for key, val in field_vals.items():
+            idx = col.get(key)
+            if idx is not None and idx < n_cols:
+                new_row[idx] = val
+
+        ws.append_row(new_row, value_input_option='USER_ENTERED')
+    except Exception as e:
+        raise SheetsUnavailableError(str(e)) from e
 
 
 def elimina_temperatura_foglio(apparecchio, data_iso, ora):
     """Elimina dal foglio TEMPERATURE la riga che corrisponde esattamente ad
     apparecchio + data + ora. Ritorna True se una riga è stata trovata ed
-    eliminata, False altrimenti."""
-    gc = _get_client()
-    ws = gc.open_by_key(SPREADSHEET_ID).worksheet(SHEET_TEMPERATURE)
+    eliminata, False altrimenti. Solleva ValueError se le colonne attese non
+    vengono trovate, SheetsUnavailableError se Sheets non è raggiungibile."""
+    try:
+        gc = _get_client()
+        ws = gc.open_by_key(SPREADSHEET_ID).worksheet(SHEET_TEMPERATURE)
 
-    headers = [h.strip() for h in ws.row_values(1)]
-    col_data = _detect(headers, 'data')
-    col_ora  = _detect(headers, 'ora')
-    col_app  = _detect(headers, 'apparecchio')
-    if col_data is None or col_app is None:
-        raise ValueError(f"Colonne 'Data'/'Apparecchio' non trovate nel foglio TEMPERATURE. Header: {headers}")
+        headers = [h.strip() for h in ws.row_values(1)]
+        col_data = _detect(headers, 'data')
+        col_ora  = _detect(headers, 'ora')
+        col_app  = _detect(headers, 'apparecchio')
+        if col_data is None or col_app is None:
+            raise ValueError(f"Colonne 'Data'/'Apparecchio' non trovate nel foglio TEMPERATURE. Header: {headers}")
 
-    target_data = _to_sheet_date(data_iso)
+        target_data = _to_sheet_date(data_iso)
 
-    all_values = ws.get_all_values()
-    for i, row in enumerate(all_values[1:], start=2):
-        cella_data = row[col_data].strip() if col_data < len(row) else ''
-        cella_ora  = row[col_ora].strip()  if (col_ora is not None and col_ora < len(row)) else ''
-        cella_app  = row[col_app].strip()  if col_app < len(row) else ''
-        if cella_data == target_data and cella_ora == (ora or '') and cella_app == apparecchio:
-            ws.delete_rows(i)
-            return True
-    return False
+        all_values = ws.get_all_values()
+        for i, row in enumerate(all_values[1:], start=2):
+            cella_data = row[col_data].strip() if col_data < len(row) else ''
+            cella_ora  = row[col_ora].strip()  if (col_ora is not None and col_ora < len(row)) else ''
+            cella_app  = row[col_app].strip()  if col_app < len(row) else ''
+            if cella_data == target_data and cella_ora == (ora or '') and cella_app == apparecchio:
+                ws.delete_rows(i)
+                return True
+        return False
+    except ValueError:
+        raise
+    except Exception as e:
+        raise SheetsUnavailableError(str(e)) from e
 
 
 def load_temperatura():

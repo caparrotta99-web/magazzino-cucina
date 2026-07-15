@@ -31,7 +31,7 @@ from database import (
     get_all_users, update_user_role, delete_user,
     approva_utente, rifiuta_utente, update_user_controllo_permesso,
     create_reset_token, get_reset_token, use_reset_token, update_user_password,
-    update_user_profile, update_user_reparto, update_user_tema, is_username_taken, get_feed,
+    update_user_profile, update_user_reparto, update_user_tema, is_username_taken,
     get_lista_spesa, add_lista_spesa_item, update_lista_spesa_completato,
     update_lista_spesa_fornitore, delete_lista_spesa_item, clear_lista_spesa,
     get_lista_spesa_item_by_id,
@@ -54,11 +54,15 @@ from database import (
     get_prenotazioni, get_prenotazione_by_id, create_prenotazione, update_prenotazione,
     delete_prenotazione, get_coperti_giorno,
     log_eliminazione_prenotazione, get_log_eliminazioni_prenotazioni,
+    get_unsynced_registro, mark_registro_synced,
+    get_unsynced_listino, mark_listino_synced,
+    get_unsynced_temperature, mark_temperatura_synced,
 )
 from sheets import (
     load_listino, load_registro, append_registro, append_listino, aggiorna_tipo_movimento,
     load_temperatura, append_temperatura, elimina_temperatura_foglio,
     aggiorna_riga_registro, elimina_riga_registro,
+    SheetsUnavailableError,
 )
 from pdf_export import (
     genera_pdf_registro, genera_pdf_temperature, genera_pdf_report_mensile,
@@ -194,16 +198,53 @@ if not get_user_by_login('admin'):
         role='admin',
     )
 
+def _push_pending_to_sheets():
+    """Invia a Google Sheets i movimenti/prodotti/temperature salvati solo in
+    locale perché Sheets non era raggiungibile al momento della scrittura
+    originale (vedi fallback nelle route /api/carico, /api/in-uso,
+    /api/temperature, /api/prodotti, /api/preparazioni/<id>/completa).
+
+    Va chiamata SEMPRE prima di un refresh da Sheets (manuale o
+    automatico): quel refresh sovrascrive il DB locale con quello che trova
+    su Sheets, quindi qualunque riga non ancora inviata andrebbe persa se
+    non la spingessimo prima."""
+    inviati = 0
+    for row in get_unsynced_registro():
+        try:
+            append_registro(row)
+            mark_registro_synced(row['id'])
+            inviati += 1
+        except Exception:
+            pass  # resta 'da sincronizzare', ci riproverà il prossimo sync
+    for row in get_unsynced_listino():
+        try:
+            append_listino(row)
+            mark_listino_synced(row['prodotto'], row['fornitore'])
+            inviati += 1
+        except Exception:
+            pass
+    for row in get_unsynced_temperature():
+        try:
+            append_temperatura(row)
+            mark_temperatura_synced(row['id'])
+            inviati += 1
+        except Exception:
+            pass
+    return inviati
+
+
 def _sync_sheets_background():
     try:
+        inviati = _push_pending_to_sheets()
         listino  = load_listino()
         replace_listino(listino)
         registro = load_registro()
         replace_registro(registro)
         temperature = load_temperatura()
         replace_temperatura(temperature)
+        extra = f" | {inviati} in sospeso sincronizzati" if inviati else ""
         print(f"[SYNC] Listino: {len(listino)} prodotti | Registro: {len(registro)} movimenti | "
-              f"Temperature: {len(temperature)} rilevazioni")
+              f"Temperature: {len(temperature)} rilevazioni{extra}")
     except Exception as e:
         print(f"[SYNC] Sheets non raggiungibile: {e}")
 
@@ -528,9 +569,12 @@ def api_aggiungi_prodotto():
     prodotto   = (d.get('prodotto')  or '').strip()
     fornitore  = (d.get('fornitore') or '').strip()
     unita      = (d.get('unita')     or 'kg').strip()
-    scorta_min = d.get('scorta_min', 0)
     categoria  = (d.get('categoria') or '').strip()
     reparto    = (d.get('reparto')   or '').strip()
+    try:
+        scorta_min = float(d.get('scorta_min', 0) or 0)
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'Scorta minima non valida'}), 400
 
     if not prodotto:
         return jsonify({'success': False, 'error': 'Nome prodotto obbligatorio'}), 400
@@ -540,17 +584,21 @@ def api_aggiungi_prodotto():
         return jsonify({'success': False, 'error': 'Seleziona il reparto'}), 400
     if categoria not in CATEGORIE_FISSE:
         return jsonify({'success': False, 'error': 'Seleziona la categoria'}), 400
+    if scorta_min < 0:
+        return jsonify({'success': False, 'error': 'Scorta minima non valida'}), 400
 
+    warning = None
     try:
         append_listino({'prodotto': prodotto, 'fornitore': fornitore, 'unita': unita,
                         'scorta_min': scorta_min, 'categoria': categoria, 'reparto': reparto})
-    except Exception as e:
-        return jsonify({'success': False, 'error': f'Errore Google Sheets: {e}'}), 500
+    except SheetsUnavailableError:
+        warning = 'Salvato localmente — Google Sheets non raggiungibile. Verrà sincronizzato automaticamente.'
 
-    insert_listino_row(prodotto, fornitore, unita, scorta_min, categoria, reparto)
+    insert_listino_row(prodotto, fornitore, unita, scorta_min, categoria, reparto,
+                        synced=(warning is None))
     return jsonify({'success': True, 'prodotto': prodotto, 'fornitore': fornitore,
                     'unita': unita, 'scorta_min': float(scorta_min or 0),
-                    'categoria': categoria, 'reparto': reparto})
+                    'categoria': categoria, 'reparto': reparto, 'warning': warning})
 
 
 # ─── API REGISTRO ─────────────────────────────────────────────────────────────
@@ -592,11 +640,15 @@ def api_lista_spesa_add():
     if not prodotto:
         return jsonify({'error': 'prodotto richiesto'}), 400
     fornitore = (data.get('fornitore')  or '').strip()
+    try:
+        quantita = float(data.get('quantita', 0) or 0)
+    except (TypeError, ValueError):
+        return jsonify({'error': 'quantità non valida'}), 400
     new_id = add_lista_spesa_item(
         prodotto,
         fornitore,
         (data.get('categoria')  or '').strip(),
-        data.get('quantita', 0),
+        quantita,
         (data.get('unita') or '').strip(),
         (data.get('reparto') or '').strip(),
     )
@@ -633,12 +685,6 @@ def api_lista_spesa_clear():
     for item in items:
         log_lista_spesa_azione('eliminato', item['prodotto'], item['fornitore'], current_user.nome)
     return jsonify({'success': True})
-
-
-@app.route('/api/feed')
-@login_required
-def api_feed():
-    return jsonify({'success': True, 'movements': get_feed()})
 
 
 # ─── OPERAZIONI ──────────────────────────────────────────────────────────────
@@ -682,10 +728,12 @@ def api_carico():
         'reparto':      get_reparto_prodotto(prodotto, fornitore),
     }
 
+    warning = None
     try:
         append_registro(row)
-    except Exception as e:
-        return jsonify({'success': False, 'error': f'Errore Google Sheets: {e}'}), 500
+    except SheetsUnavailableError:
+        row['synced'] = False
+        warning = 'Salvato localmente — Google Sheets non raggiungibile. Verrà sincronizzato automaticamente.'
 
     insert_movimento(row)
 
@@ -700,6 +748,7 @@ def api_carico():
         'scadenza':     scadenza,
         'qty':          qty,
         'unita':        unita,
+        'warning':      warning,
     })
 
 
@@ -755,10 +804,12 @@ def api_in_uso_crea():
         'tipo':         'IN_USO',
     }
 
+    warning = None
     try:
         append_registro(row)
-    except Exception as e:
-        return jsonify({'success': False, 'error': f'Errore Google Sheets: {e}'}), 500
+    except SheetsUnavailableError:
+        row['synced'] = False
+        warning = 'Salvato localmente — Google Sheets non raggiungibile. Verrà sincronizzato automaticamente.'
 
     row_id = insert_movimento(row)
 
@@ -771,6 +822,7 @@ def api_in_uso_crea():
         'lotto':        lotto,
         'qty':          qty,
         'unita':        row['unita'],
+        'warning':      warning,
     })
 
 
@@ -1033,14 +1085,16 @@ def api_temperature_registra():
         'operatore':   current_user.nome,
     }
 
+    warning = None
     try:
         append_temperatura(row)
-    except Exception as e:
-        return jsonify({'success': False, 'error': f'Errore Google Sheets: {e}'}), 500
+    except SheetsUnavailableError:
+        row['synced'] = False
+        warning = 'Salvato localmente — Google Sheets non raggiungibile. Verrà sincronizzato automaticamente.'
 
     insert_temperatura(row)
     registra_controllo_apparecchio(apparecchio_id)
-    return jsonify({'success': True, 'esito': esito})
+    return jsonify({'success': True, 'esito': esito, 'warning': warning})
 
 
 @app.route('/api/temperature/<int:temperatura_id>', methods=['DELETE'])
@@ -1097,6 +1151,7 @@ def api_controllo_log_eliminazioni_registro():
 @login_required
 def api_sync():
     try:
+        inviati = _push_pending_to_sheets()
         listino  = load_listino()
         replace_listino(listino)
         registro = load_registro()
@@ -1108,6 +1163,7 @@ def api_sync():
             'listino':     len(listino),
             'registro':    len(registro),
             'temperature': len(temperature),
+            'inviati':     inviati,
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -1346,15 +1402,17 @@ def api_preparazione_completa(prep_id):
         'tipo':         'SCARICO_PREPARAZIONE',
     }
 
+    warning = None
     try:
         append_registro(row)
-    except Exception as e:
-        return jsonify({'success': False, 'error': f'Errore Google Sheets: {e}'}), 500
+    except SheetsUnavailableError:
+        row['synced'] = False
+        warning = 'Salvato localmente — Google Sheets non raggiungibile. Verrà sincronizzato automaticamente.'
 
     insert_movimento(row)
     completa_preparazione(prep_id)
 
-    return jsonify({'success': True})
+    return jsonify({'success': True, 'warning': warning})
 
 
 # ─── SALE ──────────────────────────────────────────────────────────────────

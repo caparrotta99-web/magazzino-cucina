@@ -320,6 +320,8 @@ def db_init():
                 eliminato_il   TEXT NOT NULL DEFAULT ''
             )""",
             "CREATE INDEX IF NOT EXISTS idx_reg_prod_lotto ON registro(prodotto, lotto)",
+            "CREATE INDEX IF NOT EXISTS idx_reg_prod_lotto_tipo ON registro(prodotto, lotto, tipo)",
+            "CREATE INDEX IF NOT EXISTS idx_reg_data       ON registro(data)",
             "CREATE INDEX IF NOT EXISTS idx_reg_mov_id     ON registro(movimento_id)",
             "CREATE INDEX IF NOT EXISTS idx_temp_data      ON temperature(data)",
             "CREATE INDEX IF NOT EXISTS idx_prep_ingr_prep ON preparazione_ingredienti(preparazione_id)",
@@ -357,6 +359,9 @@ def db_init():
         ('apparecchi', 'ultima_mattina', "TEXT NOT NULL DEFAULT ''"),
         ('apparecchi', 'ultima_sera',    "TEXT NOT NULL DEFAULT ''"),
         ('preparazioni', 'completata', "INTEGER NOT NULL DEFAULT 0"),
+        ('registro',     'synced', "INTEGER NOT NULL DEFAULT 1"),
+        ('listino',      'synced', "INTEGER NOT NULL DEFAULT 1"),
+        ('temperature',  'synced', "INTEGER NOT NULL DEFAULT 1"),
     ]
     for table, col, defn in migrations:
         if _USE_PG:
@@ -432,12 +437,29 @@ def replace_listino(rows):
             )
 
 
-def insert_listino_row(prodotto, fornitore, unita, scorta_min, categoria, reparto='Cucina'):
+def insert_listino_row(prodotto, fornitore, unita, scorta_min, categoria, reparto='Cucina', synced=True):
     with get_conn() as conn:
         conn.execute(
-            "INSERT OR IGNORE INTO listino (prodotto, fornitore, unita, scorta_min, categoria, reparto) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (prodotto, fornitore, unita, float(scorta_min or 0), categoria or '', reparto or 'Cucina')
+            "INSERT OR IGNORE INTO listino (prodotto, fornitore, unita, scorta_min, categoria, reparto, synced) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (prodotto, fornitore, unita, float(scorta_min or 0), categoria or '', reparto or 'Cucina',
+             1 if synced else 0)
+        )
+
+
+def get_unsynced_listino():
+    """Prodotti scritti in locale mentre Google Sheets non era raggiungibile,
+    ancora da inviare a Sheets."""
+    with get_conn() as conn:
+        cur = conn.execute("SELECT * FROM listino WHERE synced = 0")
+        return _rows(cur)
+
+
+def mark_listino_synced(prodotto, fornitore):
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE listino SET synced = 1 WHERE prodotto = ? AND fornitore = ?",
+            (prodotto, fornitore)
         )
 
 
@@ -519,16 +541,30 @@ def insert_movimento(row):
             """INSERT INTO registro
                (gs_row, data, fornitore, prodotto, lotto, scadenza,
                 carico, scarico, unita, etichetta, movimento_id, rimanenza,
-                operatore, reparto, tipo, data_scarico)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                operatore, reparto, tipo, data_scarico, synced)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 row.get('gs_row'), row['data'], row['fornitore'], row['prodotto'],
                 row['lotto'], row['scadenza'], row['carico'], row['scarico'],
                 row['unita'], row['etichetta'], row['movimento_id'], row['rimanenza'],
                 row.get('operatore', ''), row.get('reparto', ''),
                 row.get('tipo', 'CARICO'), row.get('data_scarico', ''),
+                1 if row.get('synced', True) else 0,
             )
         )
+
+
+def get_unsynced_registro():
+    """Righe scritte in locale mentre Google Sheets non era raggiungibile,
+    ancora da inviare a Sheets."""
+    with get_conn() as conn:
+        cur = conn.execute("SELECT * FROM registro WHERE synced = 0")
+        return _rows(cur)
+
+
+def mark_registro_synced(row_id):
+    with get_conn() as conn:
+        conn.execute("UPDATE registro SET synced = 1 WHERE id = ?", (row_id,))
 
 
 def get_movimento_by_id(row_id):
@@ -1024,33 +1060,6 @@ def update_user_tema(user_id, tema):
         )
 
 
-def is_contact_taken(identifier, exclude_user_id):
-    """Restituisce True se email/telefono è già usata da un altro utente."""
-    with get_conn() as conn:
-        cur = conn.execute(
-            "SELECT id FROM users WHERE (email = ? OR telefono = ?) AND id != ?",
-            (identifier, identifier, exclude_user_id)
-        )
-        return _row(cur) is not None
-
-
-def get_feed(limit=40):
-    """Ultimi movimenti per il feed home."""
-    with get_conn() as conn:
-        cur = conn.execute(
-            """SELECT id, data, fornitore, prodotto, lotto, scadenza,
-                      carico, scarico, unita, operatore, reparto, movimento_id,
-                      tipo, data_scarico
-               FROM registro
-               ORDER BY
-                 CASE WHEN data_scarico != '' THEN data_scarico ELSE data END DESC,
-                 id DESC
-               LIMIT ?""",
-            (limit,)
-        )
-        return _rows(cur)
-
-
 # ─── APPARECCHI / TEMPERATURE ─────────────────────────────────────────────────
 
 # Range di riferimento HACCP per tipo apparecchio (usati per pre-compilare il
@@ -1167,12 +1176,26 @@ def insert_temperatura(row):
     with get_conn() as conn:
         return conn.execute_insert(
             """INSERT INTO temperature
-               (apparecchio, tipo, data, ora, temperatura, temp_min, temp_max, esito, nota, operatore)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               (apparecchio, tipo, data, ora, temperatura, temp_min, temp_max, esito, nota, operatore, synced)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (row['apparecchio'], row['tipo'], row['data'], row['ora'],
              row['temperatura'], row['temp_min'], row['temp_max'],
-             row['esito'], row.get('nota', ''), row['operatore'])
+             row['esito'], row.get('nota', ''), row['operatore'],
+             1 if row.get('synced', True) else 0)
         )
+
+
+def get_unsynced_temperature():
+    """Rilevazioni scritte in locale mentre Google Sheets non era
+    raggiungibile, ancora da inviare a Sheets."""
+    with get_conn() as conn:
+        cur = conn.execute("SELECT * FROM temperature WHERE synced = 0")
+        return _rows(cur)
+
+
+def mark_temperatura_synced(temperatura_id):
+    with get_conn() as conn:
+        conn.execute("UPDATE temperature SET synced = 1 WHERE id = ?", (temperatura_id,))
 
 
 def get_temperatura_by_id(temperatura_id):

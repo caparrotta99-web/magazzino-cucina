@@ -103,7 +103,6 @@ body {
 :root[data-theme="dark"] .modal,
 :root[data-theme="dark"] .lot-detail-sheet,
 :root[data-theme="dark"] .alert-card,
-:root[data-theme="dark"] .feed-item,
 :root[data-theme="dark"] .spesa-add-panel,
 :root[data-theme="dark"] .spesa-item,
 :root[data-theme="dark"] .eti-box,
@@ -835,13 +834,6 @@ main {
   background: var(--surface-2); border-radius: 100px;
   padding: 1px 7px; flex-shrink: 0;
 }
-.alert-type-tag {
-  font-size: 10px; font-weight: 600; letter-spacing: .4px;
-  padding: 2px 7px; border-radius: 100px; flex-shrink: 0;
-}
-.alert-type-tag.scad  { background: rgba(249,115,22,.12); color: var(--orange); }
-.alert-type-tag.scad.red { background: rgba(239,68,68,.12); color: var(--red); }
-.alert-type-tag.scorta { background: rgba(249,115,22,.12); color: var(--orange); }
 .alert-card {
   background: var(--card);
   border-radius: 16px; padding: 14px 16px;
@@ -1019,39 +1011,8 @@ main {
 .toast.success { background: #16a34a; color: #fff; border-color: transparent; }
 .toast.error   { background: #dc2626; color: #fff; border-color: transparent; }
 .toast.info    { background: var(--card); color: var(--text); }
+.toast.warning { background: var(--amber); color: #fff; border-color: transparent; }
 
-/* ─── HOME FEED ─────────────────────────────────────────────────────────── */
-.feed-section-hdr {
-  font-size: 11px; font-weight: 700; text-transform: uppercase;
-  letter-spacing: .6px; color: var(--muted); margin-bottom: 10px;
-}
-.feed-item {
-  background: var(--card);
-  border-radius: 14px; padding: 13px 14px;
-  box-shadow: var(--shadow); border: 1px solid var(--border);
-  display: flex; align-items: center; gap: 12px; margin-bottom: 8px;
-}
-.feed-dot {
-  width: 36px; height: 36px; border-radius: 10px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0;
-}
-.feed-dot.carico  { background: var(--green); color: #fff; }
-.feed-dot.in-uso  { background: var(--orange); color: #fff; }
-.feed-dot.scarico { background: var(--red); color: #fff; }
-.feed-info  { flex: 1; min-width: 0; }
-.feed-prod  { font-size: 13px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.feed-sub   { font-size: 11px; color: var(--muted); margin-top: 1px; }
-.feed-right { text-align: right; flex-shrink: 0; }
-.feed-qty   { font-size: 14px; font-weight: 700; color: var(--text); }
-.feed-tipo  {
-  font-size: 10px; font-weight: 600; letter-spacing: .5px;
-  padding: 2px 8px; border-radius: 100px; margin-top: 2px; display: inline-block;
-}
-.feed-tipo.carico  { background: rgba(34,197,94,.12);  color: var(--green); }
-.feed-tipo.in-uso  { background: rgba(249,115,22,.12); color: var(--orange); }
-.feed-tipo.scarico { background: rgba(239,68,68,.12); color: var(--red); }
-.feed-empty { font-size: 13px; color: var(--muted); text-align: center; padding: 20px 0; }
 
 /* ─── LISTA SPESA ───────────────────────────────────────────────────────── */
 .spesa-topbar {
@@ -2710,7 +2671,6 @@ const S = {
   inUso:        [],
   giacenze:     [],
   alerts:       { scadenze: [], scorte: [], count: 0 },
-  feed:         [],
   unitaCarico:  '',
   activePage:   'home',
   giacFilter:   'all',
@@ -2800,7 +2760,7 @@ async function init() {
   startHdrClock();
   animHomeCards();
   _initGiacSwipe();
-  await Promise.all([loadCategorie(), loadProdottiCarico(), loadGiacenze(), loadAlerts(), loadFeed(), loadListaSpesa(), loadInUso(), loadApparecchi(), loadStoricoTemperature()]);
+  await Promise.all([loadCategorie(), loadProdottiCarico(), loadGiacenze(), loadAlerts(), loadListaSpesa(), loadInUso(), loadApparecchi(), loadStoricoTemperature()]);
   renderInUsoProdotti();
 }
 
@@ -2877,7 +2837,7 @@ function navTo(page) {
 
   window.scrollTo({ top: 0, behavior: 'smooth' });
 
-  if (page === 'home')        { animHomeCards(); renderFeed(); }
+  if (page === 'home')        { animHomeCards(); }
   if (page === 'giacenze')   { updateFornitoriFilter(); renderGiacenze(); _setGiacPage(0, false); }
   if (page === 'alert')      renderAlerts();
   if (page === 'lista-spesa') loadListaSpesa();
@@ -2889,7 +2849,6 @@ function navTo(page) {
   if (page === 'gestione-sala') loadGestioneSala();
 }
 // alias for backward compat
-function switchTab(t) { navTo(t); }
 
 // ── HOME ANIMATION ───────────────────────────────────────────────────────
 function animHomeCards() {
@@ -2897,48 +2856,6 @@ function animHomeCards() {
     c.classList.remove('visible');
     setTimeout(() => c.classList.add('visible'), 80 + i * 110);
   });
-}
-
-// ── FEED ─────────────────────────────────────────────────────────────────
-async function loadFeed() {
-  const data = await api('/api/feed');
-  S.feed = data.movements || [];
-  renderFeed();
-}
-
-function renderFeed() {
-  const el = document.getElementById('home-feed');
-  if (!el) return;
-
-  if (!S.feed.length) {
-    el.innerHTML = '<p class="feed-empty">Nessun movimento registrato</p>';
-    return;
-  }
-
-  const TIPO_CLASS = { CARICO: 'carico', IN_USO: 'in-uso', SCARICO: 'scarico', PREPARAZIONE: 'scarico', SCARICO_PREPARAZIONE: 'scarico' };
-  const TIPO_LABEL = { CARICO: 'CARICO', IN_USO: 'IN USO', SCARICO: 'SCARICO', PREPARAZIONE: 'PREPARAZIONE', SCARICO_PREPARAZIONE: 'FINE PREPARAZIONE' };
-
-  const rows = S.feed.slice(0, 20).map(m => {
-    const tipoKey = m.tipo || ((m.carico || 0) > 0 ? 'CARICO' : 'SCARICO');
-    const cls     = TIPO_CLASS[tipoKey] || 'scarico';
-    const qty     = tipoKey === 'CARICO' ? m.carico : m.scarico;
-    const init    = (m.operatore || m.prodotto || '?')[0].toUpperCase();
-    const sub     = [m.fornitore, m.reparto, m.lotto ? `Lotto ${m.lotto}` : null]
-                      .filter(Boolean).join(' · ');
-    return `<div class="feed-item">
-      <div class="feed-dot ${cls}">${esc(init)}</div>
-      <div class="feed-info">
-        <div class="feed-prod">${esc(m.prodotto)}</div>
-        <div class="feed-sub">${esc(sub || '—')}</div>
-      </div>
-      <div class="feed-right">
-        <div class="feed-qty">${qty}&nbsp;<span style="font-size:11px;font-weight:400;color:var(--muted)">${esc(m.unita||'')}</span></div>
-        <span class="feed-tipo ${cls}">${TIPO_LABEL[tipoKey] || tipoKey}</span>
-      </div>
-    </div>`;
-  }).join('');
-
-  el.innerHTML = `<div class="feed-section-hdr">Movimenti recenti</div>${rows}`;
 }
 
 // ── GIACENZE FILTERS ─────────────────────────────────────────────────────
@@ -3134,8 +3051,9 @@ async function submitCarico() {
   if (data.success) {
     showEtichetta(data);
     resetCarico();
-    await Promise.all([loadGiacenze(), loadAlerts(), loadFeed()]);
+    await Promise.all([loadGiacenze(), loadAlerts()]);
     renderInUsoProdotti();
+    if (data.warning) toast(data.warning, 'warning');
   } else { toast(data.error || 'Errore durante il carico', 'error'); }
 }
 
@@ -3237,9 +3155,10 @@ async function submitInUso() {
   if (data.success) {
     toast(`Messo in uso — rimasto in magazzino: ${data.rimanenza}`, 'success');
     document.getElementById('u-qty').value = '';
-    await Promise.all([loadGiacenze(), loadAlerts(), loadFeed(), loadInUso()]);
+    await Promise.all([loadGiacenze(), loadAlerts(), loadInUso()]);
     renderInUsoProdotti();
     await onProdottoInUso();
+    if (data.warning) setTimeout(() => toast(data.warning, 'warning'), 1800);
   } else { toast(data.error || 'Errore durante il prelievo', 'error'); }
 }
 
@@ -3306,7 +3225,7 @@ async function submitScaricoModal() {
       : `Scarico registrato — ${data.prodotto}`;
     toast(msg, 'success');
     closeScaricoModal();
-    await Promise.all([loadInUso(), loadGiacenze(), loadAlerts(), loadFeed()]);
+    await Promise.all([loadInUso(), loadGiacenze(), loadAlerts()]);
     renderInUsoProdotti();
     if (S.activePage === 'giacenze') renderGiacenze();
   } else { toast(data.error || 'Errore durante lo scarico', 'error'); }
@@ -3625,7 +3544,6 @@ function _renderAlertCard(a) {
     const cls    = isScad ? 'danger' : 'warning';
     const ggTxt  = a.giorni === null ? '' : a.giorni < 0 ? 'Scaduto' : a.giorni === 0 ? 'Scade oggi' : `${a.giorni}gg`;
     const ggCls  = isScad ? 'red' : (a.giorni !== null && a.giorni <= 3 ? 'red' : 'orange');
-    const tagCls = isScad ? 'scad red' : 'scad';
     return `<div class="alert-card ${cls}">
       <div class="alert-ico ${cls}">
         <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
@@ -3796,7 +3714,7 @@ async function confermaEliminaCarico(rowId) {
   if (!result.success) { toast(result.error || 'Errore', 'error'); return; }
   toast('Carico eliminato', 'success');
   closeLotDetail();
-  await Promise.all([loadGiacenze(), loadAlerts(), loadFeed()]);
+  await Promise.all([loadGiacenze(), loadAlerts()]);
 }
 
 // ── ETICHETTA ─────────────────────────────────────────────────────────────
@@ -3876,7 +3794,7 @@ async function submitModificaLotto() {
   closeModificaLotto();
   closeLotDetail();
   toast('Lotto aggiornato', 'success');
-  await Promise.all([loadGiacenze(), loadAlerts(), loadFeed()]);
+  await Promise.all([loadGiacenze(), loadAlerts()]);
 }
 
 // ── LISTA SPESA ───────────────────────────────────────────────────────────
@@ -4314,7 +4232,8 @@ async function submitNuovoProdotto() {
   for (let i = 0; i < sel.options.length; i++) {
     if (sel.options[i].value === nome) { sel.selectedIndex = i; onProdottoCarico(); break; }
   }
-  toast('Prodotto aggiunto al listino', 'success');
+  if (data.warning) toast(data.warning, 'warning');
+  else toast('Prodotto aggiunto al listino', 'success');
 }
 
 // ── SYNC ──────────────────────────────────────────────────────────────────
@@ -4326,7 +4245,8 @@ async function syncAll() {
   btn.classList.remove('spinning');
   if (data.success) {
     await Promise.all([loadProdottiCarico(), loadGiacenze(), loadAlerts()]);
-    toast(`Sincronizzato: ${data.listino} prodotti, ${data.registro} movimenti`, 'success');
+    const extra = data.inviati ? ` (${data.inviati} in sospeso inviati)` : '';
+    toast(`Sincronizzato: ${data.listino} prodotti, ${data.registro} movimenti${extra}`, 'success');
   } else { toast(data.error || 'Errore sincronizzazione', 'error'); }
 }
 
@@ -4630,6 +4550,7 @@ async function submitRegistraTemp() {
   await Promise.all([loadApparecchi(), loadStoricoTemperature()]);
   toast(result.esito === 'FUORI_SOGLIA' ? 'Registrato — FUORI SOGLIA' : 'Temperatura registrata',
         result.esito === 'FUORI_SOGLIA' ? 'error' : 'success');
+  if (result.warning) setTimeout(() => toast(result.warning, 'warning'), 1800);
 }
 
 // ── STORICO TEMPERATURE ─────────────────────────────────────────────────────
@@ -4896,8 +4817,9 @@ async function confermaCompletaPreparazione(id) {
   if (!confirm('La preparazione è stata completamente consumata?')) return;
   const result = await api(`/api/preparazioni/${id}/completa`, { method: 'POST' });
   if (!result.success) { toast(result.error || 'Errore', 'error'); return; }
-  toast('Preparazione completata', 'success');
-  await Promise.all([loadPreparazioni(), loadFeed()]);
+  if (result.warning) toast(result.warning, 'warning');
+  else toast('Preparazione completata', 'success');
+  await loadPreparazioni();
 }
 
 function openNuovaPreparazione() {
@@ -5057,7 +4979,7 @@ async function submitPreparazione() {
   if (!result.success) { toast(result.error || 'Errore', 'error'); return; }
   closeNuovaPreparazione();
   toast('Preparazione registrata', 'success');
-  await Promise.all([loadPreparazioni(), loadGiacenze(), loadAlerts(), loadFeed()]);
+  await Promise.all([loadPreparazioni(), loadGiacenze(), loadAlerts()]);
 }
 
 let _prepEtichettaData = null;

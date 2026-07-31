@@ -1065,6 +1065,41 @@ main {
   cursor: pointer; transition: background .15s;
 }
 .btn-spesa-confirm:active { background: #0ea271; }
+.spesa-search-wrap { margin-bottom: 0; }
+.spesa-search-dropdown {
+  position: absolute; top: calc(100% + 6px); left: 0; right: 0;
+  background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+  box-shadow: var(--shadow-lg); max-height: 260px; overflow-y: auto;
+  z-index: 20; display: none;
+}
+.spesa-search-dropdown.open { display: block; }
+.spesa-search-item {
+  padding: 11px 14px; cursor: pointer;
+  display: flex; flex-direction: column; gap: 2px;
+  border-bottom: 1px solid var(--surface-2);
+}
+.spesa-search-item:last-child { border-bottom: none; }
+.spesa-search-item:active { background: var(--surface-2); }
+.spesa-search-item-nome { font-size: 14px; font-weight: 600; color: var(--text); }
+.spesa-search-item-forn { font-size: 12px; color: var(--muted); }
+.spesa-search-empty { padding: 14px; font-size: 13px; color: var(--muted); text-align: center; }
+.spesa-search-addnew {
+  padding: 12px 14px; cursor: pointer;
+  display: flex; align-items: center; gap: 7px;
+  font-size: 13px; font-weight: 600; color: var(--blue);
+  border-top: 1px solid var(--border);
+}
+.spesa-search-addnew:active { background: var(--surface-2); }
+.spesa-or-divider {
+  text-align: center; font-size: 11px; font-weight: 600; text-transform: uppercase;
+  letter-spacing: .5px; color: var(--muted-2); margin: 14px 0;
+  position: relative;
+}
+.spesa-or-divider::before, .spesa-or-divider::after {
+  content: ''; position: absolute; top: 50%; width: 40%; height: 1px; background: var(--border);
+}
+.spesa-or-divider::before { left: 0; }
+.spesa-or-divider::after  { right: 0; }
 .spesa-group { margin-bottom: 22px; }
 .spesa-group-hdr {
   font-size: 12px; font-weight: 700; text-transform: uppercase;
@@ -2084,6 +2119,19 @@ body.help-mode { background: #0f1f3d; }
     <!-- Panel aggiunta manuale -->
     <div class="spesa-add-panel" id="spesa-add-panel">
       <div class="fgroup" style="margin-bottom:10px">
+        <div class="flabel">Cerca prodotto</div>
+        <div class="search-wrap spesa-search-wrap">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input class="search-input" type="search" id="spesa-search-input"
+                 placeholder="Cerca per nome o fornitore…" autocomplete="off"
+                 oninput="onSpesaSearchInput()" onfocus="onSpesaSearchInput()" onblur="_closeSpesaDropdownDelayed()">
+          <div class="spesa-search-dropdown" id="spesa-search-dropdown"></div>
+        </div>
+      </div>
+
+      <div class="spesa-or-divider">oppure</div>
+
+      <div class="fgroup" style="margin-bottom:10px">
         <div class="flabel">Reparto</div>
         <div class="fselect-wrap">
           <select class="fselect" id="spesa-sel-reparto" onchange="onSpesaReparto()">
@@ -2095,7 +2143,7 @@ body.help-mode { background: #0f1f3d; }
         </div>
       </div>
       <div class="fgroup" style="margin-bottom:10px">
-        <div class="flabel">Fornitore</div>
+        <div class="flabel">Fornitore <span style="font-weight:400;color:var(--muted)">(opzionale)</span></div>
         <div class="fselect-wrap">
           <select class="fselect" id="spesa-sel-fornitore" disabled onchange="onSpesaFornitore()">
             <option value="">Seleziona prima il reparto</option>
@@ -2106,7 +2154,7 @@ body.help-mode { background: #0f1f3d; }
         <div class="flabel">Prodotto</div>
         <div class="fselect-wrap">
           <select class="fselect" id="spesa-sel-prodotto" disabled>
-            <option value="">Seleziona prima il fornitore</option>
+            <option value="">Seleziona prima il reparto</option>
           </select>
         </div>
       </div>
@@ -2672,6 +2720,7 @@ const S = {
   giacenze:     [],
   alerts:       { scadenze: [], scorte: [], count: 0 },
   unitaCarico:  '',
+  npOrigin:     'carico',   // 'carico' | 'spesa' — da dove è stato aperto il modal Nuovo prodotto
   activePage:   'home',
   giacFilter:   'all',
   giacRepartoFilter:  '',      // '' | 'cucina' | 'sala' | 'pizzeria'
@@ -3833,15 +3882,15 @@ function _populateSpesaFornitori() {
     selF.disabled = true;
   }
   const selP = document.getElementById('spesa-sel-prodotto');
-  if (selP) { selP.innerHTML = '<option value="">Seleziona prima il fornitore</option>'; selP.disabled = true; }
+  if (selP) { selP.innerHTML = '<option value="">Seleziona prima il reparto</option>'; selP.disabled = true; }
+  const searchInput = document.getElementById('spesa-search-input');
+  if (searchInput) searchInput.value = '';
+  const dd = document.getElementById('spesa-search-dropdown');
+  if (dd) { dd.classList.remove('open'); dd.innerHTML = ''; }
 }
 
-function onSpesaReparto() {
-  const reparto = document.getElementById('spesa-sel-reparto').value;
+function _populateSpesaFornitoriForReparto(reparto) {
   const selF = document.getElementById('spesa-sel-fornitore');
-  const selP = document.getElementById('spesa-sel-prodotto');
-  selP.innerHTML = '<option value="">Seleziona prima il fornitore</option>';
-  selP.disabled = true;
   if (!reparto) {
     selF.innerHTML = '<option value="">Seleziona prima il reparto</option>';
     selF.disabled = true;
@@ -3850,24 +3899,83 @@ function onSpesaReparto() {
   const fornitori = [...new Set(
     S.prodotti.filter(p => (p.reparto || 'Cucina') === reparto).map(p => p.fornitore).filter(Boolean)
   )].sort();
-  selF.innerHTML = '<option value="">Seleziona fornitore…</option>' +
+  selF.innerHTML = '<option value="">Tutti i fornitori</option>' +
     fornitori.map(f => `<option value="${esc(f)}">${esc(f)}</option>`).join('');
   selF.disabled = false;
+}
+
+function _populateSpesaProdotti(reparto, fornitore) {
+  const selP = document.getElementById('spesa-sel-prodotto');
+  if (!reparto) {
+    selP.innerHTML = '<option value="">Seleziona prima il reparto</option>';
+    selP.disabled = true;
+    return;
+  }
+  const filtered = S.prodotti.filter(p =>
+    (p.reparto || 'Cucina') === reparto && (!fornitore || p.fornitore === fornitore)
+  );
+  selP.innerHTML = '<option value="">Scegli prodotto…</option>' +
+    filtered.map(p => `<option value="${esc(p.prodotto)}|${esc(p.unita)}">${esc(p.prodotto)}</option>`).join('');
+  selP.disabled = false;
+}
+
+function onSpesaReparto() {
+  const reparto = document.getElementById('spesa-sel-reparto').value;
+  _populateSpesaFornitoriForReparto(reparto);
+  _populateSpesaProdotti(reparto, '');
 }
 
 function onSpesaFornitore() {
   const reparto   = document.getElementById('spesa-sel-reparto').value;
   const fornitore = document.getElementById('spesa-sel-fornitore').value;
+  _populateSpesaProdotti(reparto, fornitore);
+}
+
+function _setSpesaSelection(reparto, fornitore, prodotto, unita) {
+  reparto = reparto || 'Cucina';
+  const selR = document.getElementById('spesa-sel-reparto');
+  const selF = document.getElementById('spesa-sel-fornitore');
   const selP = document.getElementById('spesa-sel-prodotto');
-  if (!fornitore) {
-    selP.innerHTML = '<option value="">Seleziona prima il fornitore</option>';
-    selP.disabled = true;
-    return;
-  }
-  const filtered = S.prodotti.filter(p => p.fornitore === fornitore && (p.reparto || 'Cucina') === reparto);
-  selP.innerHTML = '<option value="">Scegli prodotto…</option>' +
-    filtered.map(p => `<option value="${esc(p.prodotto)}|${esc(p.unita)}">${esc(p.prodotto)}</option>`).join('');
-  selP.disabled = false;
+  selR.value = reparto;
+  _populateSpesaFornitoriForReparto(reparto);
+  selF.value = fornitore || '';
+  _populateSpesaProdotti(reparto, fornitore || '');
+  selP.value = `${prodotto}|${unita || ''}`;
+}
+
+function onSpesaSearchInput() {
+  const q  = document.getElementById('spesa-search-input').value.trim().toLowerCase();
+  const dd = document.getElementById('spesa-search-dropdown');
+  if (!q) { dd.classList.remove('open'); dd.innerHTML = ''; return; }
+
+  const matches = S.prodotti.filter(p =>
+    p.prodotto.toLowerCase().includes(q) || (p.fornitore || '').toLowerCase().includes(q)
+  ).slice(0, 30);
+
+  dd.innerHTML = matches.length
+    ? matches.map(p => `
+      <div class="spesa-search-item" onclick="pickSpesaSearchResult(${esc(JSON.stringify(p))})">
+        <span class="spesa-search-item-nome">${esc(p.prodotto)}</span>
+        <span class="spesa-search-item-forn">${esc(p.fornitore || '—')}${p.reparto ? ' · ' + esc(p.reparto) : ''}</span>
+      </div>`).join('')
+    : `<div class="spesa-search-empty">Nessun prodotto trovato</div>
+       <div class="spesa-search-addnew" onclick="openNuovoProdotto('spesa')">
+         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+         Aggiungi nuovo prodotto
+       </div>`;
+  dd.classList.add('open');
+}
+
+function pickSpesaSearchResult(p) {
+  document.getElementById('spesa-search-input').value = p.prodotto;
+  document.getElementById('spesa-search-dropdown').classList.remove('open');
+  _setSpesaSelection(p.reparto || 'Cucina', p.fornitore || '', p.prodotto, p.unita || '');
+}
+
+function _closeSpesaDropdownDelayed() {
+  setTimeout(() => {
+    document.getElementById('spesa-search-dropdown')?.classList.remove('open');
+  }, 150);
 }
 
 
@@ -4129,10 +4237,9 @@ async function confirmAddProdotto() {
   const selP = document.getElementById('spesa-sel-prodotto');
   const qtyEl = document.getElementById('spesa-add-qty');
   if (!selR?.value) { toast('Seleziona il reparto', 'error'); return; }
-  if (!selF?.value) { toast('Seleziona il fornitore', 'error'); return; }
   if (!selP?.value) { toast('Seleziona il prodotto', 'error'); return; }
 
-  const fornitore = selF.value;
+  const fornitore = selF?.value || '';
   const [prodotto, unita] = selP.value.split('|');
   const qty = parseFloat(qtyEl.value) || 0;
 
@@ -4162,7 +4269,10 @@ async function confirmAddProdotto() {
 }
 
 // ── NUOVO PRODOTTO ────────────────────────────────────────────────────────
-function openNuovoProdotto() {
+function openNuovoProdotto(origin = 'carico') {
+  S.npOrigin = origin;
+  document.getElementById('spesa-search-dropdown')?.classList.remove('open');
+
   // Populate fornitore select from already-loaded prodotti
   const fornitori = [...new Set(S.prodotti.map(p => p.fornitore).filter(Boolean))].sort();
   const selF = document.getElementById('np-fornitore');
@@ -4171,12 +4281,16 @@ function openNuovoProdotto() {
     '<option value="__altro__">+ Altro…</option>';
 
   // Reset fields
-  document.getElementById('np-nome').value    = '';
+  document.getElementById('np-nome').value    = origin === 'spesa'
+    ? (document.getElementById('spesa-search-input')?.value.trim() || '')
+    : '';
   document.getElementById('np-scorta').value  = '';
   document.getElementById('np-unita').value   = 'kg';
   document.getElementById('np-categoria').value = '';
-  // Pre-seleziona il reparto in base al filtro attivo nella pagina Carico
-  document.getElementById('np-reparto').value = S.caricoReparto || '';
+  // Pre-seleziona il reparto già scelto nella pagina di provenienza, se c'è
+  document.getElementById('np-reparto').value = origin === 'spesa'
+    ? (document.getElementById('spesa-sel-reparto')?.value || '')
+    : (S.caricoReparto || '');
   document.getElementById('np-fornitore-custom').value = '';
   document.getElementById('np-fornitore-custom-wrap').style.display = 'none';
   document.getElementById('btn-np-salva').disabled = false;
@@ -4227,10 +4341,15 @@ async function submitNuovoProdotto() {
   closeNuovoProdotto();
   await loadProdottiCarico();
 
-  // Auto-select the new product in the carico form
-  const sel = document.getElementById('c-prodotto');
-  for (let i = 0; i < sel.options.length; i++) {
-    if (sel.options[i].value === nome) { sel.selectedIndex = i; onProdottoCarico(); break; }
+  if (S.npOrigin === 'spesa') {
+    _setSpesaSelection(reparto, fornitore, nome, unita);
+    document.getElementById('spesa-search-input').value = nome;
+  } else {
+    // Auto-select the new product in the carico form
+    const sel = document.getElementById('c-prodotto');
+    for (let i = 0; i < sel.options.length; i++) {
+      if (sel.options[i].value === nome) { sel.selectedIndex = i; onProdottoCarico(); break; }
+    }
   }
   if (data.warning) toast(data.warning, 'warning');
   else toast('Prodotto aggiunto al listino', 'success');

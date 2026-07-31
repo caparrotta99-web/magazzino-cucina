@@ -510,6 +510,65 @@ main {
 .eti-row span { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; flex-shrink: 0; }
 .eti-row strong { font-size: 13px; font-weight: 600; color: var(--text); text-align: right; word-break: break-word; }
 
+/* ─── WIZARD CARICO ─────────────────────────────────────────────────────── */
+.btn-secondary {
+  width: 100%; height: 54px;
+  background: var(--surface-2); color: var(--text);
+  border: 1.5px solid var(--border); border-radius: 16px;
+  font-family: 'Inter', sans-serif; font-size: 16px; font-weight: 600;
+  cursor: pointer; transition: background .15s, transform .15s;
+}
+.btn-secondary:active { background: var(--border); transform: scale(.98); }
+.carico-qty-card {
+  background: var(--card); border: 1px solid var(--border); border-radius: 18px;
+  padding: 18px 16px; margin-bottom: 14px; box-shadow: var(--shadow);
+}
+.carico-qty-stepper {
+  display: flex; align-items: center; justify-content: center; gap: 14px;
+  margin-top: 6px;
+}
+.carico-qty-btn {
+  width: 52px; height: 52px; border-radius: 50%; flex-shrink: 0;
+  background: var(--surface-2); border: 1.5px solid var(--border);
+  color: var(--text); font-size: 26px; font-weight: 600; line-height: 1;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: background .15s, transform .1s;
+}
+.carico-qty-btn:active { background: var(--border); transform: scale(.94); }
+.carico-qty-input {
+  width: 120px; height: 64px; text-align: center;
+  border: none; background: transparent; color: var(--text);
+  font-family: 'Inter', sans-serif; font-size: 34px; font-weight: 700;
+  outline: none; -webkit-appearance: none; appearance: none;
+}
+.carico-qty-input::-webkit-outer-spin-button,
+.carico-qty-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.carico-step-3 { padding-top: 8px; }
+.carico-step3-actions { display: flex; gap: 10px; margin-top: 16px; }
+.carico-step3-actions .btn-secondary,
+.carico-step3-actions .btn-primary { margin-top: 0; }
+.carico-success {
+  display: none; position: fixed; inset: 0; z-index: 250;
+  background: var(--bg);
+  flex-direction: column; align-items: center; justify-content: center; gap: 18px;
+}
+.carico-success.show { display: flex; animation: fadeIn .2s ease; }
+.carico-success-check { width: 96px; height: 96px; }
+.carico-success-circle {
+  stroke: var(--green); stroke-width: 3;
+  stroke-dasharray: 151; stroke-dashoffset: 151;
+  animation: caricoCircle .4s ease forwards;
+}
+.carico-success-tick {
+  stroke: var(--green); stroke-width: 4; stroke-linecap: round; stroke-linejoin: round;
+  stroke-dasharray: 40; stroke-dashoffset: 40;
+  animation: caricoTick .3s ease forwards .35s;
+}
+.carico-success-label { font-size: 16px; font-weight: 600; color: var(--text); }
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+@keyframes caricoCircle { to { stroke-dashoffset: 0; } }
+@keyframes caricoTick   { to { stroke-dashoffset: 0; } }
+
 /* ─── SEARCH BAR ────────────────────────────────────────────────────────── */
 .search-wrap { position: relative; margin-bottom: 12px; }
 .search-wrap svg {
@@ -978,6 +1037,14 @@ main {
   cursor: pointer; transition: background .15s;
 }
 .lot-print-btn:active { background: var(--border); }
+.lock-badge {
+  width: 32px; height: 32px; border-radius: 10px; flex-shrink: 0;
+  background: rgba(180,83,9,.14); color: var(--amber); border: none;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: background .15s;
+}
+.lock-badge:active { background: rgba(180,83,9,.24); }
+.temp-app-card .lock-badge { display: inline-flex; width: 28px; height: 28px; margin-left: 8px; vertical-align: middle; margin-bottom: 8px; }
 
 /* ─── ETICHETTA LOTTO (stampa) ──────────────────────────────────────────── */
 .eti-lotto-label {
@@ -1752,98 +1819,105 @@ body.help-mode { background: #0f1f3d; }
 
   <!-- CARICO -->
   <section class="page" id="page-carico">
-    <div class="back-bar" onclick="navTo('home')">
+    <div class="back-bar" onclick="closeCaricoWizard()">
       <div class="back-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
       <span class="back-label">Carico</span>
     </div>
 
-    <div class="filter-row">
-      <select class="fselect-pill" id="c-filter-reparto" onchange="onCaricoFilterChange(this)">
-        <option value="">Reparto</option>
-        <option value="Cucina">Cucina</option>
-        <option value="Sala">Sala</option>
-        <option value="Pizzeria">Pizzeria</option>
-      </select>
-      <select class="fselect-pill" id="c-filter-categoria" onchange="onCaricoFilterChange(this)">
-        <option value="">Categoria</option>
-      </select>
+    <!-- STEP 1: Cerca prodotto -->
+    <div class="carico-step" id="carico-step-1">
+      <div class="pg-sub">Cerca il prodotto oppure scansiona l'etichetta</div>
+      <div class="search-wrap spesa-search-wrap">
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input class="search-input" type="search" id="carico-search-input"
+               placeholder="Cerca prodotto…" autocomplete="off"
+               oninput="onCaricoSearchInput()" onfocus="onCaricoSearchInput()" onblur="_closeCaricoDropdownDelayed()">
+        <div class="spesa-search-dropdown" id="carico-search-dropdown"></div>
+      </div>
+
+      <div class="spesa-or-divider">oppure</div>
+
+      <div class="scan-banner" id="scan-banner">
+        <div class="scan-banner-icon">🔍</div>
+        <div class="scan-banner-text">
+          <div class="scan-banner-title">Lettura etichetta con AI...</div>
+          <div class="scan-banner-bar-wrap"><div class="scan-banner-bar"></div></div>
+        </div>
+      </div>
+
+      <button type="button" class="btn-scan" id="btn-scan" onclick="triggerCamera()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        Scansiona etichetta
+      </button>
+      <input type="file" id="camera-input" accept="image/*" capture="environment"
+             style="display:none" onchange="onCameraCapture(this)">
     </div>
 
-    <div class="pg-sub">I campi contrassegnati con * sono obbligatori</div>
-
-    <div class="form-card">
-      <div class="fgroup">
-        <label class="flabel">Prodotto *</label>
-        <div class="fselect-wrap">
-          <select class="fselect" id="c-prodotto" onchange="onProdottoCarico()">
-            <option value="">Seleziona prodotto…</option>
-          </select>
+    <!-- STEP 2: Inserisci dati -->
+    <div class="carico-step" id="carico-step-2" style="display:none">
+      <div class="form-card">
+        <div class="fgroup">
+          <label class="flabel">Prodotto</label>
+          <div class="freadonly has-val" id="c2-prodotto"></div>
         </div>
-        <button type="button" class="btn-nuovo-prodotto" onclick="openNuovoProdotto()">
-          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-          Nuovo prodotto
+        <div class="fgroup">
+          <label class="flabel">Fornitore</label>
+          <div class="freadonly has-val" id="c2-fornitore"></div>
+        </div>
+        <div class="fgroup">
+          <label class="flabel">Unità di misura</label>
+          <div class="freadonly has-val" id="c2-unita"></div>
+        </div>
+        <div class="fgroup" style="margin-bottom:0">
+          <label class="flabel">Reparto</label>
+          <div class="freadonly has-val" id="c2-reparto"></div>
+        </div>
+      </div>
+
+      <div class="form-card">
+        <div class="fgroup">
+          <label class="flabel">Numero Lotto *</label>
+          <input class="finput" type="text" id="c2-lotto"
+                 placeholder="es. L2026001" autocomplete="off" autocapitalize="characters">
+        </div>
+        <div class="fgroup" style="margin-bottom:0">
+          <label class="flabel">Data di scadenza</label>
+          <input class="finput" type="date" id="c2-scadenza">
+        </div>
+      </div>
+
+      <div class="carico-qty-card">
+        <label class="flabel" style="text-align:center;display:block">Quantità *</label>
+        <div class="carico-qty-stepper">
+          <button type="button" class="carico-qty-btn" onclick="adjustCaricoQty(-1)" aria-label="Diminuisci">−</button>
+          <input class="carico-qty-input" type="number" id="c2-qty" inputmode="decimal" min="0" step="0.01" placeholder="0">
+          <button type="button" class="carico-qty-btn" onclick="adjustCaricoQty(1)" aria-label="Aumenta">+</button>
+        </div>
+      </div>
+
+      <button class="btn-primary" onclick="goToCaricoStep3()"><span class="btn-lbl">Avanti</span></button>
+    </div>
+
+    <!-- STEP 3: Riepilogo e conferma -->
+    <div class="carico-step carico-step-3" id="carico-step-3" style="display:none">
+      <div class="pg-sub" style="text-align:center">Controlla i dati prima di confermare</div>
+      <div class="eti-box show" id="carico-riepilogo"></div>
+      <div class="carico-step3-actions">
+        <button class="btn-secondary" onclick="backToCaricoStep2()">Modifica</button>
+        <button class="btn-primary" id="btn-carico-confirm" onclick="confermaCarico()">
+          <span class="spinner"></span><span class="btn-lbl">Conferma</span>
         </button>
       </div>
-      <div class="fgroup">
-        <label class="flabel">Fornitore *</label>
-        <div class="fselect-wrap">
-          <select class="fselect" id="c-fornitore">
-            <option value="">Seleziona prima il prodotto</option>
-          </select>
-        </div>
-      </div>
-      <div class="fgroup">
-        <label class="flabel">Unità di misura</label>
-        <div class="freadonly" id="c-unita">—</div>
-      </div>
-      <div class="fgroup">
-        <label class="flabel">Categoria</label>
-        <div class="freadonly" id="c-categoria">—</div>
-      </div>
     </div>
 
-    <div class="scan-banner" id="scan-banner">
-      <div class="scan-banner-icon">🔍</div>
-      <div class="scan-banner-text">
-        <div class="scan-banner-title">Lettura etichetta con AI...</div>
-        <div class="scan-banner-bar-wrap"><div class="scan-banner-bar"></div></div>
-      </div>
+    <!-- Animazione di successo -->
+    <div class="carico-success" id="carico-success">
+      <svg class="carico-success-check" viewBox="0 0 52 52">
+        <circle class="carico-success-circle" cx="26" cy="26" r="24" fill="none"/>
+        <path class="carico-success-tick" fill="none" d="M14 27l7 7 16-16"/>
+      </svg>
+      <div class="carico-success-label">Carico registrato</div>
     </div>
-
-    <button type="button" class="btn-scan" id="btn-scan" onclick="triggerCamera()">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-      Scansiona etichetta
-    </button>
-    <input type="file" id="camera-input" accept="image/*" capture="environment"
-           style="display:none" onchange="onCameraCapture(this)">
-
-    <div class="form-card">
-      <div class="fgroup">
-        <label class="flabel">Numero Lotto *</label>
-        <input class="finput" type="text" id="c-lotto"
-               placeholder="es. L2026001" autocomplete="off" autocapitalize="characters">
-      </div>
-      <div class="fgroup">
-        <label class="flabel">Data di scadenza</label>
-        <input class="finput" type="date" id="c-scadenza">
-      </div>
-      <div class="fgroup">
-        <label class="flabel">Quantità *</label>
-        <input class="finput" type="number" id="c-qty"
-               placeholder="0" min="0.01" step="0.01" inputmode="decimal">
-      </div>
-      <div class="fgroup">
-        <label class="flabel">Note</label>
-        <textarea class="ftextarea" id="c-note" placeholder="Note opzionali…"></textarea>
-      </div>
-    </div>
-
-    <button class="btn-primary" id="btn-carico" onclick="submitCarico()">
-      <span class="spinner"></span>
-      <span class="btn-lbl">Registra Carico</span>
-    </button>
-
-    <div class="eti-box" id="eti-box-inline"></div>
   </section>
 
   <!-- IN USO -->
@@ -2170,19 +2244,6 @@ body.help-mode { background: #0f1f3d; }
   </section>
 
 </main>
-
-<!-- ── MODAL ETICHETTA ──────────────────────────────────────────────────── -->
-<div class="modal-backdrop" id="modal-etichetta" onclick="bgClose(event)">
-  <div class="modal">
-    <div class="modal-handle"></div>
-    <div class="modal-title">Etichetta HACCP</div>
-    <div class="modal-body" id="eti-content"></div>
-    <div class="modal-actions">
-      <button class="btn-print" onclick="window.print()">Stampa</button>
-      <button class="btn-close-modal" onclick="closeModal()">Chiudi</button>
-    </div>
-  </div>
-</div>
 
 <!-- ── MODAL ETICHETTA LOTTO (Giacenze) ──────────────────────────────────── -->
 <div class="modal-backdrop" id="modal-eti-lotto" onclick="bgCloseEtiLotto(event)">
@@ -2720,7 +2781,6 @@ const S = {
   inUso:        [],
   giacenze:     [],
   alerts:       { scadenze: [], scorte: [], count: 0 },
-  unitaCarico:  '',
   npOrigin:     'carico',   // 'carico' | 'spesa' — da dove è stato aperto il modal Nuovo prodotto
   activePage:   'home',
   giacFilter:   'all',
@@ -2732,10 +2792,11 @@ const S = {
   alertTypeFilter: 'all',   // 'all' | 'scadenza' | 'scorta'
   alertCatFilter:  'all',   // 'all' | category name
   alertRepartoFilter: 'all',   // 'all' | 'cucina' | 'sala' | 'pizzeria'
-  caricoReparto:   '', caricoCategoria:   '',   // '' = Tutti/Tutte
+  caricoData: { prodotto:'', fornitore:'', unita:'', reparto:'', categoria:'', lotto:'', scadenza:'', qty:null, _scanPending:false },
   inUsoReparto:    '', inUsoCategoria:    '',
   prepIngReparto:  '',
   apparecchi:            [],
+  locks:                 [],
   puoGestireApparecchi:  false,
   rangeRiferimento:      {},
   temperatureStorico:    [],
@@ -2758,13 +2819,6 @@ function filterProdotti(items, reparto, categoria) {
     const cOk = !categoria || (p.categoria || '') === categoria;
     return rOk && cOk;
   });
-}
-
-function onCaricoFilterChange(sel) {
-  sel.classList.toggle('active', !!sel.value);
-  S.caricoReparto   = document.getElementById('c-filter-reparto').value;
-  S.caricoCategoria = document.getElementById('c-filter-categoria').value;
-  populateCaricoSelect();
 }
 
 function onInUsoFilterChange(sel) {
@@ -2810,7 +2864,8 @@ async function init() {
   startHdrClock();
   animHomeCards();
   _initGiacSwipe();
-  await Promise.all([loadCategorie(), loadProdottiCarico(), loadGiacenze(), loadAlerts(), loadListaSpesa(), loadInUso(), loadApparecchi(), loadStoricoTemperature()]);
+  await Promise.all([loadCategorie(), loadProdottiCarico(), loadGiacenze(), loadAlerts(), loadListaSpesa(), loadInUso(), loadApparecchi(), loadStoricoTemperature(), loadLocks()]);
+  setInterval(loadLocks, 20000);
   renderInUsoProdotti();
 }
 
@@ -2888,6 +2943,7 @@ function navTo(page) {
   window.scrollTo({ top: 0, behavior: 'smooth' });
 
   if (page === 'home')        { animHomeCards(); }
+  if (page === 'carico')     resetCaricoWizard();
   if (page === 'giacenze')   { updateFornitoriFilter(); renderGiacenze(); _setGiacPage(0, false); }
   if (page === 'alert')      renderAlerts();
   if (page === 'lista-spesa') loadListaSpesa();
@@ -2928,53 +2984,202 @@ function updateFornitoriFilter() {
   sel.classList.toggle('active', !!sel.value);
 }
 
+// ── LOCK MOVIMENTI ───────────────────────────────────────────────────────
+// Lock "soft" condiviso da Carico/Scarico/In uso/Preparazioni/Temperature:
+// avvisa se un collega sta già lavorando sulla stessa risorsa, ma non
+// impedisce di procedere se l'utente conferma comunque (non ruba il lock).
+async function tryAcquireLock({ tipo, prodotto = '', lotto = '', apparecchio_id = 0, form }) {
+  const res = await api('/api/locks/acquire', {
+    method: 'POST',
+    body: { tipo, prodotto, lotto, apparecchio_id, form },
+  });
+  if (res.success) return true;
+  const cosa = tipo === 'apparecchio' ? 'apparecchio' : 'prodotto';
+  return confirm(`Attenzione! ${res.locked_by} sta già lavorando su questo ${cosa}\n\nVuoi continuare comunque?`);
+}
+function releaseLock({ tipo, prodotto = '', lotto = '', apparecchio_id = 0 }) {
+  api('/api/locks/release', { method: 'POST', body: { tipo, prodotto, lotto, apparecchio_id } });
+}
+
 // ── CARICO ───────────────────────────────────────────────────────────────
 async function loadProdottiCarico() {
   const data = await api('/api/prodotti');
   S.prodotti = data.prodotti || [];
-  populateCaricoSelect();
 }
 
-function populateCaricoSelect() {
-  const filtered = filterProdotti(S.prodotti, S.caricoReparto, S.caricoCategoria);
-
-  const selProd = document.getElementById('c-prodotto');
-  selProd.innerHTML = '<option value="">Seleziona prodotto…</option>' +
-    filtered.map(p =>
-      `<option value="${esc(p.prodotto)}"
-         data-fornitore="${esc(p.fornitore)}"
-         data-unita="${esc(p.unita)}"
-         data-categoria="${esc(p.categoria||'')}"
-       >${esc(p.prodotto)}</option>`
-    ).join('');
-
-  const fornitori = [...new Set(filtered.map(p => p.fornitore).filter(Boolean))].sort();
-  document.getElementById('c-fornitore').innerHTML =
-    '<option value="">Seleziona prima il prodotto</option>' +
-    fornitori.map(f => `<option value="${esc(f)}">${esc(f)}</option>`).join('');
-
-  // reset readonly fields when tab changes
-  setRO('c-unita', '—', false);
-  setRO('c-categoria', '—', false);
-  S.unitaCarico = '';
+function resetCaricoWizard() {
+  releaseCaricoLock();
+  S.caricoData = { prodotto:'', fornitore:'', unita:'', reparto:'', categoria:'', lotto:'', scadenza:'', qty:null, _scanPending:false };
+  const searchEl = document.getElementById('carico-search-input');
+  if (searchEl) searchEl.value = '';
+  document.getElementById('carico-search-dropdown')?.classList.remove('open');
+  document.getElementById('carico-step-1').style.display = '';
+  document.getElementById('carico-step-2').style.display = 'none';
+  document.getElementById('carico-step-3').style.display = 'none';
+  document.getElementById('carico-success').classList.remove('show');
 }
 
-function onProdottoCarico() {
-  const sel       = document.getElementById('c-prodotto');
-  const opt       = sel.options[sel.selectedIndex];
-  const fornitore = opt?.dataset.fornitore || '';
-  const unita     = opt?.dataset.unita     || '';
-  const categoria = opt?.dataset.categoria || '';
-  S.unitaCarico   = unita;
-  document.getElementById('c-fornitore').value = fornitore;
-  setRO('c-unita',     unita     || '—', !!unita);
-  setRO('c-categoria', categoria || '—', !!categoria);
+function closeCaricoWizard() {
+  resetCaricoWizard();
+  navTo('home');
 }
-function setRO(id, text, hasVal) {
-  const el = document.getElementById(id);
-  if (!el) return;
-  el.textContent = text;
-  el.classList.toggle('has-val', hasVal);
+
+function releaseCaricoLock() {
+  if (!S.caricoData?.prodotto) return;
+  releaseLock({ tipo: 'prodotto_lotto', prodotto: S.caricoData.prodotto, lotto: '' });
+}
+
+function onCaricoSearchInput() {
+  const q  = document.getElementById('carico-search-input').value.trim().toLowerCase();
+  const dd = document.getElementById('carico-search-dropdown');
+  if (!q) { dd.classList.remove('open'); dd.innerHTML = ''; return; }
+
+  const matches = S.prodotti.filter(p =>
+    p.prodotto.toLowerCase().includes(q) || (p.fornitore || '').toLowerCase().includes(q)
+  ).slice(0, 30);
+
+  dd.innerHTML = matches.length
+    ? matches.map(p => `
+      <div class="spesa-search-item" onclick="pickCaricoSearchResult(${esc(JSON.stringify(p))})">
+        <span class="spesa-search-item-nome">${esc(p.prodotto)}</span>
+        <span class="spesa-search-item-forn">${esc(p.fornitore || '—')}${p.reparto ? ' · ' + esc(p.reparto) : ''}</span>
+      </div>`).join('')
+    : `<div class="spesa-search-empty">Nessun prodotto trovato</div>
+       <div class="spesa-search-addnew" onclick="openNuovoProdotto('carico')">
+         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+         Aggiungi nuovo prodotto
+       </div>`;
+  dd.classList.add('open');
+}
+
+function _closeCaricoDropdownDelayed() {
+  setTimeout(() => {
+    document.getElementById('carico-search-dropdown')?.classList.remove('open');
+  }, 150);
+}
+
+async function pickCaricoSearchResult(p) {
+  document.getElementById('carico-search-dropdown').classList.remove('open');
+  S.caricoData.prodotto  = p.prodotto;
+  S.caricoData.fornitore = p.fornitore || '';
+  S.caricoData.unita     = p.unita || '';
+  S.caricoData.reparto   = p.reparto || '';
+  S.caricoData.categoria = p.categoria || '';
+  await goToCaricoStep2();
+}
+
+async function goToCaricoStep2() {
+  const ok = await tryAcquireLock({
+    tipo: 'prodotto_lotto', prodotto: S.caricoData.prodotto, lotto: '', form: 'carico',
+  });
+  if (!ok) return;
+
+  document.getElementById('c2-prodotto').textContent  = S.caricoData.prodotto;
+  document.getElementById('c2-fornitore').textContent = S.caricoData.fornitore || '—';
+  document.getElementById('c2-unita').textContent     = S.caricoData.unita || '—';
+  document.getElementById('c2-reparto').textContent   = S.caricoData.reparto || '—';
+
+  const lottoEl = document.getElementById('c2-lotto');
+  const scadEl  = document.getElementById('c2-scadenza');
+  if (S.caricoData._scanPending) {
+    _typeIntoField(lottoEl, S.caricoData.lotto || '');
+    scadEl.value = S.caricoData.scadenza || '';
+    S.caricoData._scanPending = false;
+  } else {
+    lottoEl.value = S.caricoData.lotto || '';
+    scadEl.value  = S.caricoData.scadenza || '';
+  }
+  document.getElementById('c2-qty').value = S.caricoData.qty ?? '';
+
+  document.getElementById('carico-step-1').style.display = 'none';
+  document.getElementById('carico-step-2').style.display = '';
+  document.getElementById('carico-step-3').style.display = 'none';
+}
+
+function adjustCaricoQty(delta) {
+  const el = document.getElementById('c2-qty');
+  const unitaMinuta = ['kg', 'lt', 'l'].includes((S.caricoData.unita || '').toLowerCase());
+  const step = unitaMinuta ? 0.1 : 1;
+  let val = parseFloat(el.value) || 0;
+  val = Math.max(0, Math.round((val + delta * step) * 100) / 100);
+  el.value = val;
+}
+
+function goToCaricoStep3() {
+  const lotto    = document.getElementById('c2-lotto').value.trim();
+  const scadenza = document.getElementById('c2-scadenza').value;
+  const qty      = parseFloat(document.getElementById('c2-qty').value);
+
+  if (!lotto)           { toast('Inserisci il numero di lotto', 'error'); return; }
+  if (!qty || qty <= 0) { toast('Inserisci una quantità valida', 'error'); return; }
+
+  S.caricoData.lotto    = lotto;
+  S.caricoData.scadenza = scadenza;
+  S.caricoData.qty      = qty;
+
+  _renderCaricoRiepilogo();
+
+  document.getElementById('carico-step-2').style.display = 'none';
+  document.getElementById('carico-step-3').style.display = '';
+}
+
+function backToCaricoStep2() {
+  document.getElementById('carico-step-3').style.display = 'none';
+  document.getElementById('carico-step-2').style.display = '';
+}
+
+function _renderCaricoRiepilogo() {
+  const d = S.caricoData;
+  document.getElementById('carico-riepilogo').innerHTML = `
+    <div class="eti-hdr-lbl">HACCP — Magazzino Cucina</div>
+    <div class="eti-row"><span>Prodotto</span><strong>${esc(d.prodotto)}</strong></div>
+    <div class="eti-row"><span>Fornitore</span><strong>${esc(d.fornitore||'—')}</strong></div>
+    <div class="eti-row"><span>Lotto</span><strong>${esc(d.lotto)}</strong></div>
+    <div class="eti-row"><span>Scadenza</span><strong>${d.scadenza?fmtDate(d.scadenza):'—'}</strong></div>
+    <div class="eti-row"><span>Quantità</span><strong>${d.qty}&nbsp;${esc(d.unita||'')}</strong></div>
+    <div class="eti-row"><span>Reparto</span><strong>${esc(d.reparto||'—')}</strong></div>
+  `;
+}
+
+async function confermaCarico() {
+  const btn = document.getElementById('btn-carico-confirm');
+  btn.classList.add('loading'); btn.disabled = true;
+
+  const payload = {
+    fornitore: S.caricoData.fornitore, prodotto: S.caricoData.prodotto,
+    lotto: S.caricoData.lotto, scadenza: S.caricoData.scadenza,
+    qty: S.caricoData.qty, unita: S.caricoData.unita,
+  };
+
+  let data = await api('/api/carico', { method: 'POST', body: payload });
+
+  if (data.duplicate) {
+    btn.classList.remove('loading'); btn.disabled = false;
+    const msg = `Attenzione! Questo prodotto è già stato caricato oggi alle ${data.ora} da ${data.operatore}. Vuoi continuare comunque?`;
+    if (!confirm(msg)) return;
+    btn.classList.add('loading'); btn.disabled = true;
+    data = await api('/api/carico', { method: 'POST', body: { ...payload, force: true } });
+  }
+
+  btn.classList.remove('loading'); btn.disabled = false;
+
+  if (!data.success) { toast(data.error || 'Errore durante il carico', 'error'); return; }
+
+  releaseCaricoLock();
+  await Promise.all([loadGiacenze(), loadAlerts()]);
+  renderInUsoProdotti();
+  if (data.warning) toast(data.warning, 'warning');
+  showCaricoSuccess();
+}
+
+function showCaricoSuccess() {
+  document.getElementById('carico-step-3').style.display = 'none';
+  const el = document.getElementById('carico-success');
+  el.classList.add('show');
+  setTimeout(() => {
+    el.classList.remove('show');
+    resetCaricoWizard();
+  }, 1300);
 }
 
 function triggerCamera() { document.getElementById('camera-input').click(); }
@@ -3057,62 +3262,22 @@ async function onCameraCapture(input) {
   if (data.success) {
     let filled = false;
     if (data.lotto) {
-      _typeIntoField(document.getElementById('c-lotto'), data.lotto);
+      S.caricoData.lotto = data.lotto;
       filled = true;
     }
     if (data.scadenza) {
       const parts = String(data.scadenza).split('/');
       if (parts.length === 3) {
-        const iso = `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
-        setTimeout(() => { document.getElementById('c-scadenza').value = iso; },
-          data.lotto ? String(data.lotto).length * 35 + 80 : 0);
+        S.caricoData.scadenza = `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
         filled = true;
       }
     }
-    toast(filled ? '✓ Etichetta letta' : 'Nessun dato trovato', filled ? 'success' : 'error');
+    if (filled) S.caricoData._scanPending = true;
+    toast(filled ? '✓ Etichetta letta — ora seleziona il prodotto' : 'Nessun dato trovato', filled ? 'success' : 'error');
   } else {
     toast(data.error || 'Non riesco a leggere l\'etichetta, inserisci manualmente', 'error');
   }
   input.value = '';
-}
-
-async function submitCarico() {
-  const prodotto  = document.getElementById('c-prodotto').value;
-  const fornitore = document.getElementById('c-fornitore').value.trim();
-  const lotto     = document.getElementById('c-lotto').value.trim();
-  const scadenza  = document.getElementById('c-scadenza').value;
-  const qty       = parseFloat(document.getElementById('c-qty').value);
-
-  if (!prodotto)        { toast('Seleziona il prodotto', 'error'); return; }
-  if (!fornitore)       { toast('Seleziona il fornitore', 'error'); return; }
-  if (!lotto)           { toast('Inserisci il numero di lotto', 'error'); return; }
-  if (!qty || qty <= 0) { toast('Inserisci una quantità valida', 'error'); return; }
-
-  const btn = document.getElementById('btn-carico');
-  btn.classList.add('loading'); btn.disabled = true;
-
-  const data = await api('/api/carico', {
-    method: 'POST',
-    body: { fornitore, prodotto, lotto, scadenza, qty, unita: S.unitaCarico },
-  });
-
-  btn.classList.remove('loading'); btn.disabled = false;
-
-  if (data.success) {
-    showEtichetta(data);
-    resetCarico();
-    await Promise.all([loadGiacenze(), loadAlerts()]);
-    renderInUsoProdotti();
-    if (data.warning) toast(data.warning, 'warning');
-  } else { toast(data.error || 'Errore durante il carico', 'error'); }
-}
-
-function resetCarico() {
-  ['c-prodotto','c-fornitore','c-lotto','c-scadenza','c-qty','c-note']
-    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
-  setRO('c-unita', '—', false);
-  setRO('c-categoria', '—', false);
-  S.unitaCarico = '';
 }
 
 // ── IN USO ───────────────────────────────────────────────────────────────
@@ -3150,13 +3315,24 @@ async function onProdottoInUso() {
   lottoSel.disabled = false;
 }
 
-function onLottoInUso() {
-  const lotto = document.getElementById('u-lotto').value;
-  const info  = document.getElementById('u-lot-info');
+let _inUsoLockKey = null;
+
+async function onLottoInUso() {
+  const lotto    = document.getElementById('u-lotto').value;
+  const prodotto = document.getElementById('u-prodotto').value;
+  const info     = document.getElementById('u-lot-info');
   document.getElementById('u-qty-error').textContent = '';
   document.getElementById('u-qty-error').classList.remove('show');
   document.getElementById('u-qty').classList.remove('error');
+
+  if (_inUsoLockKey) { releaseLock({ tipo: 'prodotto_lotto', ..._inUsoLockKey }); _inUsoLockKey = null; }
+
   if (!lotto) { info.classList.remove('show'); return; }
+
+  const ok = await tryAcquireLock({ tipo: 'prodotto_lotto', prodotto, lotto, form: 'in_uso' });
+  if (!ok) { document.getElementById('u-lotto').value = ''; info.classList.remove('show'); return; }
+  _inUsoLockKey = { prodotto, lotto };
+
   const l = S.lottiInUso.find(x => x.lotto === lotto);
   if (!l)    { info.classList.remove('show'); return; }
   const giorni  = l.scadenza ? daysTo(l.scadenza) : null;
@@ -3210,6 +3386,8 @@ async function submitInUso() {
     await onProdottoInUso();
     if (data.warning) setTimeout(() => toast(data.warning, 'warning'), 1800);
   } else { toast(data.error || 'Errore durante il prelievo', 'error'); }
+
+  if (_inUsoLockKey) { releaseLock({ tipo: 'prodotto_lotto', ..._inUsoLockKey }); _inUsoLockKey = null; }
 }
 
 // ── SCARICO (finalizza un elemento IN USO, dal pulsante "Scarica" in Giacenze) ─
@@ -3220,9 +3398,15 @@ async function loadInUso() {
 
 let _scaricoModalRowId = null;
 
-function openScaricoModal(id) {
+let _scaricoLockKey = null;
+
+async function openScaricoModal(id) {
   const r = S.inUso.find(x => x.id === id);
   if (!r) return;
+  const ok = await tryAcquireLock({ tipo: 'prodotto_lotto', prodotto: r.prodotto, lotto: r.lotto, form: 'scarico' });
+  if (!ok) return;
+  _scaricoLockKey = { prodotto: r.prodotto, lotto: r.lotto };
+
   _scaricoModalRowId = id;
   document.getElementById('scarico-modal-info').innerHTML = `
     <div class="lot-info-row"><span>Prodotto</span><strong>${esc(r.prodotto)}</strong></div>
@@ -3240,7 +3424,11 @@ function openScaricoModal(id) {
   qtyEl.classList.remove('error');
   document.getElementById('modal-scarico').classList.add('open');
 }
-function closeScaricoModal() { document.getElementById('modal-scarico').classList.remove('open'); _scaricoModalRowId = null; }
+function closeScaricoModal() {
+  document.getElementById('modal-scarico').classList.remove('open');
+  _scaricoModalRowId = null;
+  if (_scaricoLockKey) { releaseLock({ tipo: 'prodotto_lotto', ..._scaricoLockKey }); _scaricoLockKey = null; }
+}
 function bgCloseScaricoModal(e) { if (e.target === document.getElementById('modal-scarico')) closeScaricoModal(); }
 
 function validateQtyScaricoModal() {
@@ -3331,6 +3519,7 @@ function renderGiacenze() {
     const idx      = S.giacenze.indexOf(g);
     const lotsHtml = g.lotti.map(l => {
       const etData = esc(JSON.stringify({ prodotto: g.prodotto, lotto: l.lotto, scadenza: l.scadenza }));
+      const lock   = _lockFor(g.prodotto, l.lotto);
       return `<div class="giac-lot-row">
         <div class="giac-lot-info">
           <span class="giac-lot-code">${esc(l.lotto)}</span>
@@ -3338,6 +3527,7 @@ function renderGiacenze() {
         </div>
         ${l.scadenza ? `<span class="scad-badge ${scadCls(l.scadenza)}">${fmtDate(l.scadenza)}</span>` : ''}
         <span class="giac-lot-qty">${l.rimanenza}&nbsp;${esc(g.unita)}</span>
+        ${lock ? `<span class="lock-badge" onclick="event.stopPropagation(); toast('In lavorazione da ${esc(lock.user_nome)}', 'info')" title="In lavorazione da ${esc(lock.user_nome)}">${_ICON_LOCK}</span>` : ''}
         <button type="button" class="lot-print-btn" onclick="event.stopPropagation(); openModificaLotto(${l.id}, ${etData})" aria-label="Modifica lotto">${_ICON_MATITA}</button>
       </div>`;
     }).join('');
@@ -3359,6 +3549,7 @@ function renderGiacenze() {
   const inUsoCard = (g) => {
     const idx      = S.giacenze.indexOf(g);
     const lotsHtml = S.inUso.filter(r => r.prodotto === g.prodotto).map(l => {
+      const lock = _lockFor(g.prodotto, l.lotto);
       return `<div class="giac-lot-row">
         <div class="giac-lot-info">
           <span class="giac-lot-code">${esc(l.lotto)}</span>
@@ -3366,6 +3557,7 @@ function renderGiacenze() {
         </div>
         ${l.scadenza ? `<span class="scad-badge ${scadCls(l.scadenza)}">${fmtDate(l.scadenza)}</span>` : ''}
         <span class="giac-lot-qty">${l.qty}&nbsp;${esc(l.unita)}</span>
+        ${lock ? `<span class="lock-badge" onclick="event.stopPropagation(); toast('In lavorazione da ${esc(lock.user_nome)}', 'info')" title="In lavorazione da ${esc(lock.user_nome)}">${_ICON_LOCK}</span>` : ''}
         <button type="button" class="lot-print-btn" onclick="event.stopPropagation(); openScaricoModal(${l.id})" aria-label="Scarica">${_ICON_SCARICA}</button>
       </div>`;
     }).join('');
@@ -3660,6 +3852,21 @@ async function addToListaFromAlert(a) {
 const _ICON_STAMPA = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect x="6" y="14" width="12" height="8"/></svg>`;
 const _ICON_MATITA = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/></svg>`;
 const _ICON_SCARICA = `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>`;
+const _ICON_LOCK    = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>`;
+
+// ── LOCK MOVIMENTI (polling) ─────────────────────────────────────────────
+async function loadLocks() {
+  const data = await api('/api/locks');
+  S.locks = data.locks || [];
+  if (S.activePage === 'giacenze')    renderGiacenze();
+  if (S.activePage === 'temperature') renderApparecchi();
+}
+function _lockFor(prodotto, lotto) {
+  return S.locks.find(l => l.tipo === 'prodotto_lotto' && l.prodotto === prodotto && l.lotto === lotto);
+}
+function _lockForApparecchio(id) {
+  return S.locks.find(l => l.tipo === 'apparecchio' && l.apparecchio_id === id);
+}
 
 function showLotDetail(g) {
   document.getElementById('lot-detail-title').textContent = g.prodotto;
@@ -3766,27 +3973,6 @@ async function confermaEliminaCarico(rowId) {
   closeLotDetail();
   await Promise.all([loadGiacenze(), loadAlerts()]);
 }
-
-// ── ETICHETTA ─────────────────────────────────────────────────────────────
-function showEtichetta(d) {
-  const oggi = new Date().toLocaleDateString('it-IT', { day:'2-digit', month:'2-digit', year:'numeric', timeZone: 'Europe/Rome' });
-  const content = `
-    <div class="eti-hdr-lbl">HACCP — Magazzino Cucina</div>
-    <div class="eti-row"><span>Prodotto</span><strong>${esc(d.prodotto)}</strong></div>
-    <div class="eti-row"><span>Fornitore</span><strong>${esc(d.fornitore||'—')}</strong></div>
-    <div class="eti-row"><span>Lotto</span><strong>${esc(d.lotto)}</strong></div>
-    <div class="eti-row"><span>Scadenza</span><strong>${d.scadenza?fmtDate(d.scadenza):'—'}</strong></div>
-    <div class="eti-row"><span>Quantità</span><strong>${d.qty}&nbsp;${esc(d.unita||'')}</strong></div>
-    <div class="eti-row"><span>Data carico</span><strong>${oggi}</strong></div>
-    <div class="eti-row"><span>ID Movimento</span><strong style="font-size:11px;opacity:.65">${esc(d.movimento_id)}</strong></div>
-  `;
-  const box = document.getElementById('eti-box-inline');
-  if (box) { box.innerHTML = content; box.classList.add('show'); box.scrollIntoView({ behavior:'smooth', block:'center' }); }
-  document.getElementById('eti-content').innerHTML = content;
-  toast('Carico registrato', 'success');
-}
-function closeModal() { document.getElementById('modal-etichetta').classList.remove('open'); }
-function bgClose(e)   { if (e.target === document.getElementById('modal-etichetta')) closeModal(); }
 
 // ── ETICHETTA LOTTO (Giacenze) ──────────────────────────────────────────────
 function printLotLabel(d) {
@@ -4289,9 +4475,8 @@ function openNuovoProdotto(origin = 'carico') {
   document.getElementById('np-unita').value   = 'kg';
   document.getElementById('np-categoria').value = '';
   // Pre-seleziona il reparto già scelto nella pagina di provenienza, se c'è
-  document.getElementById('np-reparto').value = origin === 'spesa'
-    ? (document.getElementById('spesa-sel-reparto')?.value || '')
-    : (S.caricoReparto || '');
+  document.getElementById('np-reparto').value =
+    origin === 'spesa' ? (document.getElementById('spesa-sel-reparto')?.value || '') : '';
   document.getElementById('np-fornitore-custom').value = '';
   document.getElementById('np-fornitore-custom-wrap').style.display = 'none';
   document.getElementById('btn-np-salva').disabled = false;
@@ -4346,11 +4531,14 @@ async function submitNuovoProdotto() {
     _setSpesaSelection(reparto, fornitore, nome, unita);
     document.getElementById('spesa-search-input').value = nome;
   } else {
-    // Auto-select the new product in the carico form
-    const sel = document.getElementById('c-prodotto');
-    for (let i = 0; i < sel.options.length; i++) {
-      if (sel.options[i].value === nome) { sel.selectedIndex = i; onProdottoCarico(); break; }
-    }
+    // Porta il nuovo prodotto direttamente allo Step 2 del wizard Carico
+    S.caricoData.prodotto  = nome;
+    S.caricoData.fornitore = fornitore;
+    S.caricoData.unita     = unita;
+    S.caricoData.reparto   = reparto;
+    S.caricoData.categoria = categoria;
+    document.getElementById('carico-search-input').value = nome;
+    await goToCaricoStep2();
   }
   if (data.warning) toast(data.warning, 'warning');
   else toast('Prodotto aggiunto al listino', 'success');
@@ -4460,8 +4648,10 @@ function renderApparecchi() {
       const marcaModello = [a.marca, a.modello].filter(Boolean).join(' ');
       const daControllare = a.stato_controllo === 'DA_CONTROLLARE';
       const statoBadge = `<span class="temp-stato-badge ${daControllare ? 'da-controllare' : 'ok'}">${daControllare ? 'DA CONTROLLARE' : 'OK'}</span>`;
+      const lock = _lockForApparecchio(a.id);
       return `<div class="temp-app-card">
         ${statoBadge}
+        ${lock ? `<span class="lock-badge" onclick="toast('In lavorazione da ${esc(lock.user_nome)}', 'info')" title="In lavorazione da ${esc(lock.user_nome)}">${_ICON_LOCK}</span>` : ''}
         <div class="temp-app-top">
           <div>
             <div class="temp-app-nome">${esc(a.nome)}</div>
@@ -4604,9 +4794,15 @@ async function eliminaApparecchio(id) {
 }
 
 // ── REGISTRA TEMPERATURA ───────────────────────────────────────────────────
-function openRegistraTempModal(apparecchioId) {
+let _tempLockApparecchioId = null;
+
+async function openRegistraTempModal(apparecchioId) {
   const a = S.apparecchi.find(x => x.id === apparecchioId);
   if (!a) return;
+  const ok = await tryAcquireLock({ tipo: 'apparecchio', apparecchio_id: apparecchioId, form: 'temperatura' });
+  if (!ok) return;
+  _tempLockApparecchioId = apparecchioId;
+
   const { data, ora } = dataOraItaliana();
   document.getElementById('rt-apparecchio-id').value = apparecchioId;
   document.getElementById('rt-titolo').textContent = `Registra temperatura — ${a.nome}`;
@@ -4618,7 +4814,13 @@ function openRegistraTempModal(apparecchioId) {
   document.getElementById('rt-nota-label').textContent = 'Nota';
   document.getElementById('modal-registra-temp').classList.add('open');
 }
-function closeRegistraTempModal() { document.getElementById('modal-registra-temp').classList.remove('open'); }
+function closeRegistraTempModal() {
+  document.getElementById('modal-registra-temp').classList.remove('open');
+  if (_tempLockApparecchioId !== null) {
+    releaseLock({ tipo: 'apparecchio', apparecchio_id: _tempLockApparecchioId });
+    _tempLockApparecchioId = null;
+  }
+}
 function bgCloseRegistraTemp(e) { if (e.target === document.getElementById('modal-registra-temp')) closeRegistraTempModal(); }
 
 function onRtTemperaturaInput() {
@@ -4964,15 +5166,22 @@ function onPrepIngRepartoChange(sel) {
   S.prepIngReparto = sel.value;
   renderIngredientiRows();
 }
-function closeNuovaPreparazione() { document.getElementById('modal-nuova-preparazione').classList.remove('open'); }
+function _releaseIngredienteLock(r) {
+  if (r && r.lockKey) { releaseLock({ tipo: 'prodotto_lotto', ...r.lockKey }); r.lockKey = null; }
+}
+function closeNuovaPreparazione() {
+  document.getElementById('modal-nuova-preparazione').classList.remove('open');
+  prepIngredienti.forEach(_releaseIngredienteLock);
+}
 function bgClosePrepForm(e) { if (e.target === document.getElementById('modal-nuova-preparazione')) closeNuovaPreparazione(); }
 
 function addIngredienteRow() {
-  prepIngredienti.push({ seq: prepIngredienteSeq++, prodotto: '', fonte: 'magazzino', selected: null, qty: '', lotti: [] });
+  prepIngredienti.push({ seq: prepIngredienteSeq++, prodotto: '', fonte: 'magazzino', selected: null, qty: '', lotti: [], lockKey: null });
   renderIngredientiRows();
 }
 function removeIngredienteRow(seq) {
   if (prepIngredienti.length <= 1) { toast('Serve almeno un ingrediente', 'error'); return; }
+  _releaseIngredienteLock(prepIngredienti.find(r => r.seq === seq));
   prepIngredienti = prepIngredienti.filter(r => r.seq !== seq);
   renderIngredientiRows();
 }
@@ -5030,6 +5239,7 @@ async function _caricaLottiIngrediente(r) {
 async function onIngredienteProdotto(seq, prodotto) {
   const r = prepIngredienti.find(x => x.seq === seq);
   if (!r) return;
+  _releaseIngredienteLock(r);
   r.prodotto = prodotto; r.selected = null; r.qty = ''; r.lotti = [];
   renderIngredientiRows();
   if (!prodotto) return;
@@ -5042,6 +5252,7 @@ async function onIngredienteProdotto(seq, prodotto) {
 async function onIngredienteFonte(seq, fonte) {
   const r = prepIngredienti.find(x => x.seq === seq);
   if (!r) return;
+  _releaseIngredienteLock(r);
   r.fonte = fonte; r.selected = null; r.qty = ''; r.lotti = [];
   renderIngredientiRows();
   if (!r.prodotto) return;
@@ -5051,11 +5262,19 @@ async function onIngredienteFonte(seq, fonte) {
   renderIngredientiRows();
 }
 
-function onIngredienteLotto(seq, idxStr) {
+async function onIngredienteLotto(seq, idxStr) {
   const r = prepIngredienti.find(x => x.seq === seq);
   if (!r) return;
+  _releaseIngredienteLock(r);
   const idx = idxStr === '' ? -1 : Number(idxStr);
-  r.selected = idx >= 0 ? r.lotti[idx] : null;
+  const scelto = idx >= 0 ? r.lotti[idx] : null;
+  if (!scelto) { r.selected = null; renderIngredientiRows(); return; }
+
+  const ok = await tryAcquireLock({ tipo: 'prodotto_lotto', prodotto: r.prodotto, lotto: scelto.lotto, form: 'preparazione' });
+  if (!ok) { r.selected = null; renderIngredientiRows(); return; }
+
+  r.selected = scelto;
+  r.lockKey  = { prodotto: r.prodotto, lotto: scelto.lotto };
   renderIngredientiRows();
 }
 
@@ -5686,7 +5905,7 @@ async function generaExportPdf() {
 }
 
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeModal(); closeLotDetail(); closeModificaLotto(); closeDrawer(); closeApparecchioModal(); closeRegistraTempModal(); closeNuovaPreparazione(); closePrepEtichetta(); closeScaricoModal(); closeNuovaPrenotazione(); closePrenDetail(); closeNuovaSala(); closeTavoloForm(); closeTavoloSheet(); }
+  if (e.key === 'Escape') { closeLotDetail(); closeModificaLotto(); closeDrawer(); closeApparecchioModal(); closeRegistraTempModal(); closeNuovaPreparazione(); closePrepEtichetta(); closeScaricoModal(); closeNuovaPrenotazione(); closePrenDetail(); closeNuovaSala(); closeTavoloForm(); closeTavoloSheet(); }
 });
 
 // ── BOOT ─────────────────────────────────────────────────────────────────

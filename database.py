@@ -39,6 +39,10 @@ DB_PATH = os.path.join(_data_dir, 'haccp.db')
 # calcolare i coperti (HH:MM, confronto lessicografico su stringa).
 PRANZO_CENA_CUTOFF = '17:00'
 
+# Durata di un lock su un movimento (prodotto/lotto/apparecchio) prima che
+# scada automaticamente e torni disponibile per un altro utente.
+LOCK_DURATA_MINUTI = 10
+
 if _USE_PG:
     import psycopg2
     import psycopg2.extras
@@ -319,6 +323,18 @@ def db_init():
                 eliminato_da   TEXT NOT NULL DEFAULT '',
                 eliminato_il   TEXT NOT NULL DEFAULT ''
             )""",
+            f"""CREATE TABLE IF NOT EXISTS lock_movimenti (
+                id             {pk},
+                tipo           TEXT NOT NULL,
+                prodotto       TEXT NOT NULL DEFAULT '',
+                lotto          TEXT NOT NULL DEFAULT '',
+                apparecchio_id INTEGER NOT NULL DEFAULT 0,
+                user_id        INTEGER NOT NULL,
+                user_nome      TEXT NOT NULL,
+                form           TEXT NOT NULL DEFAULT '',
+                creato_il      TEXT NOT NULL,
+                scade_il       TEXT NOT NULL
+            )""",
             "CREATE INDEX IF NOT EXISTS idx_reg_prod_lotto ON registro(prodotto, lotto)",
             "CREATE INDEX IF NOT EXISTS idx_reg_prod_lotto_tipo ON registro(prodotto, lotto, tipo)",
             "CREATE INDEX IF NOT EXISTS idx_reg_data       ON registro(data)",
@@ -329,6 +345,8 @@ def db_init():
             "CREATE INDEX IF NOT EXISTS idx_prenot_data    ON prenotazioni(data)",
             "CREATE INDEX IF NOT EXISTS idx_combi_prenot   ON combinazioni_tavoli(prenotazione_id)",
             "CREATE INDEX IF NOT EXISTS idx_combi_tavolo   ON combinazioni_tavoli(tavolo_id)",
+            "CREATE INDEX IF NOT EXISTS idx_lock_prod_lotto  ON lock_movimenti(prodotto, lotto)",
+            "CREATE INDEX IF NOT EXISTS idx_lock_apparecchio ON lock_movimenti(apparecchio_id)",
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email    ON users(email)",
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_telefono ON users(telefono)",
         ]:
@@ -362,6 +380,7 @@ def db_init():
         ('registro',     'synced', "INTEGER NOT NULL DEFAULT 1"),
         ('listino',      'synced', "INTEGER NOT NULL DEFAULT 1"),
         ('temperature',  'synced', "INTEGER NOT NULL DEFAULT 1"),
+        ('registro',     'creato_il', "TEXT NOT NULL DEFAULT ''"),
     ]
     for table, col, defn in migrations:
         if _USE_PG:
@@ -541,8 +560,8 @@ def insert_movimento(row):
             """INSERT INTO registro
                (gs_row, data, fornitore, prodotto, lotto, scadenza,
                 carico, scarico, unita, etichetta, movimento_id, rimanenza,
-                operatore, reparto, tipo, data_scarico, synced)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                operatore, reparto, tipo, data_scarico, synced, creato_il)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (
                 row.get('gs_row'), row['data'], row['fornitore'], row['prodotto'],
                 row['lotto'], row['scadenza'], row['carico'], row['scarico'],
@@ -550,8 +569,23 @@ def insert_movimento(row):
                 row.get('operatore', ''), row.get('reparto', ''),
                 row.get('tipo', 'CARICO'), row.get('data_scarico', ''),
                 1 if row.get('synced', True) else 0,
+                now_it().isoformat(),
             )
         )
+
+
+def get_carico_recente(prodotto, lotto, minuti=120):
+    """Ultimo CARICO per prodotto+lotto nelle ultime `minuti`, se esiste —
+    usato per avvisare l'utente di un possibile doppio inserimento."""
+    cutoff = (now_it() - timedelta(minutes=minuti)).isoformat()
+    with get_conn() as conn:
+        cur = conn.execute(
+            "SELECT operatore, creato_il FROM registro "
+            "WHERE prodotto = ? AND lotto = ? AND tipo = 'CARICO' AND creato_il >= ? "
+            "ORDER BY id DESC LIMIT 1",
+            (prodotto, lotto, cutoff)
+        )
+        return _row(cur)
 
 
 def get_unsynced_registro():
@@ -1758,4 +1792,90 @@ def get_log_eliminazioni_prenotazioni(limit=200):
             "SELECT * FROM log_eliminazioni_prenotazioni ORDER BY id DESC LIMIT ?",
             (limit,)
         )
+        return _rows(cur)
+
+
+# ─── LOCK MOVIMENTI ─────────────────────────────────────────────────────────
+# Lock "soft" (avviso, non blocco rigido) su un prodotto+lotto o un
+# apparecchio: quando un utente apre un form di movimento (Carico, Scarico,
+# In uso, Preparazioni, Temperature) la risorsa viene bloccata per
+# LOCK_DURATA_MINUTI, così un collega che prova ad aprire lo stesso form
+# sulla stessa risorsa viene avvisato di chi ci sta già lavorando.
+
+def _purge_lock_scaduti():
+    with get_conn() as conn:
+        conn.execute("DELETE FROM lock_movimenti WHERE scade_il < ?", (now_it().isoformat(),))
+
+
+def get_lock_attivo(tipo, prodotto='', lotto='', apparecchio_id=0):
+    """Lock attivo per questa risorsa, di qualunque utente (None se libera)."""
+    _purge_lock_scaduti()
+    with get_conn() as conn:
+        if tipo == 'apparecchio':
+            cur = conn.execute(
+                "SELECT * FROM lock_movimenti WHERE tipo = 'apparecchio' AND apparecchio_id = ?",
+                (apparecchio_id,)
+            )
+        else:
+            cur = conn.execute(
+                "SELECT * FROM lock_movimenti WHERE tipo = 'prodotto_lotto' AND prodotto = ? AND lotto = ?",
+                (prodotto, lotto)
+            )
+        return _row(cur)
+
+
+def acquire_lock(tipo, user_id, user_nome, form, prodotto='', lotto='', apparecchio_id=0, force=False):
+    """Prova ad acquisire il lock. Se già bloccato da un altro utente e non
+    force, ritorna il lock esistente senza modificarlo. Altrimenti (risorsa
+    libera, scaduta, già propria, o force) sostituisce il lock con uno nuovo
+    per l'utente corrente."""
+    esistente = get_lock_attivo(tipo, prodotto, lotto, apparecchio_id)
+    if esistente and int(esistente['user_id']) != int(user_id) and not force:
+        return {'acquired': False, 'lock': esistente}
+
+    with get_conn() as conn:
+        if tipo == 'apparecchio':
+            conn.execute(
+                "DELETE FROM lock_movimenti WHERE tipo = 'apparecchio' AND apparecchio_id = ?",
+                (apparecchio_id,)
+            )
+        else:
+            conn.execute(
+                "DELETE FROM lock_movimenti WHERE tipo = 'prodotto_lotto' AND prodotto = ? AND lotto = ?",
+                (prodotto, lotto)
+            )
+        ora    = now_it()
+        scade  = ora + timedelta(minutes=LOCK_DURATA_MINUTI)
+        conn.execute(
+            """INSERT INTO lock_movimenti
+               (tipo, prodotto, lotto, apparecchio_id, user_id, user_nome, form, creato_il, scade_il)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+            (tipo, prodotto, lotto, apparecchio_id, user_id, user_nome, form,
+             ora.isoformat(), scade.isoformat())
+        )
+    return {'acquired': True}
+
+
+def release_lock(tipo, user_id, prodotto='', lotto='', apparecchio_id=0):
+    """Rilascia il lock solo se posseduto dallo stesso user_id (idempotente —
+    un browser 'in ritardo' non può cancellare per sbaglio il lock fresco di
+    qualcun altro)."""
+    with get_conn() as conn:
+        if tipo == 'apparecchio':
+            conn.execute(
+                "DELETE FROM lock_movimenti WHERE tipo = 'apparecchio' AND apparecchio_id = ? AND user_id = ?",
+                (apparecchio_id, user_id)
+            )
+        else:
+            conn.execute(
+                "DELETE FROM lock_movimenti WHERE tipo = 'prodotto_lotto' AND prodotto = ? AND lotto = ? AND user_id = ?",
+                (prodotto, lotto, user_id)
+            )
+
+
+def get_locks_attivi():
+    """Tutti i lock non scaduti, per il polling del frontend."""
+    _purge_lock_scaduti()
+    with get_conn() as conn:
+        cur = conn.execute("SELECT * FROM lock_movimenti")
         return _rows(cur)

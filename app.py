@@ -57,6 +57,8 @@ from database import (
     get_unsynced_registro, mark_registro_synced,
     get_unsynced_listino, mark_listino_synced,
     get_unsynced_temperature, mark_temperatura_synced,
+    get_carico_recente,
+    acquire_lock, release_lock, get_locks_attivi,
 )
 from sheets import (
     load_listino, load_registro, append_registro, append_listino, aggiorna_tipo_movimento,
@@ -698,6 +700,7 @@ def api_carico():
     lotto     = (d.get('lotto')     or '').strip()
     scadenza  = (d.get('scadenza')  or '').strip()
     unita     = (d.get('unita')     or 'kg').strip()
+    force     = bool(d.get('force'))
     try:
         qty = float(d.get('qty', 0))
     except (TypeError, ValueError):
@@ -705,6 +708,16 @@ def api_carico():
 
     if not prodotto or not fornitore or not lotto or qty <= 0:
         return jsonify({'success': False, 'error': 'Compila tutti i campi obbligatori'}), 400
+
+    if not force:
+        recente = get_carico_recente(prodotto, lotto)
+        if recente:
+            return jsonify({
+                'success':   False,
+                'duplicate': True,
+                'operatore': recente['operatore'],
+                'ora':       recente['creato_il'][11:16],
+            })
 
     rimanenza_prec  = get_ultima_rimanenza(prodotto, lotto)
     nuova_rimanenza = round(rimanenza_prec + qty, 4)
@@ -1867,6 +1880,55 @@ def api_scan_apparecchio():
                         'tipo':    tipo})
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
+
+
+# ─── LOCK MOVIMENTI ───────────────────────────────────────────────────────────
+
+@app.route('/api/locks/acquire', methods=['POST'])
+@login_required
+def api_locks_acquire():
+    d = request.get_json(force=True)
+    tipo = (d.get('tipo') or '').strip()
+    if tipo not in ('prodotto_lotto', 'apparecchio'):
+        return jsonify({'success': False, 'error': 'Tipo lock non valido'}), 400
+    prodotto = (d.get('prodotto') or '').strip()
+    lotto    = (d.get('lotto')    or '').strip()
+    try:
+        apparecchio_id = int(d.get('apparecchio_id', 0) or 0)
+    except (TypeError, ValueError):
+        apparecchio_id = 0
+    form  = (d.get('form') or '').strip()
+    force = bool(d.get('force'))
+
+    result = acquire_lock(tipo, int(current_user.id), current_user.nome, form,
+                           prodotto=prodotto, lotto=lotto, apparecchio_id=apparecchio_id,
+                           force=force)
+    if result['acquired']:
+        return jsonify({'success': True})
+    lock = result['lock']
+    return jsonify({'success': False, 'locked_by': lock['user_nome'], 'form': lock['form']})
+
+
+@app.route('/api/locks/release', methods=['POST'])
+@login_required
+def api_locks_release():
+    d = request.get_json(force=True)
+    tipo     = (d.get('tipo')     or '').strip()
+    prodotto = (d.get('prodotto') or '').strip()
+    lotto    = (d.get('lotto')    or '').strip()
+    try:
+        apparecchio_id = int(d.get('apparecchio_id', 0) or 0)
+    except (TypeError, ValueError):
+        apparecchio_id = 0
+    release_lock(tipo, int(current_user.id), prodotto=prodotto, lotto=lotto,
+                 apparecchio_id=apparecchio_id)
+    return jsonify({'success': True})
+
+
+@app.route('/api/locks')
+@login_required
+def api_locks_list():
+    return jsonify({'success': True, 'locks': get_locks_attivi()})
 
 
 if __name__ == '__main__':

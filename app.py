@@ -32,6 +32,7 @@ from database import (
     approva_utente, rifiuta_utente, update_user_controllo_permesso,
     create_reset_token, get_reset_token, use_reset_token, update_user_password,
     update_user_profile, update_user_reparto, update_user_tema, update_user_home_card, is_username_taken,
+    update_user_dash_cards, get_ultimo_carico,
     get_lista_spesa, add_lista_spesa_item, update_lista_spesa_completato,
     update_lista_spesa_fornitore, delete_lista_spesa_item, clear_lista_spesa,
     get_lista_spesa_item_by_id,
@@ -90,6 +91,9 @@ class User(UserMixin):
         self.tema     = data.get('tema') or 'chiaro'
         self.stato    = data.get('stato') or 'attivo'
         self.home_card = data.get('home_card') or 'preparazioni'
+        self.dash_card1 = data.get('dash_card1') or 'alert'
+        self.dash_card2 = data.get('dash_card2') or 'temperature'
+        self.dash_card3 = data.get('dash_card3') or 'scadenza'
         self.puo_vedere_controllo = bool(data.get('puo_vedere_controllo'))
         self.puo_eliminare_carichi_raw = bool(data.get('puo_eliminare_carichi'))
 
@@ -560,6 +564,38 @@ def api_tema():
         return jsonify({'success': False, 'error': 'Tema non valido'}), 400
     update_user_tema(int(current_user.id), tema)
     return jsonify({'success': True, 'tema': tema})
+
+
+DASH_CARD_TYPES = (
+    'alert', 'temperature', 'scadenza', 'ultimo_carico',
+    'in_uso', 'preparazioni', 'coperti', 'sotto_scorta',
+)
+
+
+@app.route('/api/dashboard-cards', methods=['POST'])
+@login_required
+def api_dashboard_cards():
+    d = request.get_json(force=True)
+    cards = [(d.get('card1') or '').strip(), (d.get('card2') or '').strip(), (d.get('card3') or '').strip()]
+    if any(c not in DASH_CARD_TYPES for c in cards):
+        return jsonify({'success': False, 'error': 'Tipo di card non valido'}), 400
+    update_user_dash_cards(int(current_user.id), *cards)
+    return jsonify({'success': True})
+
+
+@app.route('/api/ultimo-carico')
+@login_required
+def api_ultimo_carico():
+    row = get_ultimo_carico()
+    if not row:
+        return jsonify({'success': True, 'prodotto': None, 'quando': None})
+    quando = ''
+    try:
+        quando = datetime.fromisoformat(row.get('creato_il') or '').strftime('%H:%M')
+    except (ValueError, TypeError):
+        # righe storiche senza creato_il: mostriamo almeno la data del movimento
+        quando = row.get('data') or ''
+    return jsonify({'success': True, 'prodotto': row.get('prodotto'), 'quando': quando})
 
 
 @app.route('/api/prodotti')

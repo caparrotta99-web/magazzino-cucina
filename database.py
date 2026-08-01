@@ -382,6 +382,9 @@ def db_init():
         ('temperature',  'synced', "INTEGER NOT NULL DEFAULT 1"),
         ('registro',     'creato_il', "TEXT NOT NULL DEFAULT ''"),
         ('users',        'home_card', "TEXT NOT NULL DEFAULT 'preparazioni'"),
+        ('users',        'dash_card1', "TEXT NOT NULL DEFAULT 'alert'"),
+        ('users',        'dash_card2', "TEXT NOT NULL DEFAULT 'temperature'"),
+        ('users',        'dash_card3', "TEXT NOT NULL DEFAULT 'scadenza'"),
     ]
     for table, col, defn in migrations:
         if _USE_PG:
@@ -1100,6 +1103,25 @@ def update_user_home_card(user_id, home_card):
         conn.execute(
             "UPDATE users SET home_card = ? WHERE id = ?", (home_card, user_id)
         )
+
+
+def update_user_dash_cards(user_id, card1, card2, card3):
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE users SET dash_card1 = ?, dash_card2 = ?, dash_card3 = ? WHERE id = ?",
+            (card1, card2, card3, user_id)
+        )
+
+
+def get_ultimo_carico():
+    """Ultimo movimento di tipo CARICO registrato (qualsiasi prodotto),
+    per la card 'Ultimo carico' della dashboard admin."""
+    with get_conn() as conn:
+        cur = conn.execute(
+            "SELECT prodotto, creato_il, data FROM registro "
+            "WHERE tipo = 'CARICO' ORDER BY id DESC LIMIT 1"
+        )
+        return _row(cur)
 
 
 # ─── APPARECCHI / TEMPERATURE ─────────────────────────────────────────────────

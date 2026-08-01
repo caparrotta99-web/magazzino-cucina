@@ -335,6 +335,12 @@ main {
    scroll di documento normale (nessuna di queste regole si applica). */
 body.home-p1 header { display: none; }
 body.home-p1 main   { margin-top: 0; height: 100dvh; overflow: hidden; }
+/* #page-home deve avere un'altezza esplicita: senza, le regole height:100%
+   qui sotto non hanno una base percentuale da cui partire (un'altezza in %
+   si risolve solo se il genitore ha un'altezza definita, non "auto") e la
+   dashboard resta alta quanto il suo contenuto, scoprendo lo sfondo della
+   pagina nella metà inferiore dello schermo. */
+body.home-p1 #page-home { height: 100%; }
 body.home-p1 .home-swipe-viewport,
 body.home-p1 .home-swipe-track { height: 100%; }
 body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: touch; }
@@ -358,18 +364,63 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
 .home-dash-hello { font-size: 32px; font-weight: 800; color: #ffffff; line-height: 1.15; letter-spacing: -.3px; }
 .home-dash-datetime { font-size: 13px; color: rgba(255,255,255,.6); margin-top: 6px; }
 .home-dash-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
-.home-dash-stat {
-  background: rgba(255,255,255,.10);
-  backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%);
-  border: 1px solid rgba(255,255,255,.18); border-radius: 18px;
+
+/* ─── DASH STAT CARD — personalizzabile (tap prolungato) ───────────────── */
+.dash-stat-card {
+  position: relative; overflow: hidden;
+  border-radius: 18px; padding: 16px 10px 13px;
+  text-align: center; cursor: pointer;
+  border: 1px solid rgba(255,255,255,.18);
   box-shadow: 0 8px 20px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.15);
-  padding: 14px 10px; text-align: center;
+  backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%);
+  -webkit-user-select: none; user-select: none; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
+  transition: transform .15s ease, box-shadow .15s ease;
 }
-.home-dash-stat-num { font-size: 27px; font-weight: 800; line-height: 1; }
-.home-dash-stat-red    { color: #ff6b6b; }
-.home-dash-stat-orange { color: #ffa94d; }
-.home-dash-stat-yellow { color: #ffd43b; }
-.home-dash-stat-lbl { font-size: 11px; color: rgba(255,255,255,.7); margin-top: 6px; line-height: 1.3; }
+.dash-stat-card.pressing { transform: scale(.93); box-shadow: 0 4px 12px rgba(0,0,0,.24); }
+.dash-stat-icon {
+  width: 30px; height: 30px; margin: 0 auto 8px;
+  display: flex; align-items: center; justify-content: center;
+  filter: drop-shadow(0 2px 5px rgba(0,0,0,.28));
+}
+.dash-stat-icon svg { width: 100%; height: 100%; display: block; }
+.dash-stat-value {
+  font-size: 25px; font-weight: 800; line-height: 1.05; color: #fff;
+  min-height: 1.05em;
+}
+.dash-stat-card.is-text .dash-stat-value {
+  font-size: 13.5px; font-weight: 700;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.dash-stat-label {
+  font-size: 10.5px; color: rgba(255,255,255,.72); margin-top: 6px; line-height: 1.3;
+}
+
+/* Gradient dinamico in base al tipo di dato scelto per la card */
+.dash-grad-red    { background: linear-gradient(155deg, rgba(248,113,113,.55), rgba(239,68,68,.16)); }
+.dash-grad-orange { background: linear-gradient(155deg, rgba(251,146,60,.55),  rgba(249,115,22,.16)); }
+.dash-grad-amber  { background: linear-gradient(155deg, rgba(250,204,21,.5),   rgba(180,83,9,.18)); }
+.dash-grad-green  { background: linear-gradient(155deg, rgba(74,222,128,.5),   rgba(22,163,74,.18)); }
+.dash-grad-blue   { background: linear-gradient(155deg, rgba(96,165,250,.5),   rgba(37,99,235,.18)); }
+.dash-grad-violet { background: linear-gradient(155deg, rgba(167,139,250,.5),  rgba(124,58,237,.18)); }
+.dash-grad-cyan   { background: linear-gradient(155deg, rgba(45,212,191,.5),   rgba(13,148,136,.18)); }
+.dash-grad-pink   { background: linear-gradient(155deg, rgba(244,114,182,.5),  rgba(219,39,119,.18)); }
+
+/* ─── PICKER "Scegli cosa mostrare" (aperto con tap prolungato) ─────────── */
+.dash-picker-opt {
+  width: 100%; display: flex; align-items: center; gap: 12px;
+  padding: 12px 6px; border: none; background: none; cursor: pointer;
+  border-bottom: 1px solid var(--border); text-align: left;
+  font-family: 'Inter', sans-serif;
+}
+.dash-picker-opt:last-child { border-bottom: none; }
+.dash-picker-opt:active { background: var(--surface-2); }
+.dash-picker-ico {
+  width: 38px; height: 38px; border-radius: 12px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+}
+.dash-picker-ico svg { width: 20px; height: 20px; color: #fff; filter: drop-shadow(0 1px 3px rgba(0,0,0,.3)); }
+.dash-picker-lbl { flex: 1; font-size: 14px; font-weight: 600; color: var(--text); }
+.dash-picker-check { color: var(--green); font-size: 16px; font-weight: 700; flex-shrink: 0; }
 .home-dash-card {
   background: rgba(255,255,255,.10);
   backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%);
@@ -1615,18 +1666,21 @@ body.help-mode { background: #0f1f3d; }
               <div class="home-dash-datetime"><span id="home-dash-date"></span>&nbsp;·&nbsp;<span id="home-dash-time"></span></div>
             </div>
 
-            <div class="home-dash-stats">
-              <div class="home-dash-stat">
-                <div class="home-dash-stat-num home-dash-stat-red" id="home-dash-alert-num">0</div>
-                <div class="home-dash-stat-lbl">Alert attivi</div>
+            <div class="home-dash-stats" id="home-dash-stats">
+              <div class="dash-stat-card" data-slot="1" id="dash-card-1">
+                <div class="dash-stat-icon" id="dash-card-1-icon"></div>
+                <div class="dash-stat-value" id="dash-card-1-value">0</div>
+                <div class="dash-stat-label" id="dash-card-1-label"></div>
               </div>
-              <div class="home-dash-stat">
-                <div class="home-dash-stat-num home-dash-stat-orange" id="home-dash-temp-num">0</div>
-                <div class="home-dash-stat-lbl">Temperature da controllare</div>
+              <div class="dash-stat-card" data-slot="2" id="dash-card-2">
+                <div class="dash-stat-icon" id="dash-card-2-icon"></div>
+                <div class="dash-stat-value" id="dash-card-2-value">0</div>
+                <div class="dash-stat-label" id="dash-card-2-label"></div>
               </div>
-              <div class="home-dash-stat">
-                <div class="home-dash-stat-num home-dash-stat-yellow" id="home-dash-scad-num">0</div>
-                <div class="home-dash-stat-lbl">In scadenza oggi</div>
+              <div class="dash-stat-card" data-slot="3" id="dash-card-3">
+                <div class="dash-stat-icon" id="dash-card-3-icon"></div>
+                <div class="dash-stat-value" id="dash-card-3-value">0</div>
+                <div class="dash-stat-label" id="dash-card-3-label"></div>
               </div>
             </div>
 
@@ -2932,6 +2986,15 @@ body.help-mode { background: #0f1f3d; }
   </div>
 </div>
 
+<!-- ── DASH CARD PICKER (tap prolungato sulle card statistiche Home) ──────── -->
+<div class="modal-backdrop" id="modal-dash-card" onclick="bgCloseDashCardPicker(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Scegli cosa mostrare</div>
+    <div class="modal-body" id="dash-card-picker-list" style="padding:4px 20px"></div>
+  </div>
+</div>
+
 <!-- ── TOAST ─────────────────────────────────────────────────────────────── -->
 <div class="toast" id="toast"></div>
 
@@ -2940,6 +3003,11 @@ const REPARTI = ['cucina', 'sala', 'pizzeria'];
 const CAN_DELETE_CARICHI = {{ 'true' if current_user.is_authenticated and current_user.puo_eliminare_carichi else 'false' }};
 const CAN_GESTIRE_SALA = {{ 'true' if current_user.is_authenticated and current_user.puo_gestire_sala else 'false' }};
 const HOME_CARD = '{{ current_user.home_card if current_user.is_authenticated else "" }}';
+const DASH_CARDS_INITIAL = [
+  '{{ current_user.dash_card1 if current_user.is_authenticated else "alert" }}',
+  '{{ current_user.dash_card2 if current_user.is_authenticated else "temperature" }}',
+  '{{ current_user.dash_card3 if current_user.is_authenticated else "scadenza" }}',
+];
 
 // ── STATE ────────────────────────────────────────────────────────────────
 const S = {
@@ -2956,6 +3024,7 @@ const S = {
   giacRepartoFilter:  '',      // '' | 'cucina' | 'sala' | 'pizzeria'
   giacPageIdx:  0,             // 0 = In magazzino, 1 = In uso (swipe pages)
   homePageIdx:  1,             // 0 = Dashboard (solo admin), 1 = Azioni rapide
+  dashCards:    DASH_CARDS_INITIAL.slice(), // le 3 card statistiche personalizzabili della Dashboard
   listaSpesa:      [],
   spesaTimers:     {},   // id → { timeout, interval, startTime }
   spesaFornFilter: 'all',
@@ -3036,6 +3105,7 @@ async function init() {
   animHomeCards();
   _initGiacSwipe();
   _initHomeSwipe();
+  initDashCardsLongPress();
   _setHomePage(1, false);
   await Promise.all([loadCategorie(), loadProdottiCarico(), loadGiacenze(), loadAlerts(), loadListaSpesa(), loadInUso(), loadApparecchi(), loadStoricoTemperature(), loadLocks()]);
   setInterval(loadLocks, 20000);
@@ -3091,15 +3161,8 @@ function startHomeDashClock() {
 }
 
 function renderHomeDashboard() {
-  const alertNum = document.getElementById('home-dash-alert-num');
-  if (!alertNum) return; // utente staff: dashboard non esiste
-  alertNum.textContent = S.alerts.count || 0;
-
-  document.getElementById('home-dash-temp-num').textContent =
-    S.apparecchi.filter(a => a.stato_controllo === 'DA_CONTROLLARE').length;
-
-  document.getElementById('home-dash-scad-num').textContent =
-    (S.alerts.scadenze || []).filter(a => a.giorni === 0).length;
+  if (!document.getElementById('dash-card-1')) return; // utente staff: dashboard non esiste
+  renderDashCards();
 
   const docks = S.listaSpesa.filter(i => i.fornitore === 'DOCKS' && !i.completato);
   document.getElementById('home-dash-docks-num').textContent = docks.length;
@@ -3108,6 +3171,182 @@ function renderHomeDashboard() {
     : 'Nessun prodotto da ordinare';
 
   _renderHomeCustomCard();
+}
+
+// ── DASH STAT CARDS — personalizzabili (tap prolungato → scelta dato) ────
+// 8 tipi di dato disponibili, ognuno con label, icona SVG dettagliata e
+// gradiente dedicato. `isText` = la card mostra un testo (es. nome prodotto
+// + orario) invece del contatore numerico animato.
+const DASH_CARD_DEFS = {
+  alert: {
+    label: 'Alert attivi', grad: 'red',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
+  },
+  temperature: {
+    label: 'Temperature da controllare', grad: 'orange',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4a2 2 0 0 0-4 0v9.54a4 4 0 1 0 4 0V4Z"/><line x1="12" y1="7" x2="12" y2="13"/></svg>',
+  },
+  scadenza: {
+    label: 'In scadenza oggi', grad: 'amber',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="3"/><line x1="16" y1="2.5" x2="16" y2="6.5"/><line x1="8" y1="2.5" x2="8" y2="6.5"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M12 14v3l2 1.3"/></svg>',
+  },
+  ultimo_carico: {
+    label: 'Ultimo carico', grad: 'green', isText: true,
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21 8-9-5-9 5 9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>',
+  },
+  in_uso: {
+    label: 'Prodotti in uso', grad: 'blue',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 1-15.3 6.4L3 21"/><path d="M3 12a9 9 0 0 1 15.3-6.4L21 3"/><path d="M3 16v-3.5h3.5"/><path d="M21 8v3.5h-3.5"/></svg>',
+  },
+  preparazioni: {
+    label: 'Preparazioni in corso', grad: 'violet',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 11h14l-1.2 7.2a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8L5 11Z"/><path d="M7 11a5 5 0 0 1 10 0"/><path d="M12 3v3"/><path d="M8.5 3.8l1 2.6"/><path d="M15.5 3.8l-1 2.6"/></svg>',
+  },
+  coperti: {
+    label: 'Coperti oggi', grad: 'cyan',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2v8a2 2 0 0 0 4 0V2"/><path d="M9 10v12"/><path d="M17 2c-1.5 0-2.5 1.5-2.5 4s1 5 2.5 7v9"/></svg>',
+  },
+  sotto_scorta: {
+    label: 'Sotto scorta minima', grad: 'pink',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h1.6l2.1 11.4a2 2 0 0 0 2 1.6h8.2a2 2 0 0 0 2-1.6L20.8 7H6"/><circle cx="9" cy="20" r="1.3"/><circle cx="17" cy="20" r="1.3"/><path d="M11 8v4"/><path d="M11 15h.01"/></svg>',
+  },
+};
+const DASH_CARD_ORDER = ['alert', 'temperature', 'scadenza', 'ultimo_carico', 'in_uso', 'preparazioni', 'coperti', 'sotto_scorta'];
+
+// Calcola il valore corrente per un tipo di card. Alcuni dati sono già in
+// memoria (alert, temperature, scadenze, in uso), altri vengono caricati
+// al volo solo quando servono (preparazioni, coperti, ultimo carico), per
+// non appesantire il caricamento iniziale della Home con richieste inutili.
+async function _dashCardData(type) {
+  switch (type) {
+    case 'alert':
+      return { value: S.alerts.count || 0 };
+    case 'temperature':
+      return { value: S.apparecchi.filter(a => a.stato_controllo === 'DA_CONTROLLARE').length };
+    case 'scadenza':
+      return { value: (S.alerts.scadenze || []).filter(a => a.giorni === 0).length };
+    case 'sotto_scorta':
+      return { value: (S.alerts.scorte || []).length };
+    case 'in_uso':
+      return { value: S.inUso.length };
+    case 'preparazioni': {
+      if (!S.preparazioni.length) await loadPreparazioni();
+      return { value: S.preparazioni.filter(p => p.stato === 'in_corso').length };
+    }
+    case 'coperti': {
+      const { data } = dataOraItaliana();
+      const res = await api(`/api/prenotazioni?data=${encodeURIComponent(data)}`);
+      return { value: (res.coperti && res.coperti.totale) || 0 };
+    }
+    case 'ultimo_carico': {
+      const res = await api('/api/ultimo-carico');
+      return res.success && res.prodotto
+        ? { text: res.prodotto, sub: res.quando ? `Ultimo carico · ${res.quando}` : 'Ultimo carico' }
+        : { text: '—', sub: 'Nessun carico registrato' };
+    }
+    default:
+      return { value: 0 };
+  }
+}
+
+function _animateDashCount(el, to) {
+  to = to || 0;
+  const from = parseInt(el.textContent, 10) || 0;
+  if (from === to) { el.textContent = to; return; }
+  const duration = 700;
+  const start = performance.now();
+  const step = now => {
+    const p = Math.min(1, (now - start) / duration);
+    const eased = 1 - Math.pow(1 - p, 3);
+    el.textContent = Math.round(from + (to - from) * eased);
+    if (p < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+
+async function _renderDashCard(slot) {
+  const type = S.dashCards[slot - 1];
+  const def  = DASH_CARD_DEFS[type] || DASH_CARD_DEFS.alert;
+  const card  = document.getElementById(`dash-card-${slot}`);
+  if (!card) return;
+  const icon  = document.getElementById(`dash-card-${slot}-icon`);
+  const value = document.getElementById(`dash-card-${slot}-value`);
+  const label = document.getElementById(`dash-card-${slot}-label`);
+
+  card.className = `dash-stat-card dash-grad-${def.grad}${def.isText ? ' is-text' : ''}`;
+  icon.innerHTML = def.icon;
+  label.textContent = def.label;
+
+  const data = await _dashCardData(type);
+  if (def.isText) {
+    value.textContent = data.text ?? '—';
+    label.textContent = data.sub ?? def.label;
+  } else {
+    _animateDashCount(value, data.value);
+  }
+}
+
+function renderDashCards() {
+  [1, 2, 3].forEach(slot => _renderDashCard(slot));
+}
+
+// ── DASH STAT CARDS — tap prolungato per aprire il picker ────────────────
+let _dashPickerSlot = null;
+
+function _attachDashLongPress(el, onLongPress) {
+  let pressTimer = null, sx = 0, sy = 0;
+  const cancelPress = () => { clearTimeout(pressTimer); pressTimer = null; el.classList.remove('pressing'); };
+  el.addEventListener('pointerdown', e => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    sx = e.clientX; sy = e.clientY;
+    el.classList.add('pressing');
+    pressTimer = setTimeout(() => { cancelPress(); onLongPress(); }, 520);
+  });
+  el.addEventListener('pointermove', e => {
+    if (!pressTimer) return;
+    if (Math.abs(e.clientX - sx) > 10 || Math.abs(e.clientY - sy) > 10) cancelPress();
+  });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(evt => el.addEventListener(evt, cancelPress));
+}
+
+function initDashCardsLongPress() {
+  [1, 2, 3].forEach(slot => {
+    const el = document.getElementById(`dash-card-${slot}`);
+    if (!el || el.dataset.lpInit) return;
+    el.dataset.lpInit = '1';
+    _attachDashLongPress(el, () => openDashCardPicker(slot));
+  });
+}
+
+function openDashCardPicker(slot) {
+  _dashPickerSlot = slot;
+  const current = S.dashCards[slot - 1];
+  const list = document.getElementById('dash-card-picker-list');
+  list.innerHTML = DASH_CARD_ORDER.map(type => {
+    const def    = DASH_CARD_DEFS[type];
+    const active = type === current;
+    return `<button type="button" class="dash-picker-opt" onclick="selectDashCard('${type}')">
+      <span class="dash-picker-ico dash-grad-${def.grad}">${def.icon}</span>
+      <span class="dash-picker-lbl">${esc(def.label)}</span>
+      ${active ? '<span class="dash-picker-check">✓</span>' : ''}
+    </button>`;
+  }).join('');
+  document.getElementById('modal-dash-card').classList.add('open');
+}
+function closeDashCardPicker() { document.getElementById('modal-dash-card').classList.remove('open'); }
+function bgCloseDashCardPicker(e) { if (e.target === document.getElementById('modal-dash-card')) closeDashCardPicker(); }
+
+async function selectDashCard(type) {
+  const slot = _dashPickerSlot;
+  if (!slot) return;
+  S.dashCards[slot - 1] = type;
+  closeDashCardPicker();
+  _renderDashCard(slot);
+  const res = await api('/api/dashboard-cards', {
+    method: 'POST',
+    body: { card1: S.dashCards[0], card2: S.dashCards[1], card3: S.dashCards[2] },
+  });
+  if (!res.success) toast(res.error || 'Errore salvataggio', 'error');
 }
 
 async function _renderHomeCustomCard() {

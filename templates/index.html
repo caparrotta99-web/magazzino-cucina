@@ -249,6 +249,24 @@ main {
 .drw-logout:hover { background: rgba(239,68,68,.14); }
 .drw-logout:active { background: rgba(239,68,68,.2); }
 
+/* ─── HOME — Pagina 2 (Azioni rapide): topbar integrata ─────────────────── */
+.home-menu-topbar {
+  display: flex; align-items: flex-start; justify-content: space-between;
+  gap: 12px; margin-bottom: 22px;
+}
+.home-menu-greeting-col { flex: 1; min-width: 0; }
+.home-menu-hello {
+  font-size: 21px; font-weight: 800; color: var(--text);
+  line-height: 1.25; letter-spacing: -.3px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.home-menu-datetime {
+  font-size: 12.5px; color: var(--muted); margin-top: 5px;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.home-menu-icons { display: flex; align-items: center; gap: 0; flex-shrink: 0; padding-top: 1px; }
+.home-menu-icons .btn-icon { width: 36px; height: 36px; }
+
 /* ─── HOME — 2×2 + 1 CARDS ─────────────────────────────────────────────── */
 .home-group-label {
   font-size: 12px; font-weight: 600; color: var(--muted);
@@ -327,14 +345,20 @@ main {
   transition: transform .32s cubic-bezier(.22,.61,.36,1);
 }
 .home-swipe-page { flex: 0 0 100%; width: 100%; min-width: 100%; }
-.home-actions { padding: 24px 16px 90px; max-width: 600px; margin: 0 auto; }
+.home-actions { padding: calc(20px + env(safe-area-inset-top)) 16px 90px; max-width: 600px; margin: 0 auto; }
+
+/* Home (entrambe le pagine, Dashboard + Azioni rapide): niente header
+   tradizionale — ogni pagina mostra la propria intestazione integrata
+   (saluto + data/ora + icone), quindi <main> non deve riservare lo
+   spazio dell'header. */
+body.home-active header { display: none; }
+body.home-active main   { margin-top: 0; min-height: 100dvh; }
 
 /* Pagina 1 (Dashboard): altezza vincolata allo schermo, niente scroll di
    documento — scroll interno solo se il contenuto lo richiede davvero.
    Pagina 2 (Azioni rapide) resta invece ad altezza naturale con lo
    scroll di documento normale (nessuna di queste regole si applica). */
-body.home-p1 header { display: none; }
-body.home-p1 main   { margin-top: 0; height: 100dvh; overflow: hidden; }
+body.home-p1 main { height: 100dvh; overflow: hidden; }
 /* #page-home deve avere un'altezza esplicita: senza, le regole height:100%
    qui sotto non hanno una base percentuale da cui partire (un'altezza in %
    si risolve solo se il genitore ha un'altezza definita, non "auto") e la
@@ -428,7 +452,6 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
   box-shadow: 0 8px 20px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.15);
   padding: 16px; margin-bottom: 14px; cursor: pointer;
 }
-.home-dash-card:empty { display: none; }
 .home-dash-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .home-dash-card-title { font-size: 14px; font-weight: 700; color: #ffffff; }
 .home-dash-card-num { font-size: 20px; font-weight: 800; color: #00e5ff; }
@@ -1488,7 +1511,7 @@ body.help-mode { background: #0f1f3d; }
 .help-card-text { font-size: 13.5px; line-height: 1.5; color: rgba(255,255,255,.75); }
 </style>
 </head>
-<body>
+<body class="home-active">
 
 <div class="aurora-bg" aria-hidden="true">
   <div class="aurora-blob b1"></div>
@@ -1500,13 +1523,13 @@ body.help-mode { background: #0f1f3d; }
 <!-- ── HEADER ──────────────────────────────────────────────────────────── -->
 <header>
   <button class="btn-icon" id="btn-theme-toggle" onclick="toggleTema()" aria-label="Cambia tema" title="Cambia tema">
-    <svg id="theme-icon-on" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+    <svg id="theme-icon-on" class="js-theme-icon-on" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
          style="display:{{ 'none' if (current_user.is_authenticated and current_user.tema == 'scuro') else 'block' }}">
       <path d="M9 18h6"/>
       <path d="M10 22h4"/>
       <path fill="currentColor" fill-opacity=".35" d="M12 2a7 7 0 0 0-4 12.75c.6.45 1 1.2 1 2.05v1.2h6v-1.2c0-.85.4-1.6 1-2.05A7 7 0 0 0 12 2Z"/>
     </svg>
-    <svg id="theme-icon-off" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+    <svg id="theme-icon-off" class="js-theme-icon-off" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
          style="display:{{ 'block' if (current_user.is_authenticated and current_user.tema == 'scuro') else 'none' }}">
       <path d="M9 18h6"/>
       <path d="M10 22h4"/>
@@ -1524,14 +1547,14 @@ body.help-mode { background: #0f1f3d; }
     </div>
   </div>
   <div class="hdr-actions">
-    <div class="hdr-alert-dot" id="hdr-alert-dot"></div>
-    <button class="btn-icon" id="btn-sync" title="Sincronizza" onclick="syncAll()">
+    <div class="hdr-alert-dot js-hdr-alert-dot" id="hdr-alert-dot"></div>
+    <button class="btn-icon js-btn-sync" id="btn-sync" title="Sincronizza" onclick="syncAll()">
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
         <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
       </svg>
     </button>
-    <button class="btn-icon" id="btn-hamburger" onclick="openDrawer()" aria-label="Menu" aria-expanded="false">
+    <button class="btn-icon js-btn-hamburger" id="btn-hamburger" onclick="openDrawer()" aria-label="Menu" aria-expanded="false">
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <line x1="3" y1="6"  x2="21" y2="6"/>
         <line x1="3" y1="12" x2="21" y2="12"/>
@@ -1696,14 +1719,49 @@ body.help-mode { background: #0f1f3d; }
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               Scarica PDF
             </button>
-
-            <div class="home-dash-card" id="home-dash-custom"></div>
           </div>
         </div>
         {% endif %}
 
         <div class="home-swipe-page">
           <div class="home-actions">
+
+            <div class="home-menu-topbar">
+              <div class="home-menu-greeting-col">
+                <div class="home-menu-hello"><span id="home-menu-greeting">Buongiorno</span>{% if current_user.is_authenticated %}, {{ current_user.nome.split(' ')[0] }}!{% endif %}</div>
+                <div class="home-menu-datetime"><span id="home-menu-date"></span>&nbsp;·&nbsp;<span id="home-menu-time"></span></div>
+              </div>
+              <div class="home-menu-icons">
+                <div class="hdr-alert-dot js-hdr-alert-dot" id="hdr-alert-dot-2"></div>
+                <button type="button" class="btn-icon" onclick="toggleTema()" aria-label="Cambia tema" title="Cambia tema">
+                  <svg class="js-theme-icon-on" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                       style="display:{{ 'none' if (current_user.is_authenticated and current_user.tema == 'scuro') else 'block' }}">
+                    <path d="M9 18h6"/>
+                    <path d="M10 22h4"/>
+                    <path fill="currentColor" fill-opacity=".35" d="M12 2a7 7 0 0 0-4 12.75c.6.45 1 1.2 1 2.05v1.2h6v-1.2c0-.85.4-1.6 1-2.05A7 7 0 0 0 12 2Z"/>
+                  </svg>
+                  <svg class="js-theme-icon-off" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
+                       style="display:{{ 'block' if (current_user.is_authenticated and current_user.tema == 'scuro') else 'none' }}">
+                    <path d="M9 18h6"/>
+                    <path d="M10 22h4"/>
+                    <path d="M12 2a7 7 0 0 0-4 12.75c.6.45 1 1.2 1 2.05v1.2h6v-1.2c0-.85.4-1.6 1-2.05A7 7 0 0 0 12 2Z"/>
+                  </svg>
+                </button>
+                <button type="button" class="btn-icon js-btn-sync" id="btn-sync-2" title="Sincronizza" onclick="syncAll()">
+                  <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
+                    <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
+                  </svg>
+                </button>
+                <button type="button" class="btn-icon js-btn-hamburger" id="btn-hamburger-2" onclick="openDrawer()" aria-label="Menu" aria-expanded="false">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="3" y1="6"  x2="21" y2="6"/>
+                    <line x1="3" y1="12" x2="21" y2="12"/>
+                    <line x1="3" y1="18" x2="21" y2="18"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
 
             <div class="home-grid" style="margin-bottom:20px">
               <div class="hcard hcard-spesa" onclick="navTo('lista-spesa')">
@@ -3002,7 +3060,6 @@ body.help-mode { background: #0f1f3d; }
 const REPARTI = ['cucina', 'sala', 'pizzeria'];
 const CAN_DELETE_CARICHI = {{ 'true' if current_user.is_authenticated and current_user.puo_eliminare_carichi else 'false' }};
 const CAN_GESTIRE_SALA = {{ 'true' if current_user.is_authenticated and current_user.puo_gestire_sala else 'false' }};
-const HOME_CARD = '{{ current_user.home_card if current_user.is_authenticated else "" }}';
 const DASH_CARDS_INITIAL = [
   '{{ current_user.dash_card1 if current_user.is_authenticated else "alert" }}',
   '{{ current_user.dash_card2 if current_user.is_authenticated else "temperature" }}',
@@ -3146,15 +3203,26 @@ function _romeHour() {
 }
 
 function startHomeDashClock() {
+  // Aggiorna sia la Dashboard (Pagina 1, solo admin) sia la topbar
+  // integrata di Azioni rapide (Pagina 2, tutti gli utenti) — ogni
+  // pagina ha i propri id, quindi si aggiorna solo ciò che esiste.
   const tick = () => {
-    const greetEl = document.getElementById('home-dash-greeting');
-    if (greetEl) greetEl.textContent = _romeHour() < 18 ? 'Buongiorno' : 'Buonasera';
-    const dEl = document.getElementById('home-dash-date');
-    const tEl = document.getElementById('home-dash-time');
-    if (dEl) dEl.textContent = new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Rome' });
-    if (tEl) tEl.textContent = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Rome' });
+    const greetTxt = _romeHour() < 18 ? 'Buongiorno' : 'Buonasera';
+    const dateTxt  = new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Rome' });
+    const timeTxt  = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Rome' });
+    ['home-dash-greeting', 'home-menu-greeting'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = greetTxt;
+    });
+    ['home-dash-date', 'home-menu-date'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = dateTxt;
+    });
+    ['home-dash-time', 'home-menu-time'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.textContent = timeTxt;
+    });
   };
-  if (!document.getElementById('home-dash-greeting')) return; // utente staff: dashboard non esiste
   tick();
   const msAlProssimoMinuto = 60000 - (Date.now() % 60000);
   setTimeout(() => { tick(); setInterval(tick, 60000); }, msAlProssimoMinuto);
@@ -3169,8 +3237,6 @@ function renderHomeDashboard() {
   document.getElementById('home-dash-docks-list').textContent = docks.length
     ? docks.slice(0, 3).map(i => i.prodotto).join(', ') + (docks.length > 3 ? '…' : '')
     : 'Nessun prodotto da ordinare';
-
-  _renderHomeCustomCard();
 }
 
 // ── DASH STAT CARDS — personalizzabili (tap prolungato → scelta dato) ────
@@ -3349,36 +3415,6 @@ async function selectDashCard(type) {
   if (!res.success) toast(res.error || 'Errore salvataggio', 'error');
 }
 
-async function _renderHomeCustomCard() {
-  const el = document.getElementById('home-dash-custom');
-  if (!el) return;
-
-  if (HOME_CARD === 'preparazioni') {
-    if (!S.preparazioni.length) await loadPreparazioni();
-    const inCorso = S.preparazioni.filter(p => p.stato === 'in_corso');
-    el.innerHTML = inCorso.length
-      ? `<div class="home-dash-card-title">Preparazioni in corso</div>
-         <div class="home-dash-card-list">${inCorso.slice(0, 4).map(p => esc(p.nome)).join(', ')}</div>`
-      : '';
-  } else if (HOME_CARD === 'apparecchi') {
-    const daControllare = S.apparecchi.filter(a => a.stato_controllo === 'DA_CONTROLLARE');
-    el.innerHTML = daControllare.length
-      ? `<div class="home-dash-card-title">Apparecchi da controllare</div>
-         <div class="home-dash-card-list">${daControllare.slice(0, 4).map(a => esc(a.nome)).join(', ')}</div>`
-      : '';
-  } else if (HOME_CARD === 'prenotazioni') {
-    const data = await api('/api/prenotazioni');
-    const oggi = (data.prenotazioni || []).filter(p => p.stato !== 'cancellata');
-    el.innerHTML = oggi.length
-      ? `<div class="home-dash-card-title">Prenotazioni di oggi</div>
-         <div class="home-dash-card-list">${oggi.slice(0, 4).map(p => `${esc(p.nome)} · ${esc(p.ora)}`).join(', ')}</div>`
-      : `<div class="home-dash-card-title">Prenotazioni di oggi</div>
-         <div class="home-dash-card-list">Nessuna prenotazione</div>`;
-  } else {
-    el.innerHTML = '';
-  }
-}
-
 // ── TEMA ─────────────────────────────────────────────────────────────────
 async function toggleTema() {
   const html   = document.documentElement;
@@ -3386,8 +3422,8 @@ async function toggleTema() {
   const nuovo  = scuro ? 'light' : 'dark';
   html.setAttribute('data-theme', nuovo);
 
-  document.getElementById('theme-icon-on').style.display  = nuovo === 'dark' ? 'none'  : 'block';
-  document.getElementById('theme-icon-off').style.display = nuovo === 'dark' ? 'block' : 'none';
+  document.querySelectorAll('.js-theme-icon-on').forEach(el  => el.style.display = nuovo === 'dark' ? 'none'  : 'block');
+  document.querySelectorAll('.js-theme-icon-off').forEach(el => el.style.display = nuovo === 'dark' ? 'block' : 'none');
 
   const metaTheme = document.querySelector('meta[name="theme-color"]');
   if (metaTheme) metaTheme.setAttribute('content', nuovo === 'dark' ? '#0a0a0a' : '#ffffff');
@@ -3400,13 +3436,13 @@ function openDrawer() {
   document.getElementById('drawer').classList.add('open');
   document.getElementById('drawer-overlay').classList.add('open');
   document.getElementById('drawer').setAttribute('aria-hidden', 'false');
-  document.getElementById('btn-hamburger').setAttribute('aria-expanded', 'true');
+  document.querySelectorAll('.js-btn-hamburger').forEach(b => b.setAttribute('aria-expanded', 'true'));
 }
 function closeDrawer() {
   document.getElementById('drawer').classList.remove('open');
   document.getElementById('drawer-overlay').classList.remove('open');
   document.getElementById('drawer').setAttribute('aria-hidden', 'true');
-  document.getElementById('btn-hamburger').setAttribute('aria-expanded', 'false');
+  document.querySelectorAll('.js-btn-hamburger').forEach(b => b.setAttribute('aria-expanded', 'false'));
 }
 
 // ── NAVIGATION ───────────────────────────────────────────────────────────
@@ -3424,6 +3460,7 @@ function navTo(page) {
 
   window.scrollTo({ top: 0, behavior: 'smooth' });
 
+  document.body.classList.toggle('home-active', page === 'home');
   if (page === 'home') { animHomeCards(); _setHomePage(1, false); }
   else                 { document.body.classList.remove('home-p1'); }
   if (page === 'carico')     resetCaricoWizard();
@@ -4217,7 +4254,7 @@ async function loadAlerts() {
   badge.textContent = count > 0 ? count : '';
   badge.classList.toggle('show', count > 0);
 
-  document.getElementById('hdr-alert-dot').style.display = count > 0 ? 'block' : 'none';
+  document.querySelectorAll('.js-hdr-alert-dot').forEach(el => el.style.display = count > 0 ? 'block' : 'none');
 
   const num = document.getElementById('home-alert-num');
   if (num) num.textContent = count;
@@ -5108,11 +5145,11 @@ async function submitNuovoProdotto() {
 
 // ── SYNC ──────────────────────────────────────────────────────────────────
 async function syncAll() {
-  const btn = document.getElementById('btn-sync');
-  btn.classList.add('spinning');
+  const btns = document.querySelectorAll('.js-btn-sync');
+  btns.forEach(b => b.classList.add('spinning'));
   toast('Sincronizzazione…', 'info');
   const data = await api('/api/sync', { method: 'POST' });
-  btn.classList.remove('spinning');
+  btns.forEach(b => b.classList.remove('spinning'));
   if (data.success) {
     await Promise.all([loadProdottiCarico(), loadGiacenze(), loadAlerts()]);
     const extra = data.inviati ? ` (${data.inviati} in sospeso inviati)` : '';

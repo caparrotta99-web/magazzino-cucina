@@ -381,6 +381,7 @@ def db_init():
         ('listino',      'synced', "INTEGER NOT NULL DEFAULT 1"),
         ('temperature',  'synced', "INTEGER NOT NULL DEFAULT 1"),
         ('registro',     'creato_il', "TEXT NOT NULL DEFAULT ''"),
+        ('users',        'home_card', "TEXT NOT NULL DEFAULT 'preparazioni'"),
     ]
     for table, col, defn in migrations:
         if _USE_PG:
@@ -1091,6 +1092,13 @@ def update_user_tema(user_id, tema):
     with get_conn() as conn:
         conn.execute(
             "UPDATE users SET tema = ? WHERE id = ?", (tema, user_id)
+        )
+
+
+def update_user_home_card(user_id, home_card):
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE users SET home_card = ? WHERE id = ?", (home_card, user_id)
         )
 
 

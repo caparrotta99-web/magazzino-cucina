@@ -158,6 +158,22 @@ input:disabled { opacity: .5; cursor: not-allowed; }
              autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false">
     </div>
 
+    <!-- ── DASHBOARD ── -->
+    <div class="section-title">Dashboard</div>
+
+    <div class="form-group">
+      <label>Card personalizzabile</label>
+      <select name="home_card">
+        <option value="nessuna"     {{ 'selected' if user.home_card == 'nessuna' }}>Nessuna</option>
+        <option value="preparazioni" {{ 'selected' if not user.home_card or user.home_card == 'preparazioni' }}>Preparazioni in corso</option>
+        <option value="apparecchi"  {{ 'selected' if user.home_card == 'apparecchi' }}>Apparecchi da controllare</option>
+        {% if current_user.puo_gestire_sala %}
+        <option value="prenotazioni" {{ 'selected' if user.home_card == 'prenotazioni' }}>Prenotazioni di oggi</option>
+        {% endif %}
+      </select>
+      <span class="hint">Cosa mostrare nella card personalizzabile della dashboard</span>
+    </div>
+
     <!-- ── CAMBIO PASSWORD ── -->
     <div class="section-title">Cambia password <span style="font-size:10px;font-weight:400;text-transform:none;letter-spacing:0">(opzionale — lascia vuoto per non cambiare)</span></div>
 

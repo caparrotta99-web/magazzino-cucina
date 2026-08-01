@@ -301,6 +301,70 @@ main {
   line-height: 1; margin-bottom: 2px;
 }
 .hcard-spesa-lbl { font-size: 12px; color: var(--muted); }
+
+/* ─── HOME — SWIPE PAGES ────────────────────────────────────────────────── */
+#page-home.page { padding: 0; max-width: none; }
+.home-dots {
+  position: absolute; left: 50%; transform: translateX(-50%);
+  bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 160;
+  display: flex; align-items: center; gap: 8px;
+}
+.home-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--border-2);
+  box-shadow: 0 1px 3px rgba(0,0,0,.2);
+  transition: background .25s ease, transform .25s ease;
+}
+.home-dot.active { background: var(--blue); transform: scale(1.3); }
+.home-swipe-viewport { overflow-x: hidden; }
+.home-swipe-track {
+  display: flex; align-items: flex-start;
+  will-change: transform;
+  transition: transform .32s cubic-bezier(.22,.61,.36,1);
+}
+.home-swipe-page { flex: 0 0 100%; width: 100%; min-width: 100%; }
+.home-actions { padding: 24px 16px 90px; max-width: 600px; margin: 0 auto; }
+
+body.home-p1 header { display: none; }
+body.home-p1 main   { margin-top: 0; min-height: 100dvh; }
+
+/* ─── HOME — DASHBOARD (Pagina 1) ───────────────────────────────────────── */
+.home-dash {
+  background: linear-gradient(180deg, #87CEEB 0%, #E0F4FF 50%, #ffffff 100%);
+  min-height: 100dvh;
+  padding: calc(28px + env(safe-area-inset-top)) 20px calc(90px + env(safe-area-inset-bottom, 0px));
+}
+.home-dash-greeting { margin-bottom: 24px; }
+.home-dash-hello { font-size: 30px; font-weight: 300; color: #0f1f3d; line-height: 1.15; }
+.home-dash-datetime { font-size: 13px; color: rgba(15,31,61,.65); margin-top: 6px; }
+.home-dash-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
+.home-dash-stat {
+  background: rgba(255,255,255,.55); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,.6); border-radius: 16px;
+  padding: 14px 10px; text-align: center;
+}
+.home-dash-stat-num { font-size: 26px; font-weight: 700; line-height: 1; }
+.home-dash-stat-red    { color: #dc2626; }
+.home-dash-stat-orange { color: #f97316; }
+.home-dash-stat-yellow { color: #eab308; }
+.home-dash-stat-lbl { font-size: 11px; color: #3a4a63; margin-top: 6px; line-height: 1.3; }
+.home-dash-card {
+  background: rgba(255,255,255,.6); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,.6); border-radius: 18px;
+  padding: 16px; margin-bottom: 14px; cursor: pointer;
+}
+.home-dash-card:empty { display: none; }
+.home-dash-card-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.home-dash-card-title { font-size: 14px; font-weight: 600; color: #0f1f3d; }
+.home-dash-card-num { font-size: 20px; font-weight: 700; color: #0f1f3d; }
+.home-dash-card-list { margin-top: 8px; font-size: 12px; color: #3a4a63; }
+.home-dash-pdf-btn {
+  width: 100%; height: 48px; margin-bottom: 14px;
+  background: rgba(15,31,61,.08); border: 1.5px solid rgba(15,31,61,.18); border-radius: 14px;
+  color: #0f1f3d; font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600;
+  display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;
+}
+.home-dash-pdf-btn:active { background: rgba(15,31,61,.14); }
 .hcard-label { font-size: 16px; font-weight: 700; line-height: 1.2; color: var(--text); }
 .hcard-sub   { font-size: 12px; color: var(--muted); margin-top: 1px; }
 .hcard-alert-num {
@@ -1505,114 +1569,178 @@ body.help-mode { background: #0f1f3d; }
   <section class="page active" id="page-home">
     <button type="button" class="btn-help" onclick="navTo('help')" aria-label="Come usare Brigade">?</button>
 
-    <div class="home-group-label">Movimenti</div>
-    <div class="home-grid">
+    {% set is_admin = current_user.is_authenticated and current_user.role == 'admin' %}
 
-      <div class="hcard hcard-spesa" onclick="navTo('lista-spesa')">
-        <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
-          <div>
-            <div class="hcard-label">Lista Spesa</div>
-            <div class="hcard-sub">Prodotti da ordinare</div>
-          </div>
-          <div class="hcard-icon">
-            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
-          </div>
-        </div>
-        <div>
-          <div class="hcard-spesa-num" id="home-spesa-num">0</div>
-          <div class="hcard-spesa-lbl">da ordinare</div>
-        </div>
-      </div>
-
-      <div class="hcard hcard-carico" onclick="navTo('carico')">
-        <div class="hcard-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
-        </div>
-        <div>
-          <div class="hcard-label">Carico</div>
-          <div class="hcard-sub">Registra entrata</div>
-        </div>
-      </div>
-
-      <div class="hcard hcard-in-uso" onclick="navTo('in-uso')">
-        <div class="hcard-icon" style="font-size:22px;line-height:1">🔄</div>
-        <div>
-          <div class="hcard-label">In uso</div>
-          <div class="hcard-sub">Preleva dal magazzino</div>
-        </div>
-      </div>
-
-      <div class="hcard hcard-giacenze" onclick="navTo('giacenze')">
-        <div class="hcard-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
-        </div>
-        <div>
-          <div class="hcard-label">Giacenze</div>
-          <div class="hcard-sub">Visualizza scorte</div>
-        </div>
-      </div>
-
-    </div>
-
-    <div class="home-group-label">HACCP</div>
-    <div class="home-grid">
-
-      <div class="hcard hcard-alert" onclick="navTo('alert')">
-        <div>
-          <div class="hcard-alert-num" id="home-alert-num">0</div>
-          <div class="hcard-alert-lbl">Alert attivi</div>
-        </div>
-        <div class="hcard-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
-        </div>
-      </div>
-
-      <div class="hcard hcard-temperature" onclick="navTo('temperature')">
-        <div class="hcard-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/></svg>
-        </div>
-        <div>
-          <div class="hcard-label">Temperature</div>
-          <div class="hcard-sub">Registro HACCP</div>
-        </div>
-      </div>
-
-      <div class="hcard hcard-preparazioni" onclick="navTo('preparazioni')">
-        <div class="hcard-icon" style="font-size:22px;line-height:1">🍲</div>
-        <div>
-          <div class="hcard-label">Preparazioni</div>
-          <div class="hcard-sub">Piatti preparati</div>
-        </div>
-      </div>
-
-    </div>
-
-    {% if current_user.is_authenticated and current_user.role == 'admin' %}
-    <div class="home-group-label">Sala</div>
-    <div class="home-grid">
-
-      <div class="hcard hcard-prenotazioni" onclick="navTo('prenotazioni')">
-        <div class="hcard-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-        </div>
-        <div>
-          <div class="hcard-label">Prenotazioni</div>
-          <div class="hcard-sub">Tavoli del giorno</div>
-        </div>
-      </div>
-
-      <div class="hcard hcard-gestione-sala" onclick="navTo('gestione-sala')">
-        <div class="hcard-icon">
-          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><circle cx="17.5" cy="6.5" r="3.5"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-        </div>
-        <div>
-          <div class="hcard-label">Gestione sala</div>
-          <div class="hcard-sub">Mappa tavoli</div>
-        </div>
-      </div>
-
+    {% if is_admin %}
+    <div class="home-dots" id="home-dots">
+      <span class="home-dot active" data-idx="0"></span>
+      <span class="home-dot" data-idx="1"></span>
     </div>
     {% endif %}
+
+    <div class="home-swipe-viewport" id="home-swipe-viewport">
+      <div class="home-swipe-track" id="home-swipe-track">
+
+        {% if is_admin %}
+        <div class="home-swipe-page">
+          <div class="home-dash" id="home-dash">
+            <div class="home-dash-greeting">
+              <div class="home-dash-hello"><span id="home-dash-greeting">Buongiorno</span>, {{ current_user.nome.split(' ')[0] }}!</div>
+              <div class="home-dash-datetime"><span id="home-dash-date"></span>&nbsp;·&nbsp;<span id="home-dash-time"></span></div>
+            </div>
+
+            <div class="home-dash-stats">
+              <div class="home-dash-stat">
+                <div class="home-dash-stat-num home-dash-stat-red" id="home-dash-alert-num">0</div>
+                <div class="home-dash-stat-lbl">Alert attivi</div>
+              </div>
+              <div class="home-dash-stat">
+                <div class="home-dash-stat-num home-dash-stat-orange" id="home-dash-temp-num">0</div>
+                <div class="home-dash-stat-lbl">Temperature da controllare</div>
+              </div>
+              <div class="home-dash-stat">
+                <div class="home-dash-stat-num home-dash-stat-yellow" id="home-dash-scad-num">0</div>
+                <div class="home-dash-stat-lbl">In scadenza oggi</div>
+              </div>
+            </div>
+
+            <div class="home-dash-card" onclick="S.spesaFornFilter='DOCKS'; navTo('lista-spesa')">
+              <div class="home-dash-card-top">
+                <div class="home-dash-card-title">Lista Spesa DOCKS</div>
+                <div class="home-dash-card-num" id="home-dash-docks-num">0</div>
+              </div>
+              <div class="home-dash-card-list" id="home-dash-docks-list"></div>
+            </div>
+
+            <button type="button" class="home-dash-pdf-btn" onclick="navTo('export')">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Scarica PDF
+            </button>
+
+            <div class="home-dash-card" id="home-dash-custom"></div>
+          </div>
+        </div>
+        {% endif %}
+
+        <div class="home-swipe-page">
+          <div class="home-actions">
+
+            <div class="home-grid" style="margin-bottom:20px">
+              <div class="hcard hcard-spesa" onclick="navTo('lista-spesa')">
+                <div style="display:flex;align-items:center;justify-content:space-between;gap:8px">
+                  <div>
+                    <div class="hcard-label">Lista Spesa</div>
+                    <div class="hcard-sub">Prodotti da ordinare</div>
+                  </div>
+                  <div class="hcard-icon">
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
+                  </div>
+                </div>
+                <div>
+                  <div class="hcard-spesa-num" id="home-spesa-num">0</div>
+                  <div class="hcard-spesa-lbl">da ordinare</div>
+                </div>
+              </div>
+            </div>
+
+            <div class="home-group-label">Movimenti</div>
+            <div class="home-grid">
+
+              <div class="hcard hcard-carico" onclick="navTo('carico')">
+                <div class="hcard-icon">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+                </div>
+                <div>
+                  <div class="hcard-label">Carico</div>
+                  <div class="hcard-sub">Registra entrata</div>
+                </div>
+              </div>
+
+              <div class="hcard hcard-in-uso" onclick="navTo('in-uso')">
+                <div class="hcard-icon" style="font-size:22px;line-height:1">🔄</div>
+                <div>
+                  <div class="hcard-label">In uso</div>
+                  <div class="hcard-sub">Preleva dal magazzino</div>
+                </div>
+              </div>
+
+              <div class="hcard hcard-giacenze" onclick="navTo('giacenze')">
+                <div class="hcard-icon">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+                </div>
+                <div>
+                  <div class="hcard-label">Giacenze</div>
+                  <div class="hcard-sub">Visualizza scorte</div>
+                </div>
+              </div>
+
+            </div>
+
+            <div class="home-group-label">HACCP</div>
+            <div class="home-grid">
+
+              <div class="hcard hcard-alert" onclick="navTo('alert')">
+                <div>
+                  <div class="hcard-alert-num" id="home-alert-num">0</div>
+                  <div class="hcard-alert-lbl">Alert attivi</div>
+                </div>
+                <div class="hcard-icon">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+                </div>
+              </div>
+
+              <div class="hcard hcard-temperature" onclick="navTo('temperature')">
+                <div class="hcard-icon">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/></svg>
+                </div>
+                <div>
+                  <div class="hcard-label">Temperature</div>
+                  <div class="hcard-sub">Registro HACCP</div>
+                </div>
+              </div>
+
+              <div class="hcard hcard-preparazioni" onclick="navTo('preparazioni')">
+                <div class="hcard-icon" style="font-size:22px;line-height:1">🍲</div>
+                <div>
+                  <div class="hcard-label">Preparazioni</div>
+                  <div class="hcard-sub">Piatti preparati</div>
+                </div>
+              </div>
+
+            </div>
+
+            {% if is_admin %}
+            <div class="home-group-label">Sala</div>
+            <div class="home-grid">
+
+              <div class="hcard hcard-prenotazioni" onclick="navTo('prenotazioni')">
+                <div class="hcard-icon">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                </div>
+                <div>
+                  <div class="hcard-label">Prenotazioni</div>
+                  <div class="hcard-sub">Tavoli del giorno</div>
+                </div>
+              </div>
+
+              <div class="hcard hcard-gestione-sala" onclick="navTo('gestione-sala')">
+                <div class="hcard-icon">
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><circle cx="17.5" cy="6.5" r="3.5"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                </div>
+                <div>
+                  <div class="hcard-label">Gestione sala</div>
+                  <div class="hcard-sub">Mappa tavoli</div>
+                </div>
+              </div>
+
+            </div>
+            {% endif %}
+
+          </div>
+        </div>
+
+      </div>
+    </div>
 
   </section>
 
@@ -2785,6 +2913,7 @@ body.help-mode { background: #0f1f3d; }
 const REPARTI = ['cucina', 'sala', 'pizzeria'];
 const CAN_DELETE_CARICHI = {{ 'true' if current_user.is_authenticated and current_user.puo_eliminare_carichi else 'false' }};
 const CAN_GESTIRE_SALA = {{ 'true' if current_user.is_authenticated and current_user.puo_gestire_sala else 'false' }};
+const HOME_CARD = '{{ current_user.home_card if current_user.is_authenticated else "" }}';
 
 // ── STATE ────────────────────────────────────────────────────────────────
 const S = {
@@ -2800,6 +2929,7 @@ const S = {
   giacFilter:   'all',
   giacRepartoFilter:  '',      // '' | 'cucina' | 'sala' | 'pizzeria'
   giacPageIdx:  0,             // 0 = In magazzino, 1 = In uso (swipe pages)
+  homePageIdx:  1,             // 0 = Dashboard (solo admin), 1 = Azioni rapide
   listaSpesa:      [],
   spesaTimers:     {},   // id → { timeout, interval, startTime }
   spesaFornFilter: 'all',
@@ -2876,8 +3006,11 @@ function _updateCategorieUI() {
 // ── INIT ─────────────────────────────────────────────────────────────────
 async function init() {
   startHdrClock();
+  startHomeDashClock();
   animHomeCards();
   _initGiacSwipe();
+  _initHomeSwipe();
+  _setHomePage(1, false);
   await Promise.all([loadCategorie(), loadProdottiCarico(), loadGiacenze(), loadAlerts(), loadListaSpesa(), loadInUso(), loadApparecchi(), loadStoricoTemperature(), loadLocks()]);
   setInterval(loadLocks, 20000);
   renderInUsoProdotti();
@@ -2909,6 +3042,76 @@ function startHdrClock() {
     setHdrTime();
     setInterval(() => { setHdrDate(); setHdrTime(); }, 60000);
   }, msAlProssimoMinuto);
+}
+
+// ── HOME — DASHBOARD (Pagina 1) ──────────────────────────────────────────
+function _romeHour() {
+  return parseInt(new Date().toLocaleString('en-US', { hour: 'numeric', hour12: false, timeZone: 'Europe/Rome' }), 10);
+}
+
+function startHomeDashClock() {
+  const tick = () => {
+    const greetEl = document.getElementById('home-dash-greeting');
+    if (greetEl) greetEl.textContent = _romeHour() < 18 ? 'Buongiorno' : 'Buonasera';
+    const dEl = document.getElementById('home-dash-date');
+    const tEl = document.getElementById('home-dash-time');
+    if (dEl) dEl.textContent = new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Rome' });
+    if (tEl) tEl.textContent = new Date().toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit', timeZone: 'Europe/Rome' });
+  };
+  if (!document.getElementById('home-dash-greeting')) return; // utente staff: dashboard non esiste
+  tick();
+  const msAlProssimoMinuto = 60000 - (Date.now() % 60000);
+  setTimeout(() => { tick(); setInterval(tick, 60000); }, msAlProssimoMinuto);
+}
+
+function renderHomeDashboard() {
+  const alertNum = document.getElementById('home-dash-alert-num');
+  if (!alertNum) return; // utente staff: dashboard non esiste
+  alertNum.textContent = S.alerts.count || 0;
+
+  document.getElementById('home-dash-temp-num').textContent =
+    S.apparecchi.filter(a => a.stato_controllo === 'DA_CONTROLLARE').length;
+
+  document.getElementById('home-dash-scad-num').textContent =
+    (S.alerts.scadenze || []).filter(a => a.giorni === 0).length;
+
+  const docks = S.listaSpesa.filter(i => i.fornitore === 'DOCKS' && !i.completato);
+  document.getElementById('home-dash-docks-num').textContent = docks.length;
+  document.getElementById('home-dash-docks-list').textContent = docks.length
+    ? docks.slice(0, 3).map(i => i.prodotto).join(', ') + (docks.length > 3 ? '…' : '')
+    : 'Nessun prodotto da ordinare';
+
+  _renderHomeCustomCard();
+}
+
+async function _renderHomeCustomCard() {
+  const el = document.getElementById('home-dash-custom');
+  if (!el) return;
+
+  if (HOME_CARD === 'preparazioni') {
+    if (!S.preparazioni.length) await loadPreparazioni();
+    const inCorso = S.preparazioni.filter(p => p.stato === 'in_corso');
+    el.innerHTML = inCorso.length
+      ? `<div class="home-dash-card-title">Preparazioni in corso</div>
+         <div class="home-dash-card-list">${inCorso.slice(0, 4).map(p => esc(p.nome)).join(', ')}</div>`
+      : '';
+  } else if (HOME_CARD === 'apparecchi') {
+    const daControllare = S.apparecchi.filter(a => a.stato_controllo === 'DA_CONTROLLARE');
+    el.innerHTML = daControllare.length
+      ? `<div class="home-dash-card-title">Apparecchi da controllare</div>
+         <div class="home-dash-card-list">${daControllare.slice(0, 4).map(a => esc(a.nome)).join(', ')}</div>`
+      : '';
+  } else if (HOME_CARD === 'prenotazioni') {
+    const data = await api('/api/prenotazioni');
+    const oggi = (data.prenotazioni || []).filter(p => p.stato !== 'cancellata');
+    el.innerHTML = oggi.length
+      ? `<div class="home-dash-card-title">Prenotazioni di oggi</div>
+         <div class="home-dash-card-list">${oggi.slice(0, 4).map(p => `${esc(p.nome)} · ${esc(p.ora)}`).join(', ')}</div>`
+      : `<div class="home-dash-card-title">Prenotazioni di oggi</div>
+         <div class="home-dash-card-list">Nessuna prenotazione</div>`;
+  } else {
+    el.innerHTML = '';
+  }
 }
 
 // ── TEMA ─────────────────────────────────────────────────────────────────
@@ -2956,7 +3159,8 @@ function navTo(page) {
 
   window.scrollTo({ top: 0, behavior: 'smooth' });
 
-  if (page === 'home')        { animHomeCards(); }
+  if (page === 'home') { animHomeCards(); _setHomePage(1, false); }
+  else                 { document.body.classList.remove('home-p1'); }
   if (page === 'carico')     resetCaricoWizard();
   if (page === 'giacenze')   { updateFornitoriFilter(); renderGiacenze(); _setGiacPage(0, false); }
   if (page === 'alert')      renderAlerts();
@@ -3662,6 +3866,79 @@ function _initGiacSwipe() {
   viewport.addEventListener('touchcancel', endDrag);
 
   window.addEventListener('resize', () => _setGiacPage(S.giacPageIdx, false));
+}
+
+// ── HOME — SWIPE PAGES ───────────────────────────────────────────────────
+function _setHomePage(idx, animate = true) {
+  const viewport = document.getElementById('home-swipe-viewport');
+  const track    = document.getElementById('home-swipe-track');
+  if (!viewport || !track) return;
+  const pages  = track.querySelectorAll('.home-swipe-page');
+  const maxIdx = pages.length - 1;
+  idx = Math.max(0, Math.min(maxIdx, idx));
+  S.homePageIdx = idx;
+  track.style.transition = animate ? '' : 'none';
+  track.style.transform  = `translateX(${-idx * viewport.offsetWidth}px)`;
+  if (!animate) track.offsetHeight; // forza il reflow prima di riabilitare la transizione
+  track.style.transition = '';
+  document.querySelectorAll('#home-dots .home-dot').forEach((d, i) => d.classList.toggle('active', i === idx));
+  document.body.classList.toggle('home-p1', pages.length > 1 && idx === 0);
+  if (idx === 0 && pages.length > 1) renderHomeDashboard();
+}
+
+function _initHomeSwipe() {
+  const viewport = document.getElementById('home-swipe-viewport');
+  const track    = document.getElementById('home-swipe-track');
+  if (!viewport || !track || viewport.dataset.swipeInit) return;
+  viewport.dataset.swipeInit = '1';
+  if (track.querySelectorAll('.home-swipe-page').length < 2) return; // utente staff: nessuna dashboard da swipare
+
+  let startX = 0, startY = 0, startTranslate = 0, dragging = false, horizontal = null;
+
+  viewport.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1) return;
+    startX         = e.touches[0].clientX;
+    startY         = e.touches[0].clientY;
+    startTranslate = -S.homePageIdx * viewport.offsetWidth;
+    dragging       = true;
+    horizontal     = null;
+    track.style.transition = 'none';
+  }, { passive: true });
+
+  viewport.addEventListener('touchmove', e => {
+    if (!dragging) return;
+    const dx = e.touches[0].clientX - startX;
+    const dy = e.touches[0].clientY - startY;
+    if (horizontal === null) {
+      if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+      horizontal = Math.abs(dx) > Math.abs(dy);
+      if (!horizontal) { dragging = false; return; } // scroll verticale nativo
+    }
+    if (!horizontal) return;
+    e.preventDefault();
+    const w = viewport.offsetWidth;
+    let next = startTranslate + dx;
+    const min = -w, max = 0;
+    if (next > max) next = max + (next - max) * 0.35;   // resistenza ai bordi
+    if (next < min) next = min + (next - min) * 0.35;
+    track.style.transform = `translateX(${next}px)`;
+  }, { passive: false });
+
+  const endDrag = e => {
+    if (!dragging) return;
+    dragging = false;
+    if (!horizontal) return;
+    const w  = viewport.offsetWidth;
+    const cx = e.changedTouches ? e.changedTouches[0].clientX : startX;
+    const dx = cx - startX;
+    let idx  = S.homePageIdx;
+    if (Math.abs(dx) > w * 0.18) idx += dx < 0 ? 1 : -1;
+    _setHomePage(idx);
+  };
+  viewport.addEventListener('touchend', endDrag);
+  viewport.addEventListener('touchcancel', endDrag);
+
+  window.addEventListener('resize', () => _setHomePage(S.homePageIdx, false));
 }
 
 // ── ALERTS ───────────────────────────────────────────────────────────────

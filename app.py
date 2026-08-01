@@ -31,7 +31,7 @@ from database import (
     get_all_users, update_user_role, delete_user,
     approva_utente, rifiuta_utente, update_user_controllo_permesso,
     create_reset_token, get_reset_token, use_reset_token, update_user_password,
-    update_user_profile, update_user_reparto, update_user_tema, is_username_taken,
+    update_user_profile, update_user_reparto, update_user_tema, update_user_home_card, is_username_taken,
     get_lista_spesa, add_lista_spesa_item, update_lista_spesa_completato,
     update_lista_spesa_fornitore, delete_lista_spesa_item, clear_lista_spesa,
     get_lista_spesa_item_by_id,
@@ -89,6 +89,7 @@ class User(UserMixin):
         self.gestisce_apparecchi = bool(data.get('gestisce_apparecchi'))
         self.tema     = data.get('tema') or 'chiaro'
         self.stato    = data.get('stato') or 'attivo'
+        self.home_card = data.get('home_card') or 'preparazioni'
         self.puo_vedere_controllo = bool(data.get('puo_vedere_controllo'))
         self.puo_eliminare_carichi_raw = bool(data.get('puo_eliminare_carichi'))
 
@@ -388,6 +389,9 @@ def profile():
         cur_pw   =  request.form.get('current_password') or ''
         new_pw   =  request.form.get('new_password')     or ''
         new_pw2  =  request.form.get('new_password2')    or ''
+        home_card = (request.form.get('home_card') or 'preparazioni').strip()
+        if home_card not in ('nessuna', 'preparazioni', 'apparecchi', 'prenotazioni'):
+            home_card = 'preparazioni'
 
         uid      = int(current_user.id)
         is_admin = current_user.role == 'admin'
@@ -411,6 +415,7 @@ def profile():
                 update_user_profile(uid, nome, username)
                 if is_admin:
                     update_user_reparto(uid, (request.form.get('reparto') or '').strip())
+                update_user_home_card(uid, home_card)
                 update_user_password(uid, generate_password_hash(new_pw, method='pbkdf2:sha256'))
                 success = 'Profilo e password aggiornati con successo'
                 user = get_user_by_id(uid)
@@ -418,6 +423,7 @@ def profile():
             update_user_profile(uid, nome, username)
             if is_admin:
                 update_user_reparto(uid, (request.form.get('reparto') or '').strip())
+            update_user_home_card(uid, home_card)
             success = 'Profilo aggiornato con successo'
             user = get_user_by_id(uid)
 

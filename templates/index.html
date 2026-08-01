@@ -303,9 +303,9 @@ main {
 .hcard-spesa-lbl { font-size: 12px; color: var(--muted); }
 
 /* ─── HOME — SWIPE PAGES ────────────────────────────────────────────────── */
-#page-home.page { padding: 0; max-width: none; height: 100dvh; overflow: hidden; }
+#page-home.page { padding: 0; max-width: none; }
 .home-switcher {
-  position: absolute; left: 50%; transform: translateX(-50%);
+  position: fixed; left: 50%; transform: translateX(-50%);
   bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 160;
   display: flex; gap: 4px; padding: 4px;
   background: rgba(10,30,45,.72);
@@ -320,27 +320,38 @@ main {
   color: rgba(255,255,255,.65); transition: background .2s ease, color .2s ease;
 }
 .home-switcher-btn.active { background: #00BCD4; color: #ffffff; box-shadow: 0 4px 14px rgba(0,188,212,.45); }
-.home-swipe-viewport { overflow-x: hidden; height: 100%; }
+.home-swipe-viewport { overflow-x: hidden; }
 .home-swipe-track {
-  display: flex; align-items: flex-start; height: 100%;
+  display: flex; align-items: flex-start;
   will-change: transform;
   transition: transform .32s cubic-bezier(.22,.61,.36,1);
 }
-.home-swipe-page { flex: 0 0 100%; width: 100%; min-width: 100%; height: 100%; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-.home-actions { padding: 24px 16px 40px; max-width: 600px; margin: 0 auto; }
+.home-swipe-page { flex: 0 0 100%; width: 100%; min-width: 100%; }
+.home-actions { padding: 24px 16px 90px; max-width: 600px; margin: 0 auto; }
 
+/* Pagina 1 (Dashboard): altezza vincolata allo schermo, niente scroll di
+   documento — scroll interno solo se il contenuto lo richiede davvero.
+   Pagina 2 (Azioni rapide) resta invece ad altezza naturale con lo
+   scroll di documento normale (nessuna di queste regole si applica). */
 body.home-p1 header { display: none; }
 body.home-p1 main   { margin-top: 0; height: 100dvh; overflow: hidden; }
+body.home-p1 .home-swipe-viewport,
+body.home-p1 .home-swipe-track { height: 100%; }
+body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 
 /* ─── HOME — DASHBOARD (Pagina 1) ───────────────────────────────────────── */
 .home-dash {
   position: relative; box-sizing: border-box;
   min-height: 100%;
+  /* sfondo "fotografico" sfumato (nebbia/foschia teal) + overlay chiaro
+     semi-trasparente sopra, come nell'immagine di riferimento */
   background:
-    radial-gradient(ellipse 130% 55% at 15% -5%, rgba(0,229,255,.5), transparent 55%),
-    radial-gradient(ellipse 110% 65% at 100% 10%, rgba(0,150,199,.45), transparent 55%),
-    radial-gradient(ellipse 140% 70% at 50% 115%, rgba(0,60,90,.7), transparent 60%),
-    linear-gradient(160deg, #061e2e 0%, #0a3348 45%, #072436 100%);
+    linear-gradient(rgba(255,255,255,.16), rgba(255,255,255,.16)),
+    radial-gradient(circle at 78% 12%, rgba(255,201,140,.32), transparent 40%),
+    radial-gradient(ellipse 130% 55% at 10% -8%, rgba(255,255,255,.35), transparent 50%),
+    radial-gradient(ellipse 120% 70% at 100% 15%, rgba(120,195,210,.5), transparent 55%),
+    radial-gradient(ellipse 150% 80% at 50% 118%, rgba(15,60,75,.6), transparent 62%),
+    linear-gradient(165deg, #71a0b0 0%, #3f7688 42%, #1c4b58 100%);
   padding: calc(28px + env(safe-area-inset-top)) 20px calc(110px + env(safe-area-inset-bottom, 0px));
 }
 .home-dash-greeting { margin-bottom: 24px; }

@@ -116,6 +116,8 @@ body {
 :root[data-theme="dark"] .log-row,
 :root[data-theme="dark"] .fpill,
 :root[data-theme="dark"] .fselect-pill,
+:root[data-theme="dark"] .tutorial-menu-card,
+:root[data-theme="dark"] .tutorial-step-icon,
 :root[data-theme="dark"] .toast:not(.success):not(.error) {
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
@@ -1501,7 +1503,6 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
 }
 .btn-help:active { opacity: .8; }
 
-body.help-mode { background: #0f1f3d; }
 .help-back-bar {
   display: flex; align-items: center; gap: 8px;
   margin-bottom: 20px; cursor: pointer;
@@ -1510,27 +1511,89 @@ body.help-mode { background: #0f1f3d; }
 .help-back-bar:active { opacity: .6; }
 .help-back-arrow {
   width: 32px; height: 32px; border-radius: 10px;
-  background: rgba(255,255,255,.12);
+  background: var(--surface-2);
   display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0; color: #ffffff;
+  flex-shrink: 0; color: var(--text);
 }
-.help-title { font-size: 22px; font-weight: 700; color: #ffffff; margin-bottom: 22px; }
-.help-card {
-  display: flex; gap: 14px;
-  background: rgba(255,255,255,.06);
-  border: 1px solid rgba(255,255,255,.12);
-  border-radius: 16px;
-  padding: 16px;
-  margin-bottom: 12px;
+.help-title { font-size: 22px; font-weight: 700; color: var(--text); margin-bottom: 22px; }
+
+/* ─── TUTORIAL — Livello 1: menu sezioni ─────────────────────────────────── */
+.tutorial-menu.hidden { display: none; }
+.tutorial-menu-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.tutorial-menu-card {
+  display: flex; flex-direction: column; align-items: flex-start; gap: 12px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px; padding: 16px;
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition: transform .15s ease;
 }
-.help-card-icon {
-  width: 40px; height: 40px; border-radius: 12px;
-  background: rgba(255,255,255,.1);
+.tutorial-menu-card:active { transform: scale(.96); }
+.tutorial-menu-icon {
+  width: 44px; height: 44px; border-radius: 12px;
+  background: var(--surface-2);
   display: flex; align-items: center; justify-content: center;
-  color: #ffffff; flex-shrink: 0;
+  color: var(--text); flex-shrink: 0;
 }
-.help-card-title { font-size: 15px; font-weight: 700; color: #ffffff; margin-bottom: 4px; }
-.help-card-text { font-size: 13.5px; line-height: 1.5; color: rgba(255,255,255,.75); }
+.tutorial-menu-icon svg { width: 24px; height: 24px; }
+.tutorial-menu-icon img { width: 26px; height: 26px; border-radius: 6px; }
+.tutorial-menu-icon.emoji { font-size: 22px; }
+.tutorial-menu-label { font-size: 14px; font-weight: 700; color: var(--text); line-height: 1.3; }
+
+/* ─── TUTORIAL — Livello 2: sezione con swipe tra i passi ────────────────── */
+.tutorial-section { display: none; }
+.tutorial-section.open { display: block; }
+.tutorial-back-bar {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 22px; cursor: pointer; width: fit-content;
+}
+.tutorial-back-bar:active { opacity: .6; }
+.tutorial-back-label { font-size: 15px; font-weight: 600; color: var(--text); }
+
+.tutorial-dots { display: flex; justify-content: center; align-items: center; gap: 8px; margin-bottom: 20px; }
+.tutorial-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--border-2);
+  transition: background .25s ease, transform .25s ease;
+}
+.tutorial-dot.active { background: var(--blue); transform: scale(1.3); }
+
+.tutorial-swipe-viewport { overflow-x: hidden; }
+.tutorial-swipe-track {
+  display: flex; align-items: flex-start;
+  will-change: transform;
+  transition: transform .32s cubic-bezier(.22,.61,.36,1);
+}
+.tutorial-swipe-page {
+  flex: 0 0 100%; width: 100%; min-width: 100%;
+  display: flex; flex-direction: column; align-items: center; text-align: center;
+  padding: 10px 14px 20px;
+}
+.tutorial-step-icon {
+  width: 88px; height: 88px; border-radius: 24px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: var(--shadow);
+  display: flex; align-items: center; justify-content: center;
+  color: var(--text); margin-bottom: 22px; flex-shrink: 0;
+}
+.tutorial-step-icon svg { width: 42px; height: 42px; }
+.tutorial-step-icon img { width: 68px; height: 68px; border-radius: 16px; }
+.tutorial-step-icon.emoji { font-size: 42px; }
+.tutorial-step-title { font-size: 19px; font-weight: 700; color: var(--text); margin-bottom: 10px; line-height: 1.3; padding: 0 8px; }
+.tutorial-step-text { font-size: 14.5px; line-height: 1.55; color: var(--muted); max-width: 320px; }
+
+.tutorial-nav { display: flex; align-items: center; justify-content: space-between; margin-top: 20px; gap: 10px; }
+.tutorial-nav-btn {
+  font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 600;
+  border: none; cursor: pointer; padding: 13px 20px; border-radius: 100px;
+}
+.tutorial-nav-skip { background: none; color: var(--muted); }
+.tutorial-nav-prev { background: var(--surface-2); color: var(--text); visibility: hidden; }
+.tutorial-nav-prev.show { visibility: visible; }
+.tutorial-nav-next { background: #10b981; color: #fff; font-weight: 700; margin-left: auto; box-shadow: 0 4px 14px rgba(16,185,129,.3); }
+.tutorial-nav-next:active { background: #0ea271; }
 </style>
 </head>
 <body class="home-active">
@@ -1901,98 +1964,78 @@ body.help-mode { background: #0f1f3d; }
 
   <!-- COME USARE BRIGADE -->
   <section class="page" id="page-help">
-    <div class="help-back-bar" onclick="navTo('home')">
-      <div class="help-back-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
-    </div>
-    <div class="help-title">Come usare Brigade</div>
 
-    <div class="help-card">
-      <div class="help-card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg></div>
-      <div>
-        <div class="help-card-title">Carico</div>
-        <div class="help-card-text">Usa questa funzione quando arriva la merce dal fornitore. Seleziona il reparto, scegli il prodotto, inserisci il numero di lotto, la data di scadenza e la quantità ricevuta. Puoi usare la fotocamera per leggere automaticamente lotto e scadenza dall'etichetta.</div>
+    <!-- LIVELLO 1: menu principale del tutorial -->
+    <div class="tutorial-menu" id="tutorial-menu">
+      <div class="help-back-bar" onclick="navTo('home')">
+        <div class="help-back-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+      </div>
+      <div class="help-title">Come usare Brigade</div>
+
+      <div class="tutorial-menu-grid">
+        <div class="tutorial-menu-card" onclick="openTutorialSection('benvenuto')">
+          <div class="tutorial-menu-icon"><img src="/static/icon.svg" alt=""></div>
+          <div class="tutorial-menu-label">Benvenuto</div>
+        </div>
+        <div class="tutorial-menu-card" onclick="openTutorialSection('carico')">
+          <div class="tutorial-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg></div>
+          <div class="tutorial-menu-label">Carico</div>
+        </div>
+        <div class="tutorial-menu-card" onclick="openTutorialSection('in-uso')">
+          <div class="tutorial-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></div>
+          <div class="tutorial-menu-label">In uso</div>
+        </div>
+        <div class="tutorial-menu-card" onclick="openTutorialSection('scarico')">
+          <div class="tutorial-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg></div>
+          <div class="tutorial-menu-label">Scarico</div>
+        </div>
+        <div class="tutorial-menu-card" onclick="openTutorialSection('giacenze')">
+          <div class="tutorial-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg></div>
+          <div class="tutorial-menu-label">Giacenze</div>
+        </div>
+        <div class="tutorial-menu-card" onclick="openTutorialSection('alert')">
+          <div class="tutorial-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
+          <div class="tutorial-menu-label">Alert</div>
+        </div>
+        <div class="tutorial-menu-card" onclick="openTutorialSection('temperature')">
+          <div class="tutorial-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/></svg></div>
+          <div class="tutorial-menu-label">Temperature</div>
+        </div>
+        <div class="tutorial-menu-card" onclick="openTutorialSection('preparazioni')">
+          <div class="tutorial-menu-icon emoji">🍲</div>
+          <div class="tutorial-menu-label">Preparazioni</div>
+        </div>
+        <div class="tutorial-menu-card" onclick="openTutorialSection('lista-spesa')">
+          <div class="tutorial-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></div>
+          <div class="tutorial-menu-label">Lista Spesa</div>
+        </div>
+        <div class="tutorial-menu-card" onclick="openTutorialSection('google-sheets')">
+          <div class="tutorial-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg></div>
+          <div class="tutorial-menu-label">Google Sheets</div>
+        </div>
       </div>
     </div>
 
-    <div class="help-card">
-      <div class="help-card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></div>
-      <div>
-        <div class="help-card-title">In uso</div>
-        <div class="help-card-text">Usa questa funzione quando prelevi un prodotto dal magazzino per portarlo in cucina. La quantità viene scalata dalla giacenza. Quando il prodotto finisce, vai in Giacenze, tab "In uso", e tocca "Scarica" sul prodotto per inserire la quantità utilizzata.</div>
+    <!-- LIVELLO 2: sezione con swipe tra i passi -->
+    <div class="tutorial-section" id="tutorial-section">
+      <div class="tutorial-back-bar" onclick="closeTutorialSection()">
+        <div class="help-back-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+        <span class="tutorial-back-label">Torna al menu</span>
+      </div>
+
+      <div class="tutorial-dots" id="tutorial-dots"></div>
+
+      <div class="tutorial-swipe-viewport" id="tutorial-swipe-viewport">
+        <div class="tutorial-swipe-track" id="tutorial-swipe-track"></div>
+      </div>
+
+      <div class="tutorial-nav">
+        <button type="button" class="tutorial-nav-btn tutorial-nav-skip" onclick="closeTutorialSection()">Salta</button>
+        <button type="button" class="tutorial-nav-btn tutorial-nav-prev" id="tutorial-btn-prev" onclick="tutorialStep(-1)">Indietro</button>
+        <button type="button" class="tutorial-nav-btn tutorial-nav-next" id="tutorial-btn-next" onclick="tutorialStep(1)">Avanti</button>
       </div>
     </div>
 
-    <div class="help-card">
-      <div class="help-card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg></div>
-      <div>
-        <div class="help-card-title">Giacenze</div>
-        <div class="help-card-text">Visualizza tutto il magazzino in tempo reale. Filtra per reparto e categoria. I prodotti in scadenza sono evidenziati in rosso o giallo.</div>
-      </div>
-    </div>
-
-    <div class="help-card">
-      <div class="help-card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/></svg></div>
-      <div>
-        <div class="help-card-title">Temperature</div>
-        <div class="help-card-text">Registra le temperature di frigoriferi e congelatori due volte al giorno (mattina e sera). Se la temperatura è fuori dalla soglia consentita apparirà un avviso rosso e sarà obbligatorio inserire una nota. Tutte le rilevazioni vengono salvate automaticamente nel tuo Google Sheets nel foglio TEMPERATURE.</div>
-      </div>
-    </div>
-
-    <div class="help-card">
-      <div class="help-card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
-      <div>
-        <div class="help-card-title">Alert</div>
-        <div class="help-card-text">Mostra i prodotti in scadenza entro 7 giorni e quelli sotto la scorta minima. Puoi aggiungere direttamente i prodotti alla Lista Spesa toccando il carrello.</div>
-      </div>
-    </div>
-
-    <div class="help-card">
-      <div class="help-card-icon" style="font-size:20px;line-height:1">🍲</div>
-      <div>
-        <div class="help-card-title">Preparazioni</div>
-        <div class="help-card-text">Registra i piatti preparati in anticipo tracciando tutti gli ingredienti usati con i relativi lotti. Genera l'etichetta con data di preparazione e scadenza.</div>
-      </div>
-    </div>
-
-    <div class="help-card">
-      <div class="help-card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg></div>
-      <div>
-        <div class="help-card-title">Lista Spesa</div>
-        <div class="help-card-text">Raccoglie i prodotti da ordinare. Puoi aggiungere prodotti manualmente o dagli Alert. Quando ordini un prodotto spuntalo — sparirà automaticamente dopo 5 secondi.</div>
-      </div>
-    </div>
-
-    <div class="help-card">
-      <div class="help-card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/></svg></div>
-      <div>
-        <div class="help-card-title">Nuovo prodotto</div>
-        <div class="help-card-text">Quando ricevi un prodotto non ancora nel listino, usa questo pulsante nel form Carico. Inserisci nome, fornitore, unità di misura, scorta minima, categoria e reparto. Il prodotto viene aggiunto automaticamente al tuo Google Sheets.</div>
-      </div>
-    </div>
-
-    <div class="help-card">
-      <div class="help-card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>
-      <div>
-        <div class="help-card-title">Profilo</div>
-        <div class="help-card-text">Accedi al tuo profilo dal menu in alto a destra. Puoi modificare il tuo nome, cognome e password.</div>
-      </div>
-    </div>
-
-    <div class="help-card">
-      <div class="help-card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg></div>
-      <div>
-        <div class="help-card-title">Google Sheets</div>
-        <div class="help-card-text">Tutti i movimenti vengono registrati automaticamente nel tuo foglio Google in tempo reale. Il foglio REGISTRO contiene la tracciabilità completa per i controlli HACCP.</div>
-      </div>
-    </div>
-
-    <div class="help-card">
-      <div class="help-card-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg></div>
-      <div>
-        <div class="help-card-title">Sincronizza</div>
-        <div class="help-card-text">Aggiorna i dati dal tuo Google Sheets. Premi il pulsante in alto a destra. Fallo ogni volta che modifichi il listino direttamente dal foglio.</div>
-      </div>
-    </div>
   </section>
 
   <!-- TEMPERATURE -->
@@ -3077,6 +3120,7 @@ body.help-mode { background: #0f1f3d; }
 const REPARTI = ['cucina', 'sala', 'pizzeria'];
 const CAN_DELETE_CARICHI = {{ 'true' if current_user.is_authenticated and current_user.puo_eliminare_carichi else 'false' }};
 const CAN_GESTIRE_SALA = {{ 'true' if current_user.is_authenticated and current_user.puo_gestire_sala else 'false' }};
+const TUTORIAL_VISTO = {{ 'true' if current_user.is_authenticated and current_user.tutorial_visto else 'false' }};
 const DASH_CARDS_INITIAL = [
   '{{ current_user.dash_card1 if current_user.is_authenticated else "alert" }}',
   '{{ current_user.dash_card2 if current_user.is_authenticated else "temperature" }}',
@@ -3184,6 +3228,13 @@ async function init() {
   await Promise.all([loadCategorie(), loadProdottiCarico(), loadGiacenze(), loadAlerts(), loadListaSpesa(), loadInUso(), loadApparecchi(), loadStoricoTemperature(), loadLocks()]);
   setInterval(loadLocks, 20000);
   renderInUsoProdotti();
+
+  // Al primo login apri automaticamente il tutorial (menu principale) e
+  // segna subito come visto, così non si ripresenta ai login successivi.
+  if (!TUTORIAL_VISTO) {
+    navTo('help');
+    api('/api/tutorial-visto', { method: 'POST' });
+  }
 }
 
 function setHdrDate() {
@@ -3466,7 +3517,6 @@ function closeDrawer() {
 function navTo(page) {
   closeDrawer();
   S.activePage = page;
-  document.body.classList.toggle('help-mode', page === 'help');
 
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   const pg = document.getElementById(`page-${page}`);
@@ -3490,6 +3540,7 @@ function navTo(page) {
   if (page === 'preparazioni') loadPreparazioni();
   if (page === 'prenotazioni') loadPrenotazioni();
   if (page === 'gestione-sala') loadGestioneSala();
+  if (page === 'help')      closeTutorialSection(); // riparti sempre dal menu principale del tutorial
 }
 // alias for backward compat
 
@@ -4259,6 +4310,236 @@ function _initHomeSwipe() {
   viewport.addEventListener('touchcancel', endDrag);
 
   window.addEventListener('resize', () => _setHomePage(S.homePageIdx, false));
+}
+
+// ── TUTORIAL ("?") ───────────────────────────────────────────────────────
+// Icone riusate identiche a quelle già presenti in Home/hcard, per coerenza visiva.
+const TUT_ICO_CARICO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>';
+const TUT_ICO_INUSO   = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>';
+const TUT_ICO_SCARICO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><polyline points="19 12 12 19 5 12"/></svg>';
+const TUT_ICO_GIACENZE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>';
+const TUT_ICO_ALERT   = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
+const TUT_ICO_TEMP    = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/></svg>';
+const TUT_ICO_SPESA   = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>';
+const TUT_ICO_SHEETS  = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>';
+
+const TUTORIAL_SECTIONS = [
+  {
+    id: 'benvenuto', icon: 'img',
+    steps: [
+      { icon: 'img', title: 'Benvenuto in Brigade!',
+        text: 'Brigade è il tuo assistente HACCP digitale. Ti aiuta a tracciare ogni prodotto dal fornitore alla cucina, registrare le temperature e gestire il magazzino in modo semplice e conforme alla normativa.' },
+    ],
+  },
+  {
+    id: 'carico', icon: TUT_ICO_CARICO,
+    steps: [
+      { icon: TUT_ICO_CARICO, title: 'Apri Carico', text: 'Quando arriva la merce dal fornitore, apri Carico dalla home' },
+      { icon: TUT_ICO_CARICO, title: 'Cerca o scansiona', text: "Cerca il prodotto scrivendo le prime lettere oppure scansiona l'etichetta con la fotocamera" },
+      { icon: TUT_ICO_CARICO, title: 'Lettura automatica AI', text: 'La fotocamera AI legge automaticamente lotto e scadenza dall\'etichetta' },
+      { icon: TUT_ICO_CARICO, title: 'Inserisci la quantità', text: 'Inserisci la quantità ricevuta usando i pulsanti + e -' },
+      { icon: TUT_ICO_CARICO, title: 'Conferma e genera etichetta', text: "Controlla il riepilogo e tocca Conferma — l'etichetta HACCP viene generata automaticamente" },
+      { icon: TUT_ICO_CARICO, title: 'Prodotto non in listino?', text: 'Se il prodotto non è nel listino, usa il pulsante + per aggiungerlo' },
+    ],
+  },
+  {
+    id: 'in-uso', icon: TUT_ICO_INUSO,
+    steps: [
+      { icon: TUT_ICO_INUSO, title: 'Preleva dal magazzino', text: 'Quando prelevi un prodotto dal magazzino per usarlo in cucina, usa In uso' },
+      { icon: TUT_ICO_INUSO, title: 'Scegli prodotto e lotto', text: 'Seleziona il prodotto e il lotto — Brigade mostra solo i lotti disponibili' },
+      { icon: TUT_ICO_INUSO, title: 'Indica la quantità', text: 'Inserisci la quantità che stai prelevando' },
+      { icon: TUT_ICO_INUSO, title: 'Aggiornamento automatico', text: 'Il prodotto passa da Magazzino a In uso nelle Giacenze' },
+    ],
+  },
+  {
+    id: 'scarico', icon: TUT_ICO_SCARICO,
+    steps: [
+      { icon: TUT_ICO_SCARICO, title: 'Prodotto finito?', text: 'Quando un prodotto è completamente finito, vai in Giacenze → tab In uso' },
+      { icon: TUT_ICO_SCARICO, title: 'Tocca Scarica', text: 'Trova il prodotto e tocca Scarica' },
+      { icon: TUT_ICO_SCARICO, title: 'Anche parziale', text: 'Inserisci la quantità consumata — puoi scaricare anche solo una parte' },
+      { icon: TUT_ICO_SCARICO, title: 'Tutto tracciato', text: 'Il movimento viene registrato nel REGISTRO Google Sheets automaticamente' },
+    ],
+  },
+  {
+    id: 'giacenze', icon: TUT_ICO_GIACENZE,
+    steps: [
+      { icon: TUT_ICO_GIACENZE, title: 'Magazzino in tempo reale', text: 'In Giacenze trovi tutto il tuo magazzino in tempo reale' },
+      { icon: TUT_ICO_GIACENZE, title: 'Magazzino e In uso', text: 'Swipe verso sinistra per vedere i prodotti In uso, verso destra per il Magazzino' },
+      { icon: TUT_ICO_GIACENZE, title: 'Badge colorati', text: 'I badge colorati indicano lo stato: verde=OK, giallo=in scadenza, rosso=scaduto' },
+      { icon: TUT_ICO_GIACENZE, title: 'Etichetta stampabile', text: "Tocca un prodotto per vedere l'etichetta stampabile con prodotto, lotto e scadenza" },
+      { icon: TUT_ICO_GIACENZE, title: 'Filtra per trovare subito', text: 'Usa i filtri Reparto e Categoria per trovare subito quello che cerchi' },
+    ],
+  },
+  {
+    id: 'alert', icon: TUT_ICO_ALERT,
+    steps: [
+      { icon: TUT_ICO_ALERT, title: 'Scadenze sotto controllo', text: 'Brigade ti avvisa automaticamente quando un prodotto scade entro 7 giorni' },
+      { icon: TUT_ICO_ALERT, title: 'Scorte minime', text: 'Ti avvisa anche quando le scorte scendono sotto il minimo impostato nel listino' },
+      { icon: TUT_ICO_ALERT, title: 'Aggiungi alla lista spesa', text: 'Tocca il carrello su un prodotto per aggiungerlo direttamente alla Lista Spesa' },
+      { icon: TUT_ICO_ALERT, title: 'Filtra gli alert', text: 'Usa i filtri per vedere gli alert per reparto o categoria' },
+    ],
+  },
+  {
+    id: 'temperature', icon: TUT_ICO_TEMP,
+    steps: [
+      { icon: TUT_ICO_TEMP, title: 'Promemoria automatico', text: 'Ogni giorno alle 08:00 e alle 21:00 Brigade ti ricorda di controllare le temperature' },
+      { icon: TUT_ICO_TEMP, title: 'Da controllare', text: 'Gli apparecchi mostrano DA CONTROLLARE finché non registri la temperatura' },
+      { icon: TUT_ICO_TEMP, title: 'Registra il valore', text: 'Tocca Registra temperatura, inserisci il valore rilevato e conferma' },
+      { icon: TUT_ICO_TEMP, title: 'Fuori soglia', text: 'Se la temperatura è fuori range appare FUORI SOGLIA e devi inserire una nota obbligatoria' },
+      { icon: TUT_ICO_TEMP, title: 'Storico su Google Sheets', text: 'Tutte le rilevazioni vengono salvate nel foglio TEMPERATURE di Google Sheets' },
+      { icon: TUT_ICO_TEMP, title: 'Hai sbagliato?', text: 'Swipe verso sinistra su una rilevazione per eliminarla se hai sbagliato' },
+    ],
+  },
+  {
+    id: 'preparazioni', icon: '🍲',
+    steps: [
+      { icon: '🍲', title: 'Prepari in anticipo?', text: 'Quando prepari un piatto in anticipo, registralo in Preparazioni' },
+      { icon: '🍲', title: 'Nome, data, scadenza', text: 'Inserisci il nome della preparazione, la data e la scadenza' },
+      { icon: '🍲', title: 'Ingredienti e lotti', text: 'Aggiungi gli ingredienti usati con i relativi lotti — Brigade scala automaticamente le giacenze' },
+      { icon: '🍲', title: 'Etichetta preparazione', text: "Genera l'etichetta con nome preparazione, data e lista ingredienti" },
+      { icon: '🍲', title: 'Preparazione finita', text: 'Quando la preparazione è finita, tocca Finita per registrare lo scarico definitivo' },
+    ],
+  },
+  {
+    id: 'lista-spesa', icon: TUT_ICO_SPESA,
+    steps: [
+      { icon: TUT_ICO_SPESA, title: 'Aggiungi prodotti', text: 'Aggiungi i prodotti da ordinare manualmente o direttamente dagli Alert' },
+      { icon: TUT_ICO_SPESA, title: 'Reparto, fornitore, prodotto', text: 'Scegli reparto, fornitore e prodotto — oppure scrivi direttamente il nome' },
+      { icon: TUT_ICO_SPESA, title: 'Filtra per fornitore', text: 'Filtra per fornitore per vedere solo i prodotti da ordinare a quel fornitore' },
+      { icon: TUT_ICO_SPESA, title: 'Copia e invia su WhatsApp', text: 'Tocca Copia ordine per copiare la lista e incollarla su WhatsApp' },
+      { icon: TUT_ICO_SPESA, title: 'Spunta quando ordini', text: 'Spunta un prodotto quando lo ordini — sparisce automaticamente dopo 5 secondi' },
+    ],
+  },
+  {
+    id: 'google-sheets', icon: TUT_ICO_SHEETS,
+    steps: [
+      { icon: TUT_ICO_SHEETS, title: 'Tutto sincronizzato', text: 'Tutti i movimenti vengono salvati automaticamente nel tuo Google Sheets' },
+      { icon: TUT_ICO_SHEETS, title: 'Foglio REGISTRO', text: 'Il foglio REGISTRO contiene ogni carico, scarico e movimento con lotto e operatore' },
+      { icon: TUT_ICO_SHEETS, title: 'Foglio TEMPERATURE', text: 'Il foglio TEMPERATURE contiene tutte le rilevazioni con stato OK o FUORI SOGLIA' },
+      { icon: TUT_ICO_SHEETS, title: 'Sincronizza manualmente', text: 'Tocca Sincronizza in alto per aggiornare i dati dal listino Google Sheets' },
+      { icon: TUT_ICO_SHEETS, title: 'Pronto per un controllo', text: 'In caso di controllo ASL/NAS hai tutto tracciato e disponibile' },
+    ],
+  },
+];
+
+let _tutStepIdx = 0;
+
+function _tutIconHtml(icon) {
+  if (icon === 'img') return '<img src="/static/icon.svg" alt="Brigade">';
+  if (icon.startsWith('<svg')) return icon;
+  return esc(icon); // emoji
+}
+function _tutIconClass(icon) {
+  return (icon !== 'img' && !icon.startsWith('<svg')) ? ' emoji' : '';
+}
+
+function openTutorialSection(id) {
+  const sec = TUTORIAL_SECTIONS.find(s => s.id === id);
+  if (!sec) return;
+
+  const track = document.getElementById('tutorial-swipe-track');
+  track.innerHTML = sec.steps.map(st => `
+    <div class="tutorial-swipe-page">
+      <div class="tutorial-step-icon${_tutIconClass(st.icon)}">${_tutIconHtml(st.icon)}</div>
+      <div class="tutorial-step-title">${esc(st.title)}</div>
+      <div class="tutorial-step-text">${esc(st.text)}</div>
+    </div>`).join('');
+
+  document.getElementById('tutorial-dots').innerHTML =
+    sec.steps.map((_, i) => `<span class="tutorial-dot${i === 0 ? ' active' : ''}"></span>`).join('');
+
+  document.getElementById('tutorial-menu').classList.add('hidden');
+  document.getElementById('tutorial-section').classList.add('open');
+
+  _initTutorialSwipe();
+  _setTutorialStep(0, false);
+}
+
+function closeTutorialSection() {
+  document.getElementById('tutorial-section').classList.remove('open');
+  document.getElementById('tutorial-menu').classList.remove('hidden');
+}
+
+function _setTutorialStep(idx, animate = true) {
+  const viewport = document.getElementById('tutorial-swipe-viewport');
+  const track    = document.getElementById('tutorial-swipe-track');
+  if (!viewport || !track) return;
+  const pages  = track.querySelectorAll('.tutorial-swipe-page');
+  const maxIdx = pages.length - 1;
+  if (maxIdx < 0) return;
+  idx = Math.max(0, Math.min(maxIdx, idx));
+  _tutStepIdx = idx;
+  track.style.transition = animate ? '' : 'none';
+  track.style.transform  = `translateX(${-idx * viewport.offsetWidth}px)`;
+  if (!animate) track.offsetHeight; // forza il reflow prima di riabilitare la transizione
+  track.style.transition = '';
+  document.querySelectorAll('#tutorial-dots .tutorial-dot').forEach((d, i) => d.classList.toggle('active', i === idx));
+  document.getElementById('tutorial-btn-prev').classList.toggle('show', idx > 0);
+  document.getElementById('tutorial-btn-next').textContent = idx === maxIdx ? 'Fine' : 'Avanti';
+}
+
+function tutorialStep(delta) {
+  const track  = document.getElementById('tutorial-swipe-track');
+  const maxIdx = track.querySelectorAll('.tutorial-swipe-page').length - 1;
+  if (delta > 0 && _tutStepIdx >= maxIdx) { closeTutorialSection(); return; }
+  _setTutorialStep(_tutStepIdx + delta);
+}
+
+function _initTutorialSwipe() {
+  const viewport = document.getElementById('tutorial-swipe-viewport');
+  const track    = document.getElementById('tutorial-swipe-track');
+  if (!viewport || !track || viewport.dataset.swipeInit) return;
+  viewport.dataset.swipeInit = '1';
+
+  let startX = 0, startY = 0, startTranslate = 0, dragging = false, horizontal = null;
+
+  viewport.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1) return;
+    startX         = e.touches[0].clientX;
+    startY         = e.touches[0].clientY;
+    startTranslate = -_tutStepIdx * viewport.offsetWidth;
+    dragging       = true;
+    horizontal     = null;
+    track.style.transition = 'none';
+  }, { passive: true });
+
+  viewport.addEventListener('touchmove', e => {
+    if (!dragging) return;
+    const dx = e.touches[0].clientX - startX;
+    const dy = e.touches[0].clientY - startY;
+    if (horizontal === null) {
+      if (Math.abs(dx) < 6 && Math.abs(dy) < 6) return;
+      horizontal = Math.abs(dx) > Math.abs(dy);
+      if (!horizontal) { dragging = false; return; } // scroll verticale nativo
+    }
+    if (!horizontal) return;
+    e.preventDefault();
+    const w      = viewport.offsetWidth;
+    const maxIdx = track.querySelectorAll('.tutorial-swipe-page').length - 1;
+    let next = startTranslate + dx;
+    const min = -maxIdx * w, max = 0;
+    if (next > max) next = max + (next - max) * 0.35;   // resistenza ai bordi
+    if (next < min) next = min + (next - min) * 0.35;
+    track.style.transform = `translateX(${next}px)`;
+  }, { passive: false });
+
+  const endDrag = e => {
+    if (!dragging) return;
+    dragging = false;
+    if (!horizontal) return;
+    const w  = viewport.offsetWidth;
+    const cx = e.changedTouches ? e.changedTouches[0].clientX : startX;
+    const dx = cx - startX;
+    let idx  = _tutStepIdx;
+    if (Math.abs(dx) > w * 0.18) idx += dx < 0 ? 1 : -1;
+    _setTutorialStep(idx);
+  };
+  viewport.addEventListener('touchend', endDrag);
+  viewport.addEventListener('touchcancel', endDrag);
+
+  window.addEventListener('resize', () => {
+    if (document.getElementById('tutorial-section').classList.contains('open')) _setTutorialStep(_tutStepIdx, false);
+  });
 }
 
 // ── ALERTS ───────────────────────────────────────────────────────────────

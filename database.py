@@ -385,6 +385,7 @@ def db_init():
         ('users',        'dash_card1', "TEXT NOT NULL DEFAULT 'alert'"),
         ('users',        'dash_card2', "TEXT NOT NULL DEFAULT 'temperature'"),
         ('users',        'dash_card3', "TEXT NOT NULL DEFAULT 'scadenza'"),
+        ('users',        'tutorial_visto', "INTEGER NOT NULL DEFAULT 0"),
     ]
     for table, col, defn in migrations:
         if _USE_PG:
@@ -1110,6 +1111,13 @@ def update_user_dash_cards(user_id, card1, card2, card3):
         conn.execute(
             "UPDATE users SET dash_card1 = ?, dash_card2 = ?, dash_card3 = ? WHERE id = ?",
             (card1, card2, card3, user_id)
+        )
+
+
+def update_user_tutorial_visto(user_id):
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE users SET tutorial_visto = 1 WHERE id = ?", (user_id,)
         )
 
 

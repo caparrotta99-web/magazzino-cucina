@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="{{ '#1c4b58' if (current_user.is_authenticated and current_user.tema == 'scuro') else '#ffffff' }}">
+<meta name="theme-color" content="{{ '#0f2c35' if (current_user.is_authenticated and current_user.tema == 'scuro') else '#ffffff' }}">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Brigade — HACCP</title>
@@ -60,12 +60,12 @@ body {
   --text:      #f5f5f7;
   --muted:     rgba(255,255,255,.68);
   --muted-2:   rgba(255,255,255,.46);
-  --border:    rgba(255,255,255,.18);
-  --border-2:  rgba(255,255,255,.28);
-  --bg:        #1c4b58;
-  --card:      rgba(255,255,255,.10);
-  --surface-2: rgba(255,255,255,.14);
-  --surface-3: rgba(255,255,255,.08);
+  --border:    rgba(255,255,255,.20);
+  --border-2:  rgba(255,255,255,.30);
+  --bg:        #0f2c35;
+  --card:      rgba(255,255,255,.16);
+  --surface-2: rgba(255,255,255,.20);
+  --surface-3: rgba(255,255,255,.13);
   --shadow:     0 2px 20px rgba(0,0,0,.5), 0 1px 2px rgba(0,0,0,.4);
   --shadow-lg:  0 10px 40px rgba(0,0,0,.6), 0 2px 8px rgba(0,0,0,.5);
   --glass-blur: blur(24px) saturate(160%);
@@ -82,12 +82,12 @@ body {
   display: block; position: fixed; inset: 0; z-index: 0;
   pointer-events: none;
   background:
-    linear-gradient(rgba(255,255,255,.16), rgba(255,255,255,.16)),
-    radial-gradient(circle at 78% 12%, rgba(255,201,140,.32), transparent 40%),
-    radial-gradient(ellipse 130% 55% at 10% -8%, rgba(255,255,255,.35), transparent 50%),
-    radial-gradient(ellipse 120% 70% at 100% 15%, rgba(120,195,210,.5), transparent 55%),
-    radial-gradient(ellipse 150% 80% at 50% 118%, rgba(15,60,75,.6), transparent 62%),
-    linear-gradient(165deg, #71a0b0 0%, #3f7688 42%, #1c4b58 100%);
+    linear-gradient(rgba(255,255,255,.08), rgba(255,255,255,.08)),
+    radial-gradient(circle at 78% 12%, rgba(255,201,140,.20), transparent 40%),
+    radial-gradient(ellipse 130% 55% at 10% -8%, rgba(255,255,255,.20), transparent 50%),
+    radial-gradient(ellipse 120% 70% at 100% 15%, rgba(120,195,210,.34), transparent 55%),
+    radial-gradient(ellipse 150% 80% at 50% 118%, rgba(8,35,42,.78), transparent 62%),
+    linear-gradient(165deg, #3d5f6c 0%, #28505c 42%, #0f2c35 100%);
 }
 
 /* Glass: card semi-trasparenti con blur, solo tema scuro — coprono ogni
@@ -393,6 +393,18 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
     linear-gradient(165deg, #71a0b0 0%, #3f7688 42%, #1c4b58 100%);
   padding: calc(28px + env(safe-area-inset-top)) 20px calc(110px + env(safe-area-inset-bottom, 0px));
 }
+/* In tema scuro la Dashboard usa una variante più scura e profonda dello
+   stesso gradiente, identica a quella del resto dell'app (.aurora-bg);
+   il tema chiaro mantiene invece il gradiente originale, invariato. */
+:root[data-theme="dark"] .home-dash {
+  background:
+    linear-gradient(rgba(255,255,255,.08), rgba(255,255,255,.08)),
+    radial-gradient(circle at 78% 12%, rgba(255,201,140,.20), transparent 40%),
+    radial-gradient(ellipse 130% 55% at 10% -8%, rgba(255,255,255,.20), transparent 50%),
+    radial-gradient(ellipse 120% 70% at 100% 15%, rgba(120,195,210,.34), transparent 55%),
+    radial-gradient(ellipse 150% 80% at 50% 118%, rgba(8,35,42,.78), transparent 62%),
+    linear-gradient(165deg, #3d5f6c 0%, #28505c 42%, #0f2c35 100%);
+}
 .home-dash-greeting { margin-bottom: 24px; }
 .home-dash-hello { font-size: 32px; font-weight: 800; color: #ffffff; line-height: 1.15; letter-spacing: -.3px; }
 .home-dash-datetime { font-size: 13px; color: rgba(255,255,255,.6); margin-top: 6px; }
@@ -465,6 +477,7 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
 .home-dash-card-title { font-size: 14px; font-weight: 700; color: #ffffff; }
 .home-dash-card-num { font-size: 20px; font-weight: 800; color: #00e5ff; }
 .home-dash-card-list { margin-top: 8px; font-size: 12px; color: rgba(255,255,255,.7); }
+:root[data-theme="dark"] .home-dash-card { background: rgba(255,255,255,.16); }
 .home-dash-pdf-btn {
   width: 100%; height: 48px; margin-bottom: 14px;
   background: rgba(0,188,212,.18);
@@ -1321,7 +1334,7 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
   box-shadow: var(--shadow-lg); max-height: 260px; overflow-y: auto;
   z-index: 50; display: none;
 }
-:root[data-theme="dark"] .spesa-search-dropdown { background: #16323b; border-color: var(--border); }
+:root[data-theme="dark"] .spesa-search-dropdown { background: #0d232a; border-color: var(--border); }
 .spesa-search-dropdown.open { display: block; }
 .spesa-search-item {
   padding: 12px 14px; cursor: pointer;
@@ -3430,7 +3443,7 @@ async function toggleTema() {
   document.querySelectorAll('.js-theme-icon-off').forEach(el => el.style.display = nuovo === 'dark' ? 'block' : 'none');
 
   const metaTheme = document.querySelector('meta[name="theme-color"]');
-  if (metaTheme) metaTheme.setAttribute('content', nuovo === 'dark' ? '#1c4b58' : '#ffffff');
+  if (metaTheme) metaTheme.setAttribute('content', nuovo === 'dark' ? '#0f2c35' : '#ffffff');
 
   await api('/api/tema', { method: 'POST', body: { tema: nuovo === 'dark' ? 'scuro' : 'chiaro' } });
 }

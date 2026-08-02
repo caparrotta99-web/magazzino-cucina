@@ -294,13 +294,13 @@ main {
 }
 .home-group-label:first-child { margin-top: 4px; }
 .home-grid {
-  display: grid; grid-template-columns: 1fr 1fr;
-  gap: 13px; padding-top: 4px;
+  display: grid; grid-template-columns: repeat(3, 1fr);
+  gap: 9px; padding-top: 4px;
 }
 .hcard {
-  border-radius: 20px; padding: 20px 16px 18px;
-  cursor: pointer; display: flex; flex-direction: column; gap: 14px;
-  min-height: 140px; position: relative; overflow: hidden;
+  border-radius: 16px; padding: 14px 10px 12px;
+  cursor: pointer; display: flex; flex-direction: column; gap: 8px;
+  min-height: 104px; position: relative; overflow: hidden;
   background: var(--card);
   border: none;
   box-shadow: var(--shadow);
@@ -313,10 +313,11 @@ main {
 .hcard:active  { scale: .96; box-shadow: 0 1px 4px rgba(0,0,0,.06); }
 
 .hcard-icon {
-  width: 44px; height: 44px; border-radius: 12px;
+  width: 32px; height: 32px; border-radius: 9px;
   display: flex; align-items: center; justify-content: center; flex-shrink: 0;
   color: #ffffff;
 }
+.hcard-icon svg { width: 18px; height: 18px; }
 .hcard-carico   .hcard-icon { background: var(--green); }
 .hcard-in-uso   .hcard-icon { background: var(--orange); }
 .hcard-giacenze .hcard-icon { background: var(--blue); }
@@ -325,14 +326,19 @@ main {
 .hcard-preparazioni .hcard-icon { background: var(--amber); }
 .hcard-prenotazioni .hcard-icon { background: var(--violet); }
 .hcard-gestione-sala .hcard-icon { background: var(--teal); }
+/* Lista Spesa resta la card "hero", più grande delle altre 3 per riga */
 .hcard-spesa {
   background: var(--card);
   border: none;
   box-shadow: var(--shadow);
   color: var(--text);
   grid-column: 1 / -1;
+  padding: 20px 16px 18px; min-height: 140px; gap: 14px;
 }
-.hcard-spesa .hcard-icon { background: var(--violet); }
+.hcard-spesa .hcard-icon { background: var(--violet); width: 44px; height: 44px; border-radius: 12px; }
+.hcard-spesa .hcard-icon svg { width: 22px; height: 22px; }
+.hcard-spesa .hcard-label { font-size: 16px; }
+.hcard-spesa .hcard-sub   { font-size: 12px; }
 .hcard-spesa-num {
   font-size: 38px; font-weight: 700; color: var(--text);
   line-height: 1; margin-bottom: 2px;
@@ -497,13 +503,13 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
   display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer;
 }
 .home-dash-pdf-btn:active { background: rgba(0,188,212,.3); }
-.hcard-label { font-size: 16px; font-weight: 700; line-height: 1.2; color: var(--text); }
-.hcard-sub   { font-size: 12px; color: var(--muted); margin-top: 1px; }
+.hcard-label { font-size: 13px; font-weight: 700; line-height: 1.25; color: var(--text); }
+.hcard-sub   { font-size: 10.5px; color: var(--muted); margin-top: 1px; line-height: 1.3; }
 .hcard-alert-num {
-  font-size: 38px; font-weight: 700; color: var(--orange);
+  font-size: 26px; font-weight: 700; color: var(--orange);
   line-height: 1; margin-bottom: 2px;
 }
-.hcard-alert-lbl { font-size: 12px; color: var(--muted); }
+.hcard-alert-lbl { font-size: 10.5px; color: var(--muted); }
 
 /* ─── BACK BAR ──────────────────────────────────────────────────────────── */
 .back-bar {
@@ -622,7 +628,8 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
 @keyframes bannerIn  { from { opacity:0; transform:translateY(-8px) scale(.97); } to { opacity:1; transform:none; } }
 @keyframes bannerOut { from { opacity:1; transform:none; } to { opacity:0; transform:translateY(-6px) scale(.97); } }
 
-.scan-banner-icon { font-size: 18px; flex-shrink: 0; }
+.scan-banner-icon { flex-shrink: 0; color: var(--action); display: flex; }
+.scan-banner-icon svg { width: 18px; height: 18px; }
 .scan-banner-text { flex: 1; }
 .scan-banner-title { font-size: 13px; font-weight: 600; color: var(--action); }
 .scan-banner-bar-wrap {
@@ -1494,8 +1501,8 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
 /* ─── RESPONSIVE ────────────────────────────────────────────────────────── */
 @media (min-width: 600px) {
   .page { padding: 32px 24px 72px; }
-  .home-grid { gap: 16px; }
-  .hcard { padding: 26px 20px 22px; min-height: 152px; }
+  .home-grid { gap: 12px; }
+  .hcard { padding: 16px 12px 14px; min-height: 116px; }
 }
 
 /* ─── AIUTO ("?") ───────────────────────────────────────────────────────── */
@@ -1700,7 +1707,7 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
     </button>
 
     <button class="drw-item" data-page="preparazioni" onclick="navTo('preparazioni')">
-      <span style="font-size:17px;line-height:1;width:17px;text-align:center">🍲</span>
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 11h14l-1.2 7.2a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8L5 11Z"/><path d="M7 11a5 5 0 0 1 10 0"/><path d="M12 3v3"/><path d="M8.5 3.8l1 2.6"/><path d="M15.5 3.8l-1 2.6"/></svg>
       <span class="lbl">Preparazioni</span>
     </button>
 
@@ -1888,7 +1895,9 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
               </div>
 
               <div class="hcard hcard-in-uso" onclick="navTo('in-uso')">
-                <div class="hcard-icon" style="font-size:22px;line-height:1">🔄</div>
+                <div class="hcard-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg>
+                </div>
                 <div>
                   <div class="hcard-label">In uso</div>
                   <div class="hcard-sub">Preleva dal magazzino</div>
@@ -1931,7 +1940,9 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
               </div>
 
               <div class="hcard hcard-preparazioni" onclick="navTo('preparazioni')">
-                <div class="hcard-icon" style="font-size:22px;line-height:1">🍲</div>
+                <div class="hcard-icon">
+                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 11h14l-1.2 7.2a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8L5 11Z"/><path d="M7 11a5 5 0 0 1 10 0"/><path d="M12 3v3"/><path d="M8.5 3.8l1 2.6"/><path d="M15.5 3.8l-1 2.6"/></svg>
+                </div>
                 <div>
                   <div class="hcard-label">Preparazioni</div>
                   <div class="hcard-sub">Piatti preparati</div>
@@ -2015,7 +2026,7 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
           <div class="tutorial-menu-label">Temperature</div>
         </div>
         <div class="tutorial-menu-card" onclick="openTutorialSection('preparazioni')">
-          <div class="tutorial-menu-icon emoji">🍲</div>
+          <div class="tutorial-menu-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 11h14l-1.2 7.2a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8L5 11Z"/><path d="M7 11a5 5 0 0 1 10 0"/><path d="M12 3v3"/><path d="M8.5 3.8l1 2.6"/><path d="M15.5 3.8l-1 2.6"/></svg></div>
           <div class="tutorial-menu-label">Preparazioni</div>
         </div>
         <div class="tutorial-menu-card" onclick="openTutorialSection('lista-spesa')">
@@ -2191,7 +2202,7 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
       <div class="spesa-or-divider">oppure</div>
 
       <div class="scan-banner" id="scan-banner">
-        <div class="scan-banner-icon">🔍</div>
+        <div class="scan-banner-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></div>
         <div class="scan-banner-text">
           <div class="scan-banner-title">Lettura etichetta con AI...</div>
           <div class="scan-banner-bar-wrap"><div class="scan-banner-bar"></div></div>
@@ -4333,6 +4344,7 @@ const TUT_ICO_SCARICO = '<svg viewBox="0 0 24 24" fill="none" stroke="currentCol
 const TUT_ICO_GIACENZE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>';
 const TUT_ICO_ALERT   = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>';
 const TUT_ICO_TEMP    = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/></svg>';
+const TUT_ICO_PREP    = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 11h14l-1.2 7.2a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8L5 11Z"/><path d="M7 11a5 5 0 0 1 10 0"/><path d="M12 3v3"/><path d="M8.5 3.8l1 2.6"/><path d="M15.5 3.8l-1 2.6"/></svg>';
 const TUT_ICO_SPESA   = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>';
 const TUT_ICO_SHEETS  = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>';
 
@@ -4404,13 +4416,13 @@ const TUTORIAL_SECTIONS = [
     ],
   },
   {
-    id: 'preparazioni', icon: '🍲',
+    id: 'preparazioni', icon: TUT_ICO_PREP,
     steps: [
-      { icon: '🍲', title: 'Prepari in anticipo?', text: 'Quando prepari un piatto in anticipo, registralo in Preparazioni' },
-      { icon: '🍲', title: 'Nome, data, scadenza', text: 'Inserisci il nome della preparazione, la data e la scadenza' },
-      { icon: '🍲', title: 'Ingredienti e lotti', text: 'Aggiungi gli ingredienti usati con i relativi lotti — Brigade scala automaticamente le giacenze' },
-      { icon: '🍲', title: 'Etichetta preparazione', text: "Genera l'etichetta con nome preparazione, data e lista ingredienti" },
-      { icon: '🍲', title: 'Preparazione finita', text: 'Quando la preparazione è finita, tocca Finita per registrare lo scarico definitivo' },
+      { icon: TUT_ICO_PREP, title: 'Prepari in anticipo?', text: 'Quando prepari un piatto in anticipo, registralo in Preparazioni' },
+      { icon: TUT_ICO_PREP, title: 'Nome, data, scadenza', text: 'Inserisci il nome della preparazione, la data e la scadenza' },
+      { icon: TUT_ICO_PREP, title: 'Ingredienti e lotti', text: 'Aggiungi gli ingredienti usati con i relativi lotti — Brigade scala automaticamente le giacenze' },
+      { icon: TUT_ICO_PREP, title: 'Etichetta preparazione', text: "Genera l'etichetta con nome preparazione, data e lista ingredienti" },
+      { icon: TUT_ICO_PREP, title: 'Preparazione finita', text: 'Quando la preparazione è finita, tocca Finita per registrare lo scarico definitivo' },
     ],
   },
   {
@@ -5143,7 +5155,7 @@ function renderListaSpesa() {
     container.innerHTML = `
       <div class="empty-state">
         <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
-        <p>Lista vuota — aggiungi prodotti manualmente o tramite il bottone 🛒 nella pagina Alert</p>
+        <p>Lista vuota — aggiungi prodotti manualmente o tramite il bottone carrello nella pagina Alert</p>
       </div>`;
     return;
   }

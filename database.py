@@ -335,6 +335,26 @@ def db_init():
                 creato_il      TEXT NOT NULL,
                 scade_il       TEXT NOT NULL
             )""",
+            f"""CREATE TABLE IF NOT EXISTS chat_messaggi (
+                id           {pk},
+                canale       TEXT NOT NULL DEFAULT 'generale',
+                utente_id    INTEGER NOT NULL,
+                utente_nome  TEXT NOT NULL DEFAULT '',
+                testo        TEXT NOT NULL DEFAULT '',
+                foto         TEXT NOT NULL DEFAULT '',
+                modificato   INTEGER NOT NULL DEFAULT 0,
+                eliminato    INTEGER NOT NULL DEFAULT 0,
+                creato_il    TEXT NOT NULL DEFAULT ''
+            )""",
+            f"""CREATE TABLE IF NOT EXISTS log_chat_messaggi (
+                id               {pk},
+                azione           TEXT NOT NULL DEFAULT '',
+                canale           TEXT NOT NULL DEFAULT '',
+                autore_originale TEXT NOT NULL DEFAULT '',
+                testo_originale  TEXT NOT NULL DEFAULT '',
+                operatore        TEXT NOT NULL DEFAULT '',
+                quando           TEXT NOT NULL DEFAULT ''
+            )""",
             "CREATE INDEX IF NOT EXISTS idx_reg_prod_lotto ON registro(prodotto, lotto)",
             "CREATE INDEX IF NOT EXISTS idx_reg_prod_lotto_tipo ON registro(prodotto, lotto, tipo)",
             "CREATE INDEX IF NOT EXISTS idx_reg_data       ON registro(data)",
@@ -347,6 +367,7 @@ def db_init():
             "CREATE INDEX IF NOT EXISTS idx_combi_tavolo   ON combinazioni_tavoli(tavolo_id)",
             "CREATE INDEX IF NOT EXISTS idx_lock_prod_lotto  ON lock_movimenti(prodotto, lotto)",
             "CREATE INDEX IF NOT EXISTS idx_lock_apparecchio ON lock_movimenti(apparecchio_id)",
+            "CREATE INDEX IF NOT EXISTS idx_chat_canale ON chat_messaggi(canale)",
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email    ON users(email)",
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_telefono ON users(telefono)",
         ]:
@@ -386,6 +407,8 @@ def db_init():
         ('users',        'dash_card2', "TEXT NOT NULL DEFAULT 'temperature'"),
         ('users',        'dash_card3', "TEXT NOT NULL DEFAULT 'scadenza'"),
         ('users',        'tutorial_visto', "INTEGER NOT NULL DEFAULT 0"),
+        ('users',        'puo_chat', "INTEGER NOT NULL DEFAULT 0"),
+        ('users',        'chat_last_seen', "TEXT NOT NULL DEFAULT ''"),
     ]
     for table, col, defn in migrations:
         if _USE_PG:
@@ -951,7 +974,7 @@ def get_all_users():
     with get_conn() as conn:
         cur = conn.execute(
             "SELECT id, nome, email, telefono, reparto, role, gestisce_apparecchi, "
-            "stato, puo_vedere_controllo, puo_eliminare_carichi FROM users ORDER BY "
+            "stato, puo_vedere_controllo, puo_eliminare_carichi, puo_chat FROM users ORDER BY "
             "CASE WHEN stato = 'in_attesa' THEN 0 ELSE 1 END, nome"
         )
         return _rows(cur)
@@ -1119,6 +1142,112 @@ def update_user_tutorial_visto(user_id):
         conn.execute(
             "UPDATE users SET tutorial_visto = 1 WHERE id = ?", (user_id,)
         )
+
+
+# ─── CHAT ──────────────────────────────────────────────────────────────────
+CHAT_CANALI = ('generale', 'cucina', 'sala', 'pizzeria')
+
+
+def update_user_chat_permesso(user_id, permesso):
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE users SET puo_chat = ? WHERE id = ?", (1 if permesso else 0, user_id)
+        )
+
+
+def update_user_chat_last_seen(user_id):
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE users SET chat_last_seen = ? WHERE id = ?", (now_it().isoformat(), user_id)
+        )
+
+
+def get_chat_messaggi(canale, limit=100):
+    """Ultimi `limit` messaggi di un canale, in ordine cronologico crescente."""
+    with get_conn() as conn:
+        cur = conn.execute(
+            "SELECT * FROM chat_messaggi WHERE canale = ? ORDER BY id DESC LIMIT ?",
+            (canale, limit)
+        )
+        rows = _rows(cur)
+        rows.reverse()
+        return rows
+
+
+def get_chat_preview(limit=4):
+    """Ultimi messaggi non eliminati su tutti i canali, per l'anteprima in dashboard."""
+    with get_conn() as conn:
+        cur = conn.execute(
+            "SELECT * FROM chat_messaggi WHERE eliminato = 0 ORDER BY id DESC LIMIT ?",
+            (limit,)
+        )
+        rows = _rows(cur)
+        rows.reverse()
+        return rows
+
+
+def get_chat_messaggio_by_id(msg_id):
+    with get_conn() as conn:
+        cur = conn.execute("SELECT * FROM chat_messaggi WHERE id = ?", (msg_id,))
+        return _row(cur)
+
+
+def insert_chat_messaggio(canale, utente_id, utente_nome, testo, foto=''):
+    with get_conn() as conn:
+        return conn.execute_insert(
+            "INSERT INTO chat_messaggi (canale, utente_id, utente_nome, testo, foto, creato_il) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (canale, utente_id, utente_nome, testo, foto, now_it().isoformat())
+        )
+
+
+def update_chat_messaggio(msg_id, testo):
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE chat_messaggi SET testo = ?, modificato = 1 WHERE id = ?",
+            (testo, msg_id)
+        )
+
+
+def elimina_chat_messaggio(msg_id):
+    with get_conn() as conn:
+        conn.execute("UPDATE chat_messaggi SET eliminato = 1 WHERE id = ?", (msg_id,))
+
+
+def get_chat_unread_count(user_id, last_seen):
+    """Messaggi di altri utenti arrivati dopo l'ultima visita alla chat."""
+    with get_conn() as conn:
+        if last_seen:
+            cur = conn.execute(
+                "SELECT COUNT(*) AS c FROM chat_messaggi "
+                "WHERE eliminato = 0 AND utente_id != ? AND creato_il > ?",
+                (user_id, last_seen)
+            )
+        else:
+            cur = conn.execute(
+                "SELECT COUNT(*) AS c FROM chat_messaggi WHERE eliminato = 0 AND utente_id != ?",
+                (user_id,)
+            )
+        row = _row(cur)
+        return row['c'] if row else 0
+
+
+def log_chat_azione(azione, canale, autore_originale, testo_originale, operatore):
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO log_chat_messaggi "
+            "(azione, canale, autore_originale, testo_originale, operatore, quando) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (azione, canale, autore_originale, testo_originale, operatore, now_it().isoformat())
+        )
+
+
+def get_log_chat_messaggi(limit=200):
+    with get_conn() as conn:
+        cur = conn.execute(
+            "SELECT * FROM log_chat_messaggi ORDER BY id DESC LIMIT ?", (limit,)
+        )
+        return _rows(cur)
 
 
 def get_ultimo_carico():

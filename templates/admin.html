@@ -154,6 +154,7 @@
             {% if u.role == 'staff' and u.gestisce_apparecchi %}<span class="badge badge-reparto">Gestisce apparecchi</span>{% endif %}
             {% if u.role == 'staff' and u.puo_vedere_controllo %}<span class="badge badge-controllo">Accesso Controllo</span>{% endif %}
             {% if u.role == 'staff' and u.puo_eliminare_carichi %}<span class="badge badge-controllo">Elimina carichi</span>{% endif %}
+            {% if u.role == 'staff' and u.puo_chat %}<span class="badge badge-controllo">Chat</span>{% endif %}
           </div>
         </div>
       </div>
@@ -215,6 +216,17 @@
             <input type="hidden" name="permesso" value="{{ '0' if u.puo_eliminare_carichi else '1' }}">
             <button type="submit" class="btn-action">
               {% if u.puo_eliminare_carichi %}✕ Revoca permesso{% else %}+ Abilita permesso{% endif %}
+            </button>
+          </form>
+        </div>
+
+        <div class="settings-row">
+          <span class="settings-label">Accesso Chat</span>
+          <form method="post" action="/admin/chat-permesso">
+            <input type="hidden" name="user_id" value="{{ u.id }}">
+            <input type="hidden" name="permesso" value="{{ '0' if u.puo_chat else '1' }}">
+            <button type="submit" class="btn-action">
+              {% if u.puo_chat %}✕ Revoca accesso{% else %}+ Abilita accesso{% endif %}
             </button>
           </form>
         </div>

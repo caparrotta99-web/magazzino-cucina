@@ -3,6 +3,8 @@ import re
 import json
 import random
 import string
+import base64
+import uuid
 import threading
 from datetime import datetime, timedelta
 from functools import wraps
@@ -33,6 +35,10 @@ from database import (
     create_reset_token, get_reset_token, use_reset_token, update_user_password,
     update_user_profile, update_user_reparto, update_user_tema, update_user_home_card, is_username_taken,
     update_user_dash_cards, get_ultimo_carico, update_user_tutorial_visto,
+    CHAT_CANALI, update_user_chat_permesso, update_user_chat_last_seen,
+    get_chat_messaggi, get_chat_preview, get_chat_messaggio_by_id, insert_chat_messaggio,
+    update_chat_messaggio, elimina_chat_messaggio, get_chat_unread_count,
+    log_chat_azione, get_log_chat_messaggi,
     get_lista_spesa, add_lista_spesa_item, update_lista_spesa_completato,
     update_lista_spesa_fornitore, delete_lista_spesa_item, clear_lista_spesa,
     get_lista_spesa_item_by_id,
@@ -97,6 +103,8 @@ class User(UserMixin):
         self.tutorial_visto = bool(data.get('tutorial_visto'))
         self.puo_vedere_controllo = bool(data.get('puo_vedere_controllo'))
         self.puo_eliminare_carichi_raw = bool(data.get('puo_eliminare_carichi'))
+        self.puo_chat_raw = bool(data.get('puo_chat'))
+        self.chat_last_seen = data.get('chat_last_seen') or ''
 
     @property
     def puo_gestire_apparecchi(self):
@@ -113,6 +121,10 @@ class User(UserMixin):
     @property
     def puo_gestire_sala(self):
         return self.role == 'admin' or self.reparto == 'Sala'
+
+    @property
+    def puo_accedere_chat(self):
+        return self.role == 'admin' or self.puo_chat_raw
 
 
 @login_manager.user_loader
@@ -168,6 +180,15 @@ def gestione_sala_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
         if not current_user.is_authenticated or not current_user.puo_gestire_sala:
+            abort(403)
+        return f(*args, **kwargs)
+    return decorated
+
+
+def chat_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not current_user.is_authenticated or not current_user.puo_accedere_chat:
             abort(403)
         return f(*args, **kwargs)
     return decorated
@@ -502,6 +523,18 @@ def admin_set_eliminazione_carichi_permesso():
     if not user_id:
         abort(400)
     update_user_eliminazione_carichi_permesso(user_id, permesso)
+    return redirect(url_for('admin_page'))
+
+
+@app.route('/admin/chat-permesso', methods=['POST'])
+@login_required
+@admin_required
+def admin_set_chat_permesso():
+    user_id  = request.form.get('user_id', type=int)
+    permesso = request.form.get('permesso') == '1'
+    if not user_id:
+        abort(400)
+    update_user_chat_permesso(user_id, permesso)
     return redirect(url_for('admin_page'))
 
 
@@ -1979,6 +2012,115 @@ def api_locks_release():
 @login_required
 def api_locks_list():
     return jsonify({'success': True, 'locks': get_locks_attivi()})
+
+
+# ─── CHAT ─────────────────────────────────────────────────────────────────────
+CHAT_UPLOAD_DIR = os.path.join(app.root_path, 'static', 'chat_uploads')
+
+
+def _salva_foto_chat(foto_b64):
+    """Decodifica un'immagine base64 (eventualmente con prefisso data URL) e la
+    salva su disco, restituendo l'URL relativo da salvare nel messaggio."""
+    if not foto_b64:
+        return ''
+    if ',' in foto_b64:
+        foto_b64 = foto_b64.split(',', 1)[1]
+    os.makedirs(CHAT_UPLOAD_DIR, exist_ok=True)
+    nome_file = f"{uuid.uuid4().hex}.jpg"
+    with open(os.path.join(CHAT_UPLOAD_DIR, nome_file), 'wb') as f:
+        f.write(base64.b64decode(foto_b64))
+    return f"/static/chat_uploads/{nome_file}"
+
+
+@app.route('/api/chat')
+@login_required
+@chat_required
+def api_chat_list():
+    canale = (request.args.get('canale') or 'generale').strip()
+    if canale not in CHAT_CANALI:
+        return jsonify({'success': False, 'error': 'Canale non valido'}), 400
+    return jsonify({'success': True, 'messaggi': get_chat_messaggi(canale)})
+
+
+@app.route('/api/chat', methods=['POST'])
+@login_required
+@chat_required
+def api_chat_invia():
+    d      = request.get_json(force=True)
+    canale = (d.get('canale') or 'generale').strip()
+    testo  = (d.get('testo') or '').strip()
+    foto_b64 = d.get('foto') or ''
+    if canale not in CHAT_CANALI:
+        return jsonify({'success': False, 'error': 'Canale non valido'}), 400
+    if not testo and not foto_b64:
+        return jsonify({'success': False, 'error': 'Messaggio vuoto'}), 400
+
+    foto_url = _salva_foto_chat(foto_b64)
+    msg_id = insert_chat_messaggio(canale, int(current_user.id), current_user.nome, testo, foto_url)
+    return jsonify({'success': True, 'id': msg_id})
+
+
+@app.route('/api/chat/<int:msg_id>', methods=['PUT'])
+@login_required
+@chat_required
+def api_chat_modifica(msg_id):
+    msg = get_chat_messaggio_by_id(msg_id)
+    if not msg or msg['eliminato']:
+        return jsonify({'success': False, 'error': 'Messaggio non trovato'}), 404
+    if msg['utente_id'] != int(current_user.id) and current_user.role != 'admin':
+        return jsonify({'success': False, 'error': 'Non autorizzato'}), 403
+
+    testo = (request.get_json(force=True).get('testo') or '').strip()
+    if not testo:
+        return jsonify({'success': False, 'error': 'Testo vuoto'}), 400
+
+    log_chat_azione('modificato', msg['canale'], msg['utente_nome'], msg['testo'], current_user.nome)
+    update_chat_messaggio(msg_id, testo)
+    return jsonify({'success': True})
+
+
+@app.route('/api/chat/<int:msg_id>', methods=['DELETE'])
+@login_required
+@chat_required
+def api_chat_elimina(msg_id):
+    msg = get_chat_messaggio_by_id(msg_id)
+    if not msg or msg['eliminato']:
+        return jsonify({'success': False, 'error': 'Messaggio non trovato'}), 404
+    if msg['utente_id'] != int(current_user.id) and current_user.role != 'admin':
+        return jsonify({'success': False, 'error': 'Non autorizzato'}), 403
+
+    log_chat_azione('eliminato', msg['canale'], msg['utente_nome'], msg['testo'], current_user.nome)
+    elimina_chat_messaggio(msg_id)
+    return jsonify({'success': True})
+
+
+@app.route('/api/chat/preview')
+@login_required
+@chat_required
+def api_chat_preview():
+    return jsonify({'success': True, 'messaggi': get_chat_preview()})
+
+
+@app.route('/api/chat/unread-count')
+@login_required
+@chat_required
+def api_chat_unread_count():
+    return jsonify({'success': True, 'count': get_chat_unread_count(int(current_user.id), current_user.chat_last_seen)})
+
+
+@app.route('/api/chat/letto', methods=['POST'])
+@login_required
+@chat_required
+def api_chat_letto():
+    update_user_chat_last_seen(int(current_user.id))
+    return jsonify({'success': True})
+
+
+@app.route('/api/controllo/log-chat')
+@login_required
+@controllo_required
+def api_controllo_log_chat():
+    return jsonify({'success': True, 'log': get_log_chat_messaggi()})
 
 
 if __name__ == '__main__':

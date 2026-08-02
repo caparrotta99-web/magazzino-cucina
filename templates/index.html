@@ -437,64 +437,48 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
 .home-dash-greeting { margin-bottom: 24px; }
 .home-dash-hello { font-size: 32px; font-weight: 800; color: #ffffff; line-height: 1.15; letter-spacing: -.3px; }
 .home-dash-datetime { font-size: 13px; color: rgba(255,255,255,.6); margin-top: 6px; }
-.home-dash-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 16px; }
 
-/* ─── DASH STAT CARD — personalizzabile (tap prolungato) ───────────────── */
-.dash-stat-card {
-  position: relative; overflow: hidden;
-  border-radius: 18px; padding: 16px 10px 13px;
-  text-align: center; cursor: pointer;
-  border: 1px solid rgba(255,255,255,.18);
-  box-shadow: 0 8px 20px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.15);
+/* ─── METEO VIGEVANO ──────────────────────────────────────────────────────── */
+.home-dash-meteo {
+  display: flex; align-items: center; gap: 14px;
+  background: rgba(255,255,255,.10);
   backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%);
-  -webkit-user-select: none; user-select: none; touch-action: manipulation; -webkit-tap-highlight-color: transparent;
-  transition: transform .15s ease, box-shadow .15s ease;
+  border: 1px solid rgba(255,255,255,.18); border-radius: 18px;
+  box-shadow: 0 8px 20px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.15);
+  padding: 14px 16px; margin-bottom: 14px;
 }
-.dash-stat-card.pressing { transform: scale(.93); box-shadow: 0 4px 12px rgba(0,0,0,.24); }
-.dash-stat-icon {
-  width: 30px; height: 30px; margin: 0 auto 8px;
-  display: flex; align-items: center; justify-content: center;
-  filter: drop-shadow(0 2px 5px rgba(0,0,0,.28));
-}
-.dash-stat-icon svg { width: 100%; height: 100%; display: block; }
-.dash-stat-value {
-  font-size: 25px; font-weight: 800; line-height: 1.05; color: #fff;
-  min-height: 1.05em;
-}
-.dash-stat-card.is-text .dash-stat-value {
-  font-size: 13.5px; font-weight: 700;
-  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-}
-.dash-stat-label {
-  font-size: 10.5px; color: rgba(255,255,255,.72); margin-top: 6px; line-height: 1.3;
-}
+.home-dash-meteo-icon { width: 38px; height: 38px; flex-shrink: 0; color: #fff; }
+.home-dash-meteo-icon svg { width: 100%; height: 100%; }
+.home-dash-meteo-temp { font-size: 24px; font-weight: 800; color: #fff; line-height: 1; }
+.home-dash-meteo-info { min-width: 0; }
+.home-dash-meteo-cond { font-size: 13px; color: rgba(255,255,255,.85); font-weight: 600; }
+.home-dash-meteo-loc  { font-size: 11px; color: rgba(255,255,255,.6); margin-top: 2px; }
 
-/* Gradient dinamico in base al tipo di dato scelto per la card */
-.dash-grad-red    { background: linear-gradient(155deg, rgba(248,113,113,.55), rgba(239,68,68,.16)); }
-.dash-grad-orange { background: linear-gradient(155deg, rgba(251,146,60,.55),  rgba(249,115,22,.16)); }
-.dash-grad-amber  { background: linear-gradient(155deg, rgba(250,204,21,.5),   rgba(180,83,9,.18)); }
-.dash-grad-green  { background: linear-gradient(155deg, rgba(74,222,128,.5),   rgba(22,163,74,.18)); }
-.dash-grad-blue   { background: linear-gradient(155deg, rgba(96,165,250,.5),   rgba(37,99,235,.18)); }
-.dash-grad-violet { background: linear-gradient(155deg, rgba(167,139,250,.5),  rgba(124,58,237,.18)); }
-.dash-grad-cyan   { background: linear-gradient(155deg, rgba(45,212,191,.5),   rgba(13,148,136,.18)); }
-.dash-grad-pink   { background: linear-gradient(155deg, rgba(244,114,182,.5),  rgba(219,39,119,.18)); }
+/* ─── LISTA SEMPLICE (Lista Spesa DOCKS, anteprima chat) ─────────────────── */
+.home-dash-simple-list { list-style: none; margin-top: 10px; display: flex; flex-direction: column; gap: 7px; }
+.home-dash-simple-list li {
+  font-size: 13px; color: rgba(255,255,255,.85); line-height: 1.3;
+  padding-left: 14px; position: relative;
+}
+.home-dash-simple-list li::before {
+  content: ''; position: absolute; left: 0; top: 6px;
+  width: 5px; height: 5px; border-radius: 50%; background: rgba(255,255,255,.5);
+}
+.home-dash-simple-list li.home-dash-simple-empty { color: rgba(255,255,255,.6); padding-left: 0; }
+.home-dash-simple-list li.home-dash-simple-empty::before { display: none; }
 
-/* ─── PICKER "Scegli cosa mostrare" (aperto con tap prolungato) ─────────── */
-.dash-picker-opt {
-  width: 100%; display: flex; align-items: center; gap: 12px;
-  padding: 12px 6px; border: none; background: none; cursor: pointer;
-  border-bottom: 1px solid var(--border); text-align: left;
-  font-family: 'Inter', sans-serif;
+/* ─── ANTEPRIMA CHAT ──────────────────────────────────────────────────────── */
+.home-dash-chat-row { display: flex; flex-direction: column; gap: 2px; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,.10); }
+.home-dash-chat-row:last-child { border-bottom: none; }
+.home-dash-chat-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.home-dash-chat-nome { font-size: 12.5px; font-weight: 700; color: #fff; }
+.home-dash-chat-ora  { font-size: 10.5px; color: rgba(255,255,255,.55); flex-shrink: 0; }
+.home-dash-chat-testo { font-size: 12.5px; color: rgba(255,255,255,.8); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.home-dash-chat-testo em { color: rgba(255,255,255,.5); font-style: italic; }
+.home-dash-badge {
+  background: var(--error); color: #fff; font-size: 10px; font-weight: 700;
+  padding: 2px 7px; border-radius: 100px; min-width: 18px; text-align: center;
 }
-.dash-picker-opt:last-child { border-bottom: none; }
-.dash-picker-opt:active { background: var(--surface-2); }
-.dash-picker-ico {
-  width: 38px; height: 38px; border-radius: 12px; flex-shrink: 0;
-  display: flex; align-items: center; justify-content: center;
-}
-.dash-picker-ico svg { width: 20px; height: 20px; color: #fff; filter: drop-shadow(0 1px 3px rgba(0,0,0,.3)); }
-.dash-picker-lbl { flex: 1; font-size: 14px; font-weight: 600; color: var(--text); }
-.dash-picker-check { color: var(--green); font-size: 16px; font-weight: 700; flex-shrink: 0; }
 .home-dash-card {
   background: rgba(255,255,255,.10);
   backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%);
@@ -1627,6 +1611,99 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
 .tutorial-nav-prev.show { visibility: visible; }
 .tutorial-nav-next { background: #10b981; color: #fff; font-weight: 700; margin-left: auto; box-shadow: 0 4px 14px rgba(16,185,129,.3); }
 .tutorial-nav-next:active { background: #0ea271; }
+
+/* ─── CHAT ────────────────────────────────────────────────────────────────
+   Pagina a layout fisso (come la Dashboard): header/tab in cima, messaggi
+   che scorrono internamente, barra di input sempre ancorata in basso. */
+body.chat-active main { height: calc(100dvh - var(--hdr-h) - env(safe-area-inset-top)); overflow: hidden; }
+#page-chat.page { padding: 0; max-width: none; }
+#page-chat.page.active {
+  display: flex; flex-direction: column;
+  height: 100%;
+}
+.chat-header { padding: 16px 16px 0; flex-shrink: 0; }
+.chat-tabs {
+  display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none;
+  padding: 12px 16px; flex-shrink: 0;
+}
+.chat-tabs::-webkit-scrollbar { display: none; }
+
+.chat-messages {
+  flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  padding: 8px 14px; display: flex; flex-direction: column; gap: 10px;
+}
+
+.chat-bubble-row { display: flex; flex-direction: column; max-width: 78%; }
+.chat-bubble-row.own { align-self: flex-end; align-items: flex-end; }
+.chat-bubble-row.other { align-self: flex-start; align-items: flex-start; }
+.chat-bubble-nome { font-size: 11px; font-weight: 700; color: var(--muted); margin: 0 4px 3px; }
+.chat-bubble {
+  border-radius: 16px; padding: 9px 12px; position: relative;
+  font-size: 14.5px; line-height: 1.4; word-break: break-word;
+  box-shadow: var(--shadow); cursor: pointer; -webkit-user-select: none; user-select: none;
+}
+.chat-bubble-row.own .chat-bubble { background: #10b981; color: #fff; border-bottom-right-radius: 4px; }
+.chat-bubble-row.other .chat-bubble { background: var(--card); border: 1px solid var(--border); color: var(--text); border-bottom-left-radius: 4px; }
+:root[data-theme="dark"] .chat-bubble-row.other .chat-bubble { backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); }
+.chat-bubble.deleted { font-style: italic; opacity: .65; }
+.chat-bubble img { max-width: 100%; border-radius: 10px; display: block; margin-bottom: 6px; }
+.chat-bubble-meta { font-size: 10px; margin-top: 4px; text-align: right; }
+.chat-bubble-row.own .chat-bubble-meta { color: rgba(255,255,255,.75); }
+.chat-bubble-row.other .chat-bubble-meta { color: var(--muted-2); }
+.chat-bubble-edited { font-style: italic; opacity: .8; }
+
+.chat-edit-wrap { display: flex; flex-direction: column; gap: 6px; min-width: 180px; }
+.chat-edit-textarea {
+  width: 100%; min-height: 44px; resize: none; border-radius: 10px;
+  border: 1px solid var(--border); padding: 8px 10px; font-family: 'Inter', sans-serif;
+  font-size: 14px; background: var(--surface-3); color: var(--text);
+}
+.chat-edit-actions { display: flex; gap: 8px; justify-content: flex-end; }
+.chat-edit-actions button {
+  font-family: 'Inter', sans-serif; font-size: 12px; font-weight: 700;
+  border: none; border-radius: 100px; padding: 6px 12px; cursor: pointer;
+}
+.chat-edit-save   { background: #10b981; color: #fff; }
+.chat-edit-cancel { background: var(--surface-2); color: var(--text); }
+
+.chat-photo-preview {
+  flex-shrink: 0; padding: 10px 16px; display: flex; align-items: center; gap: 10px;
+  border-top: 1px solid var(--border);
+}
+.chat-photo-preview img { width: 56px; height: 56px; object-fit: cover; border-radius: 10px; }
+.chat-photo-preview-remove {
+  width: 26px; height: 26px; border-radius: 50%; border: none; cursor: pointer;
+  background: rgba(239,68,68,.12); color: var(--red);
+  display: flex; align-items: center; justify-content: center;
+}
+
+.chat-input-bar {
+  flex-shrink: 0; display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--border); background: var(--card);
+}
+:root[data-theme="dark"] .chat-input-bar { backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); }
+.chat-icon-btn {
+  width: 40px; height: 40px; border-radius: 50%; border: none; flex-shrink: 0;
+  background: var(--surface-2); color: var(--text); cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.chat-icon-btn.chat-send-btn { background: #10b981; color: #fff; }
+.chat-text-input {
+  flex: 1; height: 40px; border-radius: 20px; border: 1.5px solid var(--border);
+  background: var(--surface-3); color: var(--text); padding: 0 16px;
+  font-family: 'Inter', sans-serif; font-size: 15px; outline: none;
+}
+.chat-text-input:focus { border-color: rgba(var(--action-rgb),.5); }
+
+.chat-action-opt {
+  width: 100%; padding: 16px; border: none; background: none; cursor: pointer;
+  font-family: 'Inter', sans-serif; font-size: 15px; font-weight: 600; color: var(--text);
+  border-bottom: 1px solid var(--border); text-align: center;
+}
+.chat-action-opt:last-child { border-bottom: none; }
+.chat-action-opt:active { background: var(--surface-2); }
+.chat-action-delete { color: var(--red); }
 </style>
 </head>
 <body class="home-active">
@@ -1767,6 +1844,14 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
     </button>
     {% endif %}
 
+    {% if current_user.is_authenticated and current_user.puo_accedere_chat %}
+    <button class="drw-item" data-page="chat" onclick="navTo('chat')">
+      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      <span class="lbl">Chat</span>
+      <span class="drw-badge" id="drw-chat-badge"></span>
+    </button>
+    {% endif %}
+
     <button class="drw-item" data-page="lista-spesa" onclick="navTo('lista-spesa')">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
       <span class="lbl">Lista spesa</span>
@@ -1833,21 +1918,12 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
               <div class="home-dash-datetime"><span id="home-dash-date"></span>&nbsp;·&nbsp;<span id="home-dash-time"></span></div>
             </div>
 
-            <div class="home-dash-stats" id="home-dash-stats">
-              <div class="dash-stat-card" data-slot="1" id="dash-card-1">
-                <div class="dash-stat-icon" id="dash-card-1-icon"></div>
-                <div class="dash-stat-value" id="dash-card-1-value">0</div>
-                <div class="dash-stat-label" id="dash-card-1-label"></div>
-              </div>
-              <div class="dash-stat-card" data-slot="2" id="dash-card-2">
-                <div class="dash-stat-icon" id="dash-card-2-icon"></div>
-                <div class="dash-stat-value" id="dash-card-2-value">0</div>
-                <div class="dash-stat-label" id="dash-card-2-label"></div>
-              </div>
-              <div class="dash-stat-card" data-slot="3" id="dash-card-3">
-                <div class="dash-stat-icon" id="dash-card-3-icon"></div>
-                <div class="dash-stat-value" id="dash-card-3-value">0</div>
-                <div class="dash-stat-label" id="dash-card-3-label"></div>
+            <div class="home-dash-meteo" id="home-dash-meteo">
+              <div class="home-dash-meteo-icon" id="home-dash-meteo-icon"></div>
+              <div class="home-dash-meteo-info">
+                <span class="home-dash-meteo-temp" id="home-dash-meteo-temp">--°</span>
+                <div class="home-dash-meteo-cond" id="home-dash-meteo-cond">Caricamento meteo…</div>
+                <div class="home-dash-meteo-loc">Vigevano</div>
               </div>
             </div>
 
@@ -1856,13 +1932,24 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
                 <div class="home-dash-card-title">Lista Spesa DOCKS</div>
                 <div class="home-dash-card-num" id="home-dash-docks-num">0</div>
               </div>
-              <div class="home-dash-card-list" id="home-dash-docks-list"></div>
+              <ul class="home-dash-simple-list" id="home-dash-docks-list"></ul>
             </div>
 
             <button type="button" class="home-dash-pdf-btn" onclick="navTo('export')">
               <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
               Scarica PDF
             </button>
+
+            {% if current_user.puo_accedere_chat %}
+            <div class="home-dash-card" onclick="navTo('chat')">
+              <div class="home-dash-card-top">
+                <div class="home-dash-card-title">Messaggi recenti</div>
+                <span class="home-dash-badge" id="home-dash-chat-badge" style="display:none">0</span>
+              </div>
+              <div id="home-dash-chat-preview"></div>
+              <button type="button" class="home-dash-pdf-btn" style="margin-top:12px;margin-bottom:0" onclick="event.stopPropagation(); navTo('chat')">Apri chat</button>
+            </div>
+            {% endif %}
           </div>
         </div>
         {% endif %}
@@ -2143,6 +2230,54 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
     <div id="temp-storico-list"></div>
   </section>
 
+  <!-- CHAT -->
+  {% if current_user.is_authenticated and current_user.puo_accedere_chat %}
+  <section class="page" id="page-chat">
+    <div class="chat-header">
+      <div class="back-bar" onclick="navTo('home')" style="margin-bottom:0">
+        <div class="back-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+        <span class="back-label">Chat</span>
+      </div>
+    </div>
+
+    <div class="chat-tabs" id="chat-tabs">
+      <button type="button" class="fpill active" data-canale="generale" onclick="setChatCanale('generale', this)">Generale</button>
+      <button type="button" class="fpill" data-canale="cucina" onclick="setChatCanale('cucina', this)">Cucina</button>
+      <button type="button" class="fpill" data-canale="sala" onclick="setChatCanale('sala', this)">Sala</button>
+      <button type="button" class="fpill" data-canale="pizzeria" onclick="setChatCanale('pizzeria', this)">Pizzeria</button>
+    </div>
+
+    <div class="chat-messages" id="chat-messages"></div>
+
+    <div class="chat-photo-preview" id="chat-photo-preview" style="display:none">
+      <img id="chat-photo-preview-img" alt="">
+      <button type="button" class="chat-photo-preview-remove" onclick="cancelChatPhoto()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+
+    <div class="chat-input-bar">
+      <button type="button" class="chat-icon-btn" onclick="document.getElementById('chat-photo-input').click()" aria-label="Allega foto">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+      </button>
+      <input type="file" id="chat-photo-input" accept="image/*" capture="environment" style="display:none" onchange="onChatPhotoSelected(event)">
+      <input type="text" class="chat-text-input" id="chat-text-input" placeholder="Scrivi un messaggio…" autocomplete="off">
+      <button type="button" class="chat-icon-btn chat-send-btn" onclick="sendChatMessage()" aria-label="Invia">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+      </button>
+    </div>
+
+    <!-- Azioni su messaggio (tap prolungato): Modifica/Elimina -->
+    <div class="modal-backdrop" id="modal-chat-azioni" onclick="bgCloseChatAzioni(event)">
+      <div class="modal">
+        <div class="modal-handle"></div>
+        <button type="button" class="chat-action-opt" onclick="startEditChatMessage()">Modifica</button>
+        <button type="button" class="chat-action-opt chat-action-delete" onclick="confirmDeleteChatMessage()">Elimina</button>
+      </div>
+    </div>
+  </section>
+  {% endif %}
+
   <!-- CONTROLLO -->
   <section class="page" id="page-controllo">
     <div class="back-bar" onclick="navTo('home')">
@@ -2163,6 +2298,9 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
 
     <div class="pg-title" style="margin-top:24px">Eliminazioni carichi</div>
     <div id="controllo-log-eliminazioni-registro"></div>
+
+    <div class="pg-title" style="margin-top:24px">Chat</div>
+    <div id="controllo-log-chat"></div>
   </section>
 
   <!-- EXPORT -->
@@ -3172,15 +3310,6 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
   </div>
 </div>
 
-<!-- ── DASH CARD PICKER (tap prolungato sulle card statistiche Home) ──────── -->
-<div class="modal-backdrop" id="modal-dash-card" onclick="bgCloseDashCardPicker(event)">
-  <div class="modal">
-    <div class="modal-handle"></div>
-    <div class="modal-title">Scegli cosa mostrare</div>
-    <div class="modal-body" id="dash-card-picker-list" style="padding:4px 20px"></div>
-  </div>
-</div>
-
 <!-- ── TOAST ─────────────────────────────────────────────────────────────── -->
 <div class="toast" id="toast"></div>
 
@@ -3189,11 +3318,9 @@ const REPARTI = ['cucina', 'sala', 'pizzeria'];
 const CAN_DELETE_CARICHI = {{ 'true' if current_user.is_authenticated and current_user.puo_eliminare_carichi else 'false' }};
 const CAN_GESTIRE_SALA = {{ 'true' if current_user.is_authenticated and current_user.puo_gestire_sala else 'false' }};
 const TUTORIAL_VISTO = {{ 'true' if current_user.is_authenticated and current_user.tutorial_visto else 'false' }};
-const DASH_CARDS_INITIAL = [
-  '{{ current_user.dash_card1 if current_user.is_authenticated else "alert" }}',
-  '{{ current_user.dash_card2 if current_user.is_authenticated else "temperature" }}',
-  '{{ current_user.dash_card3 if current_user.is_authenticated else "scadenza" }}',
-];
+const CAN_CHAT = {{ 'true' if current_user.is_authenticated and current_user.puo_accedere_chat else 'false' }};
+const CURRENT_USER_ID = {{ current_user.id if current_user.is_authenticated else 0 }};
+const IS_ADMIN = {{ 'true' if current_user.is_authenticated and current_user.role == 'admin' else 'false' }};
 
 // ── STATE ────────────────────────────────────────────────────────────────
 const S = {
@@ -3210,7 +3337,8 @@ const S = {
   giacRepartoFilter:  '',      // '' | 'cucina' | 'sala' | 'pizzeria'
   giacPageIdx:  0,             // 0 = In magazzino, 1 = In uso (swipe pages)
   homePageIdx:  1,             // 0 = Dashboard (solo admin), 1 = Azioni rapide
-  dashCards:    DASH_CARDS_INITIAL.slice(), // le 3 card statistiche personalizzabili della Dashboard
+  chatCanale:      'generale',
+  chatMessaggi:    [],
   listaSpesa:      [],
   spesaTimers:     {},   // id → { timeout, interval, startTime }
   spesaFornFilter: 'all',
@@ -3291,11 +3419,11 @@ async function init() {
   animHomeCards();
   _initGiacSwipe();
   _initHomeSwipe();
-  initDashCardsLongPress();
   _setHomePage(1, false);
   await Promise.all([loadCategorie(), loadProdottiCarico(), loadGiacenze(), loadAlerts(), loadListaSpesa(), loadInUso(), loadApparecchi(), loadStoricoTemperature(), loadLocks()]);
   setInterval(loadLocks, 20000);
   renderInUsoProdotti();
+  if (CAN_CHAT) loadChatUnreadBadge();
 
   // Al primo login apri automaticamente il tutorial (menu principale) e
   // segna subito come visto, così non si ripresenta ai login successivi.
@@ -3365,190 +3493,98 @@ function startHomeDashClock() {
 }
 
 function renderHomeDashboard() {
-  if (!document.getElementById('dash-card-1')) return; // utente staff: dashboard non esiste
-  renderDashCards();
+  if (!document.getElementById('home-dash-meteo')) return; // utente staff: dashboard non esiste
 
   const docks = S.listaSpesa.filter(i => i.fornitore === 'DOCKS' && !i.completato);
   document.getElementById('home-dash-docks-num').textContent = docks.length;
-  document.getElementById('home-dash-docks-list').textContent = docks.length
-    ? docks.slice(0, 3).map(i => i.prodotto).join(', ') + (docks.length > 3 ? '…' : '')
-    : 'Nessun prodotto da ordinare';
+  document.getElementById('home-dash-docks-list').innerHTML = docks.length
+    ? docks.slice(0, 8).map(i => `<li>${esc(i.prodotto)}</li>`).join('')
+    : '<li class="home-dash-simple-empty">Nessun prodotto da ordinare</li>';
+
+  loadMeteoVigevano();
+  if (CAN_CHAT) loadChatPreview();
 }
 
-// ── DASH STAT CARDS — personalizzabili (tap prolungato → scelta dato) ────
-// 8 tipi di dato disponibili, ognuno con label, icona SVG dettagliata e
-// gradiente dedicato. `isText` = la card mostra un testo (es. nome prodotto
-// + orario) invece del contatore numerico animato.
-const DASH_CARD_DEFS = {
-  alert: {
-    label: 'Alert attivi', grad: 'red',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>',
-  },
-  temperature: {
-    label: 'Temperature da controllare', grad: 'orange',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 4a2 2 0 0 0-4 0v9.54a4 4 0 1 0 4 0V4Z"/><line x1="12" y1="7" x2="12" y2="13"/></svg>',
-  },
-  scadenza: {
-    label: 'In scadenza oggi', grad: 'amber',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4.5" width="18" height="16" rx="3"/><line x1="16" y1="2.5" x2="16" y2="6.5"/><line x1="8" y1="2.5" x2="8" y2="6.5"/><line x1="3" y1="10" x2="21" y2="10"/><path d="M12 14v3l2 1.3"/></svg>',
-  },
-  ultimo_carico: {
-    label: 'Ultimo carico', grad: 'green', isText: true,
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m21 8-9-5-9 5 9 5 9-5Z"/><path d="M3 8v8l9 5 9-5V8"/><path d="M12 13v8"/></svg>',
-  },
-  in_uso: {
-    label: 'Prodotti in uso', grad: 'blue',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 0 1-15.3 6.4L3 21"/><path d="M3 12a9 9 0 0 1 15.3-6.4L21 3"/><path d="M3 16v-3.5h3.5"/><path d="M21 8v3.5h-3.5"/></svg>',
-  },
-  preparazioni: {
-    label: 'Preparazioni in corso', grad: 'violet',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 11h14l-1.2 7.2a2 2 0 0 1-2 1.8H8.2a2 2 0 0 1-2-1.8L5 11Z"/><path d="M7 11a5 5 0 0 1 10 0"/><path d="M12 3v3"/><path d="M8.5 3.8l1 2.6"/><path d="M15.5 3.8l-1 2.6"/></svg>',
-  },
-  coperti: {
-    label: 'Coperti oggi', grad: 'cyan',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2v8a2 2 0 0 0 4 0V2"/><path d="M9 10v12"/><path d="M17 2c-1.5 0-2.5 1.5-2.5 4s1 5 2.5 7v9"/></svg>',
-  },
-  sotto_scorta: {
-    label: 'Sotto scorta minima', grad: 'pink',
-    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3h1.6l2.1 11.4a2 2 0 0 0 2 1.6h8.2a2 2 0 0 0 2-1.6L20.8 7H6"/><circle cx="9" cy="20" r="1.3"/><circle cx="17" cy="20" r="1.3"/><path d="M11 8v4"/><path d="M11 15h.01"/></svg>',
-  },
+// ── METEO VIGEVANO (Open-Meteo, nessuna chiave richiesta) ────────────────
+const METEO_LAT = 45.3236, METEO_LON = 8.8586;
+let _meteoLoaded = false;
+
+// Icone SVG minimal, mappate dai weather_code WMO restituiti da Open-Meteo
+const METEO_ICONS = {
+  sereno: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"/><path d="M12 2v2M12 20v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M2 12h2M20 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/></svg>',
+  nuvoloso: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 19a4.5 4.5 0 0 1-.7-8.94 5.5 5.5 0 0 1 10.6-2.02A4.5 4.5 0 0 1 17.5 19h-11Z"/></svg>',
+  nebbia: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 15a4.5 4.5 0 0 1-.7-8.94 5.5 5.5 0 0 1 10.6-2.02A4.5 4.5 0 0 1 17.5 12"/><line x1="3" y1="18" x2="21" y2="18"/><line x1="5" y1="21" x2="19" y2="21"/></svg>',
+  pioggia: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 13a4.5 4.5 0 0 1-.7-8.94 5.5 5.5 0 0 1 10.6-2.02A4.5 4.5 0 0 1 17.5 13h-11Z"/><line x1="8" y1="16" x2="7" y2="20"/><line x1="12" y1="16" x2="11" y2="20"/><line x1="16" y1="16" x2="15" y2="20"/></svg>',
+  neve: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 13a4.5 4.5 0 0 1-.7-8.94 5.5 5.5 0 0 1 10.6-2.02A4.5 4.5 0 0 1 17.5 13h-11Z"/><line x1="8" y1="17" x2="8" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/><line x1="16" y1="17" x2="16" y2="21"/><line x1="6.5" y1="19" x2="9.5" y2="19"/><line x1="10.5" y1="19" x2="13.5" y2="19"/><line x1="14.5" y1="19" x2="17.5" y2="19"/></svg>',
+  temporale: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 13a4.5 4.5 0 0 1-.7-8.94 5.5 5.5 0 0 1 10.6-2.02A4.5 4.5 0 0 1 17.5 13h-11Z"/><polyline points="13 15 10 20 13 20 11 24"/></svg>',
 };
-const DASH_CARD_ORDER = ['alert', 'temperature', 'scadenza', 'ultimo_carico', 'in_uso', 'preparazioni', 'coperti', 'sotto_scorta'];
-
-// Calcola il valore corrente per un tipo di card. Alcuni dati sono già in
-// memoria (alert, temperature, scadenze, in uso), altri vengono caricati
-// al volo solo quando servono (preparazioni, coperti, ultimo carico), per
-// non appesantire il caricamento iniziale della Home con richieste inutili.
-async function _dashCardData(type) {
-  switch (type) {
-    case 'alert':
-      return { value: S.alerts.count || 0 };
-    case 'temperature':
-      return { value: S.apparecchi.filter(a => a.stato_controllo === 'DA_CONTROLLARE').length };
-    case 'scadenza':
-      return { value: (S.alerts.scadenze || []).filter(a => a.giorni === 0).length };
-    case 'sotto_scorta':
-      return { value: (S.alerts.scorte || []).length };
-    case 'in_uso':
-      return { value: S.inUso.length };
-    case 'preparazioni': {
-      if (!S.preparazioni.length) await loadPreparazioni();
-      return { value: S.preparazioni.filter(p => p.stato === 'in_corso').length };
+function _meteoInfo(code) {
+  if (code === 0) return { label: 'Sereno', icon: 'sereno' };
+  if ([1, 2, 3].includes(code)) return { label: 'Nuvoloso', icon: 'nuvoloso' };
+  if ([45, 48].includes(code)) return { label: 'Nebbia', icon: 'nebbia' };
+  if ([51, 53, 55, 56, 57, 61, 63, 65, 66, 67, 80, 81, 82].includes(code)) return { label: 'Pioggia', icon: 'pioggia' };
+  if ([71, 73, 75, 77, 85, 86].includes(code)) return { label: 'Neve', icon: 'neve' };
+  if ([95, 96, 99].includes(code)) return { label: 'Temporale', icon: 'temporale' };
+  return { label: 'Variabile', icon: 'nuvoloso' };
+}
+async function loadMeteoVigevano() {
+  if (_meteoLoaded) return;
+  _meteoLoaded = true;
+  try {
+    const cached = sessionStorage.getItem('meteoVigevano');
+    if (cached) {
+      const { t, data } = JSON.parse(cached);
+      if (Date.now() - t < 10 * 60 * 1000) { _renderMeteo(data); return; }
     }
-    case 'coperti': {
-      const { data } = dataOraItaliana();
-      const res = await api(`/api/prenotazioni?data=${encodeURIComponent(data)}`);
-      return { value: (res.coperti && res.coperti.totale) || 0 };
-    }
-    case 'ultimo_carico': {
-      const res = await api('/api/ultimo-carico');
-      return res.success && res.prodotto
-        ? { text: res.prodotto, sub: res.quando ? `Ultimo carico · ${res.quando}` : 'Ultimo carico' }
-        : { text: '—', sub: 'Nessun carico registrato' };
-    }
-    default:
-      return { value: 0 };
+    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${METEO_LAT}&longitude=${METEO_LON}&current=temperature_2m,weather_code&timezone=Europe%2FRome`);
+    const data = await res.json();
+    sessionStorage.setItem('meteoVigevano', JSON.stringify({ t: Date.now(), data }));
+    _renderMeteo(data);
+  } catch (e) {
+    const cond = document.getElementById('home-dash-meteo-cond');
+    if (cond) cond.textContent = 'Meteo non disponibile';
   }
 }
-
-function _animateDashCount(el, to) {
-  to = to || 0;
-  const from = parseInt(el.textContent, 10) || 0;
-  if (from === to) { el.textContent = to; return; }
-  const duration = 700;
-  const start = performance.now();
-  const step = now => {
-    const p = Math.min(1, (now - start) / duration);
-    const eased = 1 - Math.pow(1 - p, 3);
-    el.textContent = Math.round(from + (to - from) * eased);
-    if (p < 1) requestAnimationFrame(step);
-  };
-  requestAnimationFrame(step);
+function _renderMeteo(data) {
+  const cur = data && data.current;
+  if (!cur) return;
+  const info = _meteoInfo(cur.weather_code);
+  document.getElementById('home-dash-meteo-temp').textContent = Math.round(cur.temperature_2m) + '°';
+  document.getElementById('home-dash-meteo-cond').textContent = info.label;
+  document.getElementById('home-dash-meteo-icon').innerHTML = METEO_ICONS[info.icon];
 }
 
-async function _renderDashCard(slot) {
-  const type = S.dashCards[slot - 1];
-  const def  = DASH_CARD_DEFS[type] || DASH_CARD_DEFS.alert;
-  const card  = document.getElementById(`dash-card-${slot}`);
-  if (!card) return;
-  const icon  = document.getElementById(`dash-card-${slot}-icon`);
-  const value = document.getElementById(`dash-card-${slot}-value`);
-  const label = document.getElementById(`dash-card-${slot}-label`);
-
-  card.className = `dash-stat-card dash-grad-${def.grad}${def.isText ? ' is-text' : ''}`;
-  icon.innerHTML = def.icon;
-  label.textContent = def.label;
-
-  const data = await _dashCardData(type);
-  if (def.isText) {
-    value.textContent = data.text ?? '—';
-    label.textContent = data.sub ?? def.label;
-  } else {
-    _animateDashCount(value, data.value);
-  }
+// ── ANTEPRIMA CHAT (dashboard) ────────────────────────────────────────────
+function _fmtChatOra(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const oggi = new Date();
+  const stessoGiorno = d.toDateString() === oggi.toDateString();
+  return stessoGiorno
+    ? d.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
+    : d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' });
 }
+async function loadChatPreview() {
+  const [dataMsg, dataUnread] = await Promise.all([
+    api('/api/chat/preview'),
+    api('/api/chat/unread-count'),
+  ]);
+  const el = document.getElementById('home-dash-chat-preview');
+  const msgs = dataMsg.messaggi || [];
+  el.innerHTML = msgs.length
+    ? msgs.map(m => `
+        <div class="home-dash-chat-row">
+          <div class="home-dash-chat-top">
+            <span class="home-dash-chat-nome">${esc(m.utente_nome)}</span>
+            <span class="home-dash-chat-ora">${_fmtChatOra(m.creato_il)}</span>
+          </div>
+          <div class="home-dash-chat-testo">${m.eliminato ? '<em>Messaggio eliminato</em>' : esc(m.testo || (m.foto ? 'Foto' : ''))}</div>
+        </div>`).join('')
+    : '<div class="home-dash-card-list">Nessun messaggio</div>';
 
-function renderDashCards() {
-  [1, 2, 3].forEach(slot => _renderDashCard(slot));
-}
-
-// ── DASH STAT CARDS — tap prolungato per aprire il picker ────────────────
-let _dashPickerSlot = null;
-
-function _attachDashLongPress(el, onLongPress) {
-  let pressTimer = null, sx = 0, sy = 0;
-  const cancelPress = () => { clearTimeout(pressTimer); pressTimer = null; el.classList.remove('pressing'); };
-  el.addEventListener('pointerdown', e => {
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
-    sx = e.clientX; sy = e.clientY;
-    el.classList.add('pressing');
-    pressTimer = setTimeout(() => { cancelPress(); onLongPress(); }, 520);
-  });
-  el.addEventListener('pointermove', e => {
-    if (!pressTimer) return;
-    if (Math.abs(e.clientX - sx) > 10 || Math.abs(e.clientY - sy) > 10) cancelPress();
-  });
-  ['pointerup', 'pointercancel', 'pointerleave'].forEach(evt => el.addEventListener(evt, cancelPress));
-}
-
-function initDashCardsLongPress() {
-  [1, 2, 3].forEach(slot => {
-    const el = document.getElementById(`dash-card-${slot}`);
-    if (!el || el.dataset.lpInit) return;
-    el.dataset.lpInit = '1';
-    _attachDashLongPress(el, () => openDashCardPicker(slot));
-  });
-}
-
-function openDashCardPicker(slot) {
-  _dashPickerSlot = slot;
-  const current = S.dashCards[slot - 1];
-  const list = document.getElementById('dash-card-picker-list');
-  list.innerHTML = DASH_CARD_ORDER.map(type => {
-    const def    = DASH_CARD_DEFS[type];
-    const active = type === current;
-    return `<button type="button" class="dash-picker-opt" onclick="selectDashCard('${type}')">
-      <span class="dash-picker-ico dash-grad-${def.grad}">${def.icon}</span>
-      <span class="dash-picker-lbl">${esc(def.label)}</span>
-      ${active ? '<span class="dash-picker-check">✓</span>' : ''}
-    </button>`;
-  }).join('');
-  document.getElementById('modal-dash-card').classList.add('open');
-}
-function closeDashCardPicker() { document.getElementById('modal-dash-card').classList.remove('open'); }
-function bgCloseDashCardPicker(e) { if (e.target === document.getElementById('modal-dash-card')) closeDashCardPicker(); }
-
-async function selectDashCard(type) {
-  const slot = _dashPickerSlot;
-  if (!slot) return;
-  S.dashCards[slot - 1] = type;
-  closeDashCardPicker();
-  _renderDashCard(slot);
-  const res = await api('/api/dashboard-cards', {
-    method: 'POST',
-    body: { card1: S.dashCards[0], card2: S.dashCards[1], card3: S.dashCards[2] },
-  });
-  if (!res.success) toast(res.error || 'Errore salvataggio', 'error');
+  const badge = document.getElementById('home-dash-chat-badge');
+  const count = dataUnread.count || 0;
+  if (badge) { badge.textContent = count; badge.style.display = count > 0 ? 'inline-block' : 'none'; }
 }
 
 // ── TEMA ─────────────────────────────────────────────────────────────────
@@ -3609,6 +3645,9 @@ function navTo(page) {
   if (page === 'prenotazioni') loadPrenotazioni();
   if (page === 'gestione-sala') loadGestioneSala();
   if (page === 'help')      closeTutorialSection(); // riparti sempre dal menu principale del tutorial
+
+  document.body.classList.toggle('chat-active', page === 'chat');
+  if (page === 'chat') initChatPage(); else stopChatPolling();
 }
 // alias for backward compat
 
@@ -5944,16 +5983,18 @@ function fmtDateTime(iso) {
 }
 
 async function loadControlloLogs() {
-  const [dataTemp, dataSpesa, dataRegistro, dataElimReg] = await Promise.all([
+  const [dataTemp, dataSpesa, dataRegistro, dataElimReg, dataChat] = await Promise.all([
     api('/api/controllo/log-temperature'),
     api('/api/controllo/log-lista-spesa'),
     api('/api/controllo/log-modifiche-registro'),
     api('/api/controllo/log-eliminazioni-registro'),
+    api('/api/controllo/log-chat'),
   ]);
   renderLogEliminazioniTemperature(dataTemp.log || []);
   renderLogListaSpesa(dataSpesa.log || []);
   renderLogModificheRegistro(dataRegistro.log || []);
   renderLogEliminazioniRegistro(dataElimReg.log || []);
+  renderLogChat(dataChat.log || []);
 }
 
 function renderLogEliminazioniTemperature(log) {
@@ -6046,6 +6087,28 @@ function renderLogEliminazioniRegistro(log) {
     </div>
   `;
   }).join('');
+}
+
+function renderLogChat(log) {
+  const el = document.getElementById('controllo-log-chat');
+  if (!el) return;
+  if (!log.length) {
+    el.innerHTML = `<div class="empty-state"><p>Nessuna attività registrata</p></div>`;
+    return;
+  }
+  const AZIONE_LBL = { modificato: 'Modificato', eliminato: 'Eliminato' };
+  el.innerHTML = log.map(l => `
+    <div class="log-row">
+      <div class="log-row-top">
+        <div class="log-row-title">${esc(l.canale)} · ${esc(l.autore_originale)}</div>
+        <span class="log-row-tag ${l.azione}">${AZIONE_LBL[l.azione] || l.azione}</span>
+      </div>
+      <div class="log-row-meta">"${esc(l.testo_originale || '')}"</div>
+      <div class="log-row-meta">
+        <strong>${esc(l.operatore)}</strong> il ${fmtDateTime(l.quando)}
+      </div>
+    </div>
+  `).join('');
 }
 
 // ── PREPARAZIONI ─────────────────────────────────────────────────────────
@@ -6870,8 +6933,194 @@ async function generaExportPdf() {
   }
 }
 
+// ── CHAT ─────────────────────────────────────────────────────────────────
+let _chatPollTimer  = null;
+let _chatPhotoData  = null;   // data URL della foto selezionata, in attesa di invio
+let _chatLongPressT = null;
+let _chatActionMsgId = null;  // messaggio bersaglio del foglio Modifica/Elimina
+let _chatEditingId   = null;  // messaggio attualmente in modifica inline
+
+function _fmtChatBubbleOra(iso) {
+  if (!iso) return '';
+  return new Date(iso).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+}
+
+function initChatPage() {
+  api('/api/chat/letto', { method: 'POST' }).then(loadChatUnreadBadge);
+  loadChatMessages(true);
+  stopChatPolling();
+  _chatPollTimer = setInterval(() => { if (_chatEditingId === null) loadChatMessages(false); }, 10000);
+  const input = document.getElementById('chat-text-input');
+  if (input && !input.dataset.enterBound) {
+    input.dataset.enterBound = '1';
+    input.addEventListener('keydown', e => {
+      if (e.key === 'Enter') { e.preventDefault(); sendChatMessage(); }
+    });
+  }
+}
+
+function stopChatPolling() {
+  if (_chatPollTimer) { clearInterval(_chatPollTimer); _chatPollTimer = null; }
+}
+
+function setChatCanale(canale, btn) {
+  S.chatCanale = canale;
+  _chatEditingId = null;
+  document.querySelectorAll('#chat-tabs .fpill').forEach(p => p.classList.remove('active'));
+  btn.classList.add('active');
+  loadChatMessages(true);
+}
+
+async function loadChatMessages(scrollToBottom) {
+  const data = await api(`/api/chat?canale=${encodeURIComponent(S.chatCanale)}`);
+  S.chatMessaggi = data.messaggi || [];
+  renderChatMessages(scrollToBottom);
+}
+
+function renderChatMessages(scrollToBottom) {
+  const el = document.getElementById('chat-messages');
+  if (!el) return;
+  const eraInFondo = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+
+  el.innerHTML = S.chatMessaggi.map(m => {
+    const own = m.utente_id === CURRENT_USER_ID;
+    if (m.eliminato) {
+      return `
+        <div class="chat-bubble-row ${own ? 'own' : 'other'}">
+          ${!own ? `<div class="chat-bubble-nome">${esc(m.utente_nome)}</div>` : ''}
+          <div class="chat-bubble deleted">Messaggio eliminato</div>
+        </div>`;
+    }
+    const canEdit = own || IS_ADMIN;
+    const foto = m.foto ? `<img src="${esc(m.foto)}" alt="">` : '';
+    const testo = m.testo ? esc(m.testo) : '';
+    const editedTag = m.modificato ? ' <span class="chat-bubble-edited">(modificato)</span>' : '';
+    return `
+      <div class="chat-bubble-row ${own ? 'own' : 'other'}">
+        ${!own ? `<div class="chat-bubble-nome">${esc(m.utente_nome)}</div>` : ''}
+        <div class="chat-bubble" data-id="${m.id}" data-can-edit="${canEdit ? '1' : '0'}">
+          ${foto}${testo}${editedTag}
+          <div class="chat-bubble-meta">${_fmtChatBubbleOra(m.creato_il)}</div>
+        </div>
+      </div>`;
+  }).join('');
+
+  document.querySelectorAll('.chat-bubble[data-can-edit="1"]').forEach(_attachChatLongPress);
+
+  if (scrollToBottom || eraInFondo) el.scrollTop = el.scrollHeight;
+}
+
+function _attachChatLongPress(el) {
+  if (el.dataset.lpInit) return;
+  el.dataset.lpInit = '1';
+  let sx = 0, sy = 0;
+  const cancel = () => clearTimeout(_chatLongPressT);
+  el.addEventListener('pointerdown', e => {
+    sx = e.clientX; sy = e.clientY;
+    _chatLongPressT = setTimeout(() => openChatAzioni(parseInt(el.dataset.id, 10)), 480);
+  });
+  el.addEventListener('pointermove', e => {
+    if (Math.abs(e.clientX - sx) > 10 || Math.abs(e.clientY - sy) > 10) cancel();
+  });
+  ['pointerup', 'pointercancel', 'pointerleave'].forEach(evt => el.addEventListener(evt, cancel));
+}
+
+function openChatAzioni(msgId) {
+  _chatActionMsgId = msgId;
+  document.getElementById('modal-chat-azioni').classList.add('open');
+}
+function closeChatAzioni() { document.getElementById('modal-chat-azioni').classList.remove('open'); }
+function bgCloseChatAzioni(e) { if (e.target === document.getElementById('modal-chat-azioni')) closeChatAzioni(); }
+
+function startEditChatMessage() {
+  const msgId = _chatActionMsgId;
+  closeChatAzioni();
+  const msg = S.chatMessaggi.find(m => m.id === msgId);
+  if (!msg) return;
+  _chatEditingId = msgId;
+  const bubble = document.querySelector(`.chat-bubble[data-id="${msgId}"]`);
+  if (!bubble) return;
+  bubble.innerHTML = `
+    <div class="chat-edit-wrap">
+      <textarea class="chat-edit-textarea" id="chat-edit-textarea">${esc(msg.testo)}</textarea>
+      <div class="chat-edit-actions">
+        <button type="button" class="chat-edit-cancel" onclick="cancelEditChatMessage()">Annulla</button>
+        <button type="button" class="chat-edit-save" onclick="saveEditChatMessage(${msgId})">Salva</button>
+      </div>
+    </div>`;
+  document.getElementById('chat-edit-textarea').focus();
+}
+
+function cancelEditChatMessage() {
+  _chatEditingId = null;
+  renderChatMessages(false);
+}
+
+async function saveEditChatMessage(msgId) {
+  const testo = document.getElementById('chat-edit-textarea').value.trim();
+  if (!testo) { toast('Il messaggio non può essere vuoto', 'error'); return; }
+  const res = await api(`/api/chat/${msgId}`, { method: 'PUT', body: { testo } });
+  if (!res.success) { toast(res.error || 'Errore', 'error'); return; }
+  _chatEditingId = null;
+  await loadChatMessages(false);
+}
+
+function confirmDeleteChatMessage() {
+  const msgId = _chatActionMsgId;
+  closeChatAzioni();
+  if (!confirm('Eliminare questo messaggio?')) return;
+  api(`/api/chat/${msgId}`, { method: 'DELETE' }).then(res => {
+    if (!res.success) { toast(res.error || 'Errore', 'error'); return; }
+    loadChatMessages(false);
+  });
+}
+
+async function sendChatMessage() {
+  const input = document.getElementById('chat-text-input');
+  const testo = input.value.trim();
+  const foto  = _chatPhotoData;
+  if (!testo && !foto) return;
+
+  input.value = '';
+  cancelChatPhoto();
+
+  const res = await api('/api/chat', {
+    method: 'POST',
+    body: { canale: S.chatCanale, testo, foto: foto || '' },
+  });
+  if (!res.success) { toast(res.error || 'Errore invio messaggio', 'error'); return; }
+  loadChatMessages(true);
+}
+
+async function onChatPhotoSelected(event) {
+  const file = event.target.files[0];
+  event.target.value = '';
+  if (!file) return;
+  try {
+    _chatPhotoData = await compressImage(file, 1000, 0.75);
+    document.getElementById('chat-photo-preview-img').src = _chatPhotoData;
+    document.getElementById('chat-photo-preview').style.display = 'flex';
+  } catch (e) {
+    toast('Impossibile leggere la foto', 'error');
+  }
+}
+
+function cancelChatPhoto() {
+  _chatPhotoData = null;
+  document.getElementById('chat-photo-preview').style.display = 'none';
+  document.getElementById('chat-photo-preview-img').src = '';
+}
+
+async function loadChatUnreadBadge() {
+  if (!CAN_CHAT) return;
+  const data = await api('/api/chat/unread-count');
+  const count = data.count || 0;
+  const badge = document.getElementById('drw-chat-badge');
+  if (badge) { badge.textContent = count > 0 ? count : ''; badge.classList.toggle('show', count > 0); }
+}
+
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeLotDetail(); closeModificaLotto(); closeDrawer(); closeApparecchioModal(); closeRegistraTempModal(); closeNuovaPreparazione(); closePrepEtichetta(); closeScaricoModal(); closeNuovaPrenotazione(); closePrenDetail(); closeNuovaSala(); closeTavoloForm(); closeTavoloSheet(); }
+  if (e.key === 'Escape') { closeLotDetail(); closeModificaLotto(); closeDrawer(); closeApparecchioModal(); closeRegistraTempModal(); closeNuovaPreparazione(); closePrepEtichetta(); closeScaricoModal(); closeNuovaPrenotazione(); closePrenDetail(); closeNuovaSala(); closeTavoloForm(); closeTavoloSheet(); closeChatAzioni(); }
 });
 
 // ── BOOT ─────────────────────────────────────────────────────────────────

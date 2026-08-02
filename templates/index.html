@@ -98,6 +98,20 @@ body {
     linear-gradient(165deg, #3d5f6c 0%, #28505c 42%, #0f2c35 100%);
 }
 
+/* ─── UTENSILI FISICA (giroscopio, solo tema scuro) ──────────────────────
+   Coltelli/forchette/cucchiai stilizzati che scivolano dentro/fuori dallo
+   schermo seguendo l'inclinazione del telefono (DeviceOrientation/Motion).
+   Il contenitore viene creato via JS (initUtensiliFisica) e appeso a
+   <body>; qui definiamo solo la visibilità (nascosto in chiaro) e lo
+   z-index, sullo stesso livello dell'aurora e sempre dietro a <main>. */
+.utensils-bg { display: none; }
+:root[data-theme="dark"] .utensils-bg {
+  display: block; position: fixed; inset: 0; z-index: 0;
+  overflow: hidden; pointer-events: none;
+}
+.utensil { position: absolute; top: 0; left: 0; color: #ffffff; will-change: transform; }
+.utensil svg { display: block; width: 100%; height: 100%; }
+
 /* Glass: card semi-trasparenti con blur, solo tema scuro — coprono ogni
    superficie "a card" dell'app, così lo sfondo sfumato di .aurora-bg si
    vede in trasparenza su tutte le pagine, non solo nella Dashboard. */
@@ -3248,6 +3262,7 @@ async function init() {
   _initGiacSwipe();
   _initHomeSwipe();
   initDashCardsLongPress();
+  _initUtensiliFisica();
   _setHomePage(1, false);
   await Promise.all([loadCategorie(), loadProdottiCarico(), loadGiacenze(), loadAlerts(), loadListaSpesa(), loadInUso(), loadApparecchi(), loadStoricoTemperature(), loadLocks()]);
   setInterval(loadLocks, 20000);
@@ -3507,6 +3522,163 @@ async function selectDashCard(type) {
   if (!res.success) toast(res.error || 'Errore salvataggio', 'error');
 }
 
+// ── UTENSILI FISICA (giroscopio, solo tema scuro) ─────────────────────────
+// Coltelli/forchette/cucchiai in line-art bianco semi-trasparente, in
+// riposo appena fuori dai bordi dello schermo. Un'accelerazione uniforme
+// derivata dall'inclinazione del telefono (DeviceOrientation, calibrata
+// sulla posizione di lettura normale) li trascina verso il centro: quelli
+// "parcheggiati" sul bordo verso cui si inclina il telefono scivolano
+// dentro lo schermo, gli altri restano nascosti (o si nascondono di più).
+// Grazie all'inerzia (nessuna molla di richiamo), quando il telefono torna
+// piatto l'utensile continua per la sua strada ed esce dal bordo opposto.
+const UTENSIL_SHAPES = {
+  knife: '<svg viewBox="0 0 40 200" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 4c8 0 12 18 10 40l-4 60h-12l-4-60c-2-22 2-40 10-40z"/><line x1="20" y1="104" x2="20" y2="196"/></svg>',
+  fork:  '<svg viewBox="0 0 40 200" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="4" x2="8" y2="36"/><line x1="16" y1="4" x2="16" y2="42"/><line x1="24" y1="4" x2="24" y2="42"/><line x1="32" y1="4" x2="32" y2="36"/><path d="M8 36c0 14 12 16 12 28M32 36c0 14-12 16-12 28"/><line x1="20" y1="64" x2="20" y2="196"/></svg>',
+  spoon: '<svg viewBox="0 0 40 200" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="20" cy="26" rx="15" ry="22"/><line x1="20" y1="48" x2="20" y2="196"/></svg>',
+};
+const UTENSIL_DEFS = [
+  { type: 'knife', h: 150 }, { type: 'fork',  h: 115 }, { type: 'spoon', h: 85  },
+  { type: 'knife', h: 105 }, { type: 'fork',  h: 145 }, { type: 'spoon', h: 100 },
+  { type: 'fork',  h: 80  }, { type: 'spoon', h: 125 },
+];
+const UTENSIL_ACCEL   = 900;  // px/s² alla massima inclinazione considerata
+const UTENSIL_MAX_TILT = 32;  // gradi oltre i quali l'inclinazione è "al massimo"
+const UTENSIL_DAMPING = .985; // decadimento velocità per frame (attrito)
+const UTENSIL_MAX_V   = 900;  // clamp velocità, evita accelerazioni fuori controllo
+const UTENSIL_RECYCLE = 260;  // px oltre il bordo dopo cui l'utensile viene riparcheggiato
+
+let _utensils        = [];
+let _utensilsInit    = false;
+let _utensilsRunning = false;
+let _utensilsAsked   = false;
+let _utGravBaseline  = null;           // { beta, gamma } di calibrazione iniziale
+let _utGrav          = { x: 0, y: 0 }; // segnale di gravità normalizzato e filtrato, -1..1
+let _utLastFrame     = null;
+
+function _parkUtensil(u) {
+  const w = window.innerWidth, h = window.innerHeight, margin = 120;
+  const edge = Math.floor(Math.random() * 4); // 0=sopra 1=destra 2=sotto 3=sinistra
+  if      (edge === 0) { u.x = Math.random() * w;              u.y = -margin - u.h; }
+  else if (edge === 1) { u.x = w + margin;                     u.y = Math.random() * h; }
+  else if (edge === 2) { u.x = Math.random() * w;               u.y = h + margin; }
+  else                 { u.x = -margin - u.w;                   u.y = Math.random() * h; }
+  u.vx = 0; u.vy = 0;
+}
+
+function _buildUtensilsDom() {
+  const host = document.createElement('div');
+  host.className = 'utensils-bg';
+  host.setAttribute('aria-hidden', 'true');
+  UTENSIL_DEFS.forEach(def => {
+    const el = document.createElement('div');
+    el.className = 'utensil';
+    el.innerHTML = UTENSIL_SHAPES[def.type];
+    const w = Math.round(def.h * 0.2);
+    el.style.width   = w + 'px';
+    el.style.height  = def.h + 'px';
+    el.style.opacity = (0.15 + Math.random() * 0.10).toFixed(2);
+    host.appendChild(el);
+    const u = { el, w, h: def.h, x: 0, y: 0, vx: 0, vy: 0, rot: Math.random() * 50 - 25, mass: 0.7 + Math.random() * 0.6 };
+    _parkUtensil(u);
+    _utensils.push(u);
+  });
+  document.body.appendChild(host);
+}
+
+function _onUtensilsOrientation(e) {
+  if (e.beta == null || e.gamma == null) return;
+  if (!_utGravBaseline) { _utGravBaseline = { beta: e.beta, gamma: e.gamma }; return; }
+  const dGamma = e.gamma - _utGravBaseline.gamma; // tilt sinistra/destra rispetto alla presa iniziale
+  const dBeta  = e.beta  - _utGravBaseline.beta;  // tilt avanti/indietro rispetto alla presa iniziale
+  const nx = Math.max(-1, Math.min(1, dGamma / UTENSIL_MAX_TILT));
+  const ny = Math.max(-1, Math.min(1, dBeta  / UTENSIL_MAX_TILT));
+  _utGrav.x += (nx - _utGrav.x) * 0.15; // smoothing esponenziale per un movimento fluido
+  _utGrav.y += (ny - _utGrav.y) * 0.15;
+}
+
+function _onUtensilsMotion(e) {
+  const a = e.acceleration; // senza gravità: solo gli scatti/impulsi volontari
+  if (!a || a.x == null) return;
+  const JOLT = 0.06;
+  _utensils.forEach(u => {
+    u.vx += (a.x || 0) * JOLT / u.mass;
+    u.vy -= (a.y || 0) * JOLT / u.mass; // asse Y del device è invertito rispetto allo schermo
+  });
+}
+
+function _utensilsFrame(ts) {
+  if (!_utensilsRunning) return;
+  if (_utLastFrame == null) _utLastFrame = ts;
+  let dt = (ts - _utLastFrame) / 1000;
+  _utLastFrame = ts;
+  dt = Math.min(dt, 0.05); // evita salti se il tab torna attivo dopo essere stato in background
+
+  const w = window.innerWidth, h = window.innerHeight;
+  const ax = -_utGrav.x * UTENSIL_ACCEL;
+  const ay = -_utGrav.y * UTENSIL_ACCEL;
+
+  _utensils.forEach(u => {
+    u.vx = (u.vx + (ax / u.mass) * dt) * UTENSIL_DAMPING;
+    u.vy = (u.vy + (ay / u.mass) * dt) * UTENSIL_DAMPING;
+    u.vx = Math.max(-UTENSIL_MAX_V, Math.min(UTENSIL_MAX_V, u.vx));
+    u.vy = Math.max(-UTENSIL_MAX_V, Math.min(UTENSIL_MAX_V, u.vy));
+    u.x += u.vx * dt;
+    u.y += u.vy * dt;
+
+    if (u.x < -UTENSIL_RECYCLE - u.w || u.x > w + UTENSIL_RECYCLE ||
+        u.y < -UTENSIL_RECYCLE - u.h || u.y > h + UTENSIL_RECYCLE) {
+      _parkUtensil(u);
+    }
+
+    const rot = u.rot + Math.max(-18, Math.min(18, u.vx * 0.05));
+    u.el.style.transform = `translate3d(${u.x}px, ${u.y}px, 0) rotate(${rot}deg)`;
+  });
+
+  requestAnimationFrame(_utensilsFrame);
+}
+
+function _startUtensilsEffect() {
+  if (_utensilsRunning) return;
+  if (!_utensilsInit) { _buildUtensilsDom(); _utensilsInit = true; }
+  _utensilsRunning = true;
+  window.addEventListener('deviceorientation', _onUtensilsOrientation);
+  window.addEventListener('devicemotion', _onUtensilsMotion);
+  _utLastFrame = null;
+  requestAnimationFrame(_utensilsFrame);
+}
+
+// Su iOS 13+ l'accesso a giroscopio/accelerometro richiede il permesso
+// esplicito dell'utente, e la richiesta deve partire da un vero tap
+// (non può essere automatica). Se il browser non espone questa API
+// (Android, iOS più vecchi, desktop) si procede direttamente senza popup.
+async function _requestUtensilsPermission() {
+  if (_utensilsAsked || _utensilsRunning) return;
+  _utensilsAsked = true;
+  try {
+    let orientationOk = true, motionOk = true;
+    if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+      orientationOk = (await DeviceOrientationEvent.requestPermission()) === 'granted';
+    }
+    if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+      motionOk = (await DeviceMotionEvent.requestPermission()) === 'granted';
+    }
+    if (!orientationOk && !motionOk) return; // negato: fallback, nessun effetto
+    _startUtensilsEffect();
+  } catch (e) {
+    // API non disponibile/negata: nessun effetto, in silenzio
+  }
+}
+
+// Se all'avvio il tema è già scuro, il primo tap sull'app (qualsiasi) prova
+// a richiedere il permesso; se invece si passa al tema scuro col pulsante,
+// usiamo direttamente quel tap in toggleTema().
+function _initUtensiliFisica() {
+  document.addEventListener('pointerdown', function onFirstTap() {
+    document.removeEventListener('pointerdown', onFirstTap);
+    if (document.documentElement.getAttribute('data-theme') === 'dark') _requestUtensilsPermission();
+  }, { once: true });
+}
+
 // ── TEMA ─────────────────────────────────────────────────────────────────
 async function toggleTema() {
   const html   = document.documentElement;
@@ -3519,6 +3691,8 @@ async function toggleTema() {
 
   const metaTheme = document.querySelector('meta[name="theme-color"]');
   if (metaTheme) metaTheme.setAttribute('content', nuovo === 'dark' ? '#0f2c35' : '#ffffff');
+
+  if (nuovo === 'dark') _requestUtensilsPermission();
 
   await api('/api/tema', { method: 'POST', body: { tema: nuovo === 'dark' ? 'scuro' : 'chiaro' } });
 }

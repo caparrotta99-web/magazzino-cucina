@@ -452,6 +452,7 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
 .home-dash-meteo-temp { font-size: 24px; font-weight: 800; color: #fff; line-height: 1; }
 .home-dash-meteo-info { min-width: 0; }
 .home-dash-meteo-cond { font-size: 13px; color: rgba(255,255,255,.85); font-weight: 600; }
+.home-dash-meteo-minmax { font-size: 11px; color: rgba(255,255,255,.7); margin-top: 1px; }
 .home-dash-meteo-loc  { font-size: 11px; color: rgba(255,255,255,.6); margin-top: 2px; }
 
 /* ─── LISTA SEMPLICE (Lista Spesa DOCKS, anteprima chat) ─────────────────── */
@@ -1942,6 +1943,7 @@ body.chat-active main { height: calc(100dvh - var(--hdr-h) - env(safe-area-inset
               <div class="home-dash-meteo-info">
                 <span class="home-dash-meteo-temp" id="home-dash-meteo-temp">--°</span>
                 <div class="home-dash-meteo-cond" id="home-dash-meteo-cond">Caricamento meteo…</div>
+                <div class="home-dash-meteo-minmax" id="home-dash-meteo-minmax"></div>
                 <div class="home-dash-meteo-loc">Vigevano</div>
               </div>
             </div>
@@ -3548,7 +3550,7 @@ function renderHomeDashboard() {
 }
 
 // ── METEO VIGEVANO (Open-Meteo, nessuna chiave richiesta) ────────────────
-const METEO_LAT = 45.3236, METEO_LON = 8.8586;
+const METEO_LAT = 45.3156, METEO_LON = 8.8597;
 let _meteoLoaded = false;
 
 // Icone SVG minimal, mappate dai weather_code WMO restituiti da Open-Meteo
@@ -3573,14 +3575,14 @@ async function loadMeteoVigevano() {
   if (_meteoLoaded) return;
   _meteoLoaded = true;
   try {
-    const cached = sessionStorage.getItem('meteoVigevano');
+    const cached = sessionStorage.getItem('meteoVigevanoV2');
     if (cached) {
       const { t, data } = JSON.parse(cached);
       if (Date.now() - t < 10 * 60 * 1000) { _renderMeteo(data); return; }
     }
-    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${METEO_LAT}&longitude=${METEO_LON}&current=temperature_2m,weather_code&timezone=Europe%2FRome`);
+    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${METEO_LAT}&longitude=${METEO_LON}&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=Europe%2FRome&forecast_days=1`);
     const data = await res.json();
-    sessionStorage.setItem('meteoVigevano', JSON.stringify({ t: Date.now(), data }));
+    sessionStorage.setItem('meteoVigevanoV2', JSON.stringify({ t: Date.now(), data }));
     _renderMeteo(data);
   } catch (e) {
     const cond = document.getElementById('home-dash-meteo-cond');
@@ -3594,6 +3596,14 @@ function _renderMeteo(data) {
   document.getElementById('home-dash-meteo-temp').textContent = Math.round(cur.temperature_2m) + '°';
   document.getElementById('home-dash-meteo-cond').textContent = info.label;
   document.getElementById('home-dash-meteo-icon').innerHTML = METEO_ICONS[info.icon];
+
+  const daily = data && data.daily;
+  const minmaxEl = document.getElementById('home-dash-meteo-minmax');
+  if (minmaxEl) {
+    minmaxEl.textContent = (daily && daily.temperature_2m_min && daily.temperature_2m_max)
+      ? `min ${Math.round(daily.temperature_2m_min[0])}° · max ${Math.round(daily.temperature_2m_max[0])}°`
+      : '';
+  }
 }
 
 // ── RACCOLTA RIFIUTI (Open-Meteo per il meteo, geolocalizzazione per la zona) ──

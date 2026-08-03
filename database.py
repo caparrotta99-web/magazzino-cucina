@@ -1,5 +1,6 @@
 import os
 import re
+import base64
 import sqlite3
 from datetime import date, datetime, timedelta, timezone
 from collections import OrderedDict
@@ -409,6 +410,13 @@ def db_init():
                 tipo_rifiuto     TEXT NOT NULL,
                 UNIQUE(zona, giorno_settimana, tipo_rifiuto)
             )""",
+            f"""CREATE TABLE IF NOT EXISTS push_subscriptions (
+                id                 {pk},
+                utente_id          INTEGER NOT NULL,
+                subscription_json  TEXT NOT NULL,
+                endpoint           TEXT NOT NULL DEFAULT '',
+                created_at         TEXT NOT NULL DEFAULT ''
+            )""",
             "CREATE INDEX IF NOT EXISTS idx_reg_prod_lotto ON registro(prodotto, lotto)",
             "CREATE INDEX IF NOT EXISTS idx_reg_prod_lotto_tipo ON registro(prodotto, lotto, tipo)",
             "CREATE INDEX IF NOT EXISTS idx_reg_data       ON registro(data)",
@@ -423,6 +431,8 @@ def db_init():
             "CREATE INDEX IF NOT EXISTS idx_lock_apparecchio ON lock_movimenti(apparecchio_id)",
             "CREATE INDEX IF NOT EXISTS idx_chat_canale ON chat_messaggi(canale)",
             "CREATE INDEX IF NOT EXISTS idx_raccolta_zona ON raccolta_rifiuti_calendario(zona)",
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_push_sub_endpoint ON push_subscriptions(endpoint)",
+            "CREATE INDEX IF NOT EXISTS idx_push_sub_utente ON push_subscriptions(utente_id)",
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email    ON users(email)",
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_telefono ON users(telefono)",
         ]:
@@ -1334,6 +1344,70 @@ def get_raccolta_calendario(zona):
             "WHERE zona = ? ORDER BY giorno_settimana",
             (zona,)
         )
+        return _rows(cur)
+
+
+# ─── PUSH NOTIFICATIONS ──────────────────────────────────────────────────────
+
+def _b64url(data):
+    return base64.urlsafe_b64encode(data).rstrip(b'=').decode()
+
+
+def get_or_create_vapid_keys():
+    """Coppia di chiavi VAPID (pubblica, privata) per le Web Push, generata
+    una sola volta e persistita in impostazioni_app — mai hardcoded nel
+    codice sorgente."""
+    pub  = get_impostazione('vapid_public_key', '')
+    priv = get_impostazione('vapid_private_key', '')
+    if pub and priv:
+        return pub, priv
+
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+    from cryptography.hazmat.backends import default_backend
+
+    priv_key = ec.generate_private_key(ec.SECP256R1(), default_backend())
+    priv_raw = priv_key.private_numbers().private_value.to_bytes(32, 'big')
+    pub_raw  = priv_key.public_key().public_bytes(Encoding.X962, PublicFormat.UncompressedPoint)
+
+    pub, priv = _b64url(pub_raw), _b64url(priv_raw)
+    set_impostazione('vapid_public_key', pub)
+    set_impostazione('vapid_private_key', priv)
+    return pub, priv
+
+
+def save_push_subscription(utente_id, subscription_json, endpoint):
+    with get_conn() as conn:
+        conn.execute("DELETE FROM push_subscriptions WHERE endpoint = ?", (endpoint,))
+        conn.execute(
+            "INSERT INTO push_subscriptions (utente_id, subscription_json, endpoint, created_at) "
+            "VALUES (?, ?, ?, ?)",
+            (utente_id, subscription_json, endpoint, now_it().isoformat())
+        )
+
+
+def delete_push_subscription(endpoint):
+    with get_conn() as conn:
+        conn.execute("DELETE FROM push_subscriptions WHERE endpoint = ?", (endpoint,))
+
+
+def get_push_subscriptions_by_users(utente_ids):
+    utente_ids = list(utente_ids)
+    if not utente_ids:
+        return []
+    placeholders = ','.join('?' * len(utente_ids))
+    with get_conn() as conn:
+        cur = conn.execute(
+            f"SELECT id, utente_id, subscription_json, endpoint FROM push_subscriptions "
+            f"WHERE utente_id IN ({placeholders})",
+            tuple(utente_ids)
+        )
+        return _rows(cur)
+
+
+def get_all_push_subscriptions():
+    with get_conn() as conn:
+        cur = conn.execute("SELECT id, utente_id, subscription_json, endpoint FROM push_subscriptions")
         return _rows(cur)
 
 

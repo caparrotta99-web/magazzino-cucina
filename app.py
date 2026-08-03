@@ -9,7 +9,7 @@ import threading
 from datetime import datetime, timedelta
 from functools import wraps
 
-from timezone_utils import now_it, today_it
+from timezone_utils import now_it, today_it, TZ_ITALIA
 
 from flask import (
     Flask, render_template, request, jsonify,
@@ -20,6 +20,9 @@ from flask_login import (
     login_user, logout_user, login_required, current_user,
 )
 from werkzeug.security import generate_password_hash, check_password_hash
+from pywebpush import webpush, WebPushException
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
 
 from database import (
     db_init,
@@ -40,6 +43,8 @@ from database import (
     update_chat_messaggio, elimina_chat_messaggio, get_chat_unread_count,
     log_chat_azione, get_log_chat_messaggi,
     RIFIUTI_ZONE_INFO, get_impostazione, set_impostazione, get_raccolta_calendario,
+    get_or_create_vapid_keys, save_push_subscription, delete_push_subscription,
+    get_push_subscriptions_by_users, get_all_push_subscriptions,
     get_lista_spesa, add_lista_spesa_item, update_lista_spesa_completato,
     update_lista_spesa_fornitore, delete_lista_spesa_item, clear_lista_spesa,
     get_lista_spesa_item_by_id,
@@ -227,6 +232,43 @@ if not get_user_by_login('admin'):
         reparto='',
         role='admin',
     )
+
+VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY = get_or_create_vapid_keys()
+VAPID_CLAIMS_SUB = os.environ.get('VAPID_SUBJECT', 'mailto:info@brigade-app.local')
+
+
+def _invia_push(subscriptions, title, body, url='/', tag=''):
+    """Invia una notifica push a una lista di subscription (righe di
+    push_subscriptions). Rimuove automaticamente le subscription scadute
+    (endpoint non più valido, es. utente disinstallato/notifiche revocate)."""
+    payload = json.dumps({'title': title, 'body': body, 'url': url, 'tag': tag})
+    for sub in subscriptions:
+        try:
+            webpush(
+                subscription_info=json.loads(sub['subscription_json']),
+                data=payload,
+                vapid_private_key=VAPID_PRIVATE_KEY,
+                vapid_claims={'sub': VAPID_CLAIMS_SUB},
+            )
+        except WebPushException as e:
+            status = getattr(e.response, 'status_code', None)
+            if status in (404, 410):
+                delete_push_subscription(sub['endpoint'])
+        except Exception:
+            pass  # invio best-effort: un errore di rete non deve interrompere gli altri invii
+
+
+def push_to_users(user_ids, title, body, url='/', tag=''):
+    subs = get_push_subscriptions_by_users(user_ids)
+    if subs:
+        _invia_push(subs, title, body, url, tag)
+
+
+def push_to_all(title, body, url='/', tag=''):
+    subs = get_all_push_subscriptions()
+    if subs:
+        _invia_push(subs, title, body, url, tag)
+
 
 def _push_pending_to_sheets():
     """Invia a Google Sheets i movimenti/prodotti/temperature salvati solo in
@@ -454,7 +496,7 @@ def profile():
             success = 'Profilo aggiornato con successo'
             user = get_user_by_id(uid)
 
-    return render_template('profile.html', user=user, error=error, success=success)
+    return render_template('profile.html', user=user, error=error, success=success, vapid_public_key=VAPID_PUBLIC_KEY)
 
 
 # ─── ADMIN ────────────────────────────────────────────────────────────────────
@@ -566,7 +608,7 @@ def admin_rifiuta_utente():
 @app.route('/')
 @login_required
 def index():
-    return render_template('index.html')
+    return render_template('index.html', vapid_public_key=VAPID_PUBLIC_KEY)
 
 
 @app.route('/static/sw.js')
@@ -833,6 +875,12 @@ def api_carico():
         warning = 'Salvato localmente — Google Sheets non raggiungibile. Verrà sincronizzato automaticamente.'
 
     insert_movimento(row)
+
+    if scadenza == oggi:
+        push_to_all(
+            'Prodotto in scadenza oggi', f'{prodotto} (lotto {lotto}) scade oggi',
+            url='/?goto=alert', tag='scadenza-oggi'
+        )
 
     return jsonify({
         'success':      True,
@@ -1191,6 +1239,17 @@ def api_temperature_registra():
 
     insert_temperatura(row)
     registra_controllo_apparecchio(apparecchio_id)
+
+    if fuori_soglia:
+        reparto = app_row.get('reparto') or ''
+        dest = [u['id'] for u in get_all_users()
+                if u['stato'] == 'attivo' and (u['role'] == 'admin' or u['reparto'] == reparto)]
+        push_to_users(
+            dest, 'Temperatura fuori soglia',
+            f"{app_row['nome']}: {temperatura}°C (range {app_row['temp_min']}–{app_row['temp_max']}°C)",
+            url='/?goto=temperature', tag='temp-fuori-soglia'
+        )
+
     return jsonify({'success': True, 'esito': esito, 'warning': warning})
 
 
@@ -2058,6 +2117,15 @@ def api_chat_invia():
 
     foto_url = _salva_foto_chat(foto_b64)
     msg_id = insert_chat_messaggio(canale, int(current_user.id), current_user.nome, testo, foto_url)
+
+    dest = [u['id'] for u in get_all_users()
+            if u['stato'] == 'attivo' and (u['role'] == 'admin' or u['puo_chat']) and u['id'] != int(current_user.id)]
+    push_to_users(
+        dest, f'{current_user.nome} in chat',
+        testo if testo else 'Ha inviato una foto',
+        url='/?goto=chat', tag='chat'
+    )
+
     return jsonify({'success': True, 'id': msg_id})
 
 
@@ -2152,6 +2220,79 @@ def api_rifiuti_set_zona():
     return jsonify({'success': True})
 
 
+# ─── PUSH NOTIFICATIONS ─────────────────────────────────────────────────────
+
+@app.route('/api/push/vapid-public-key')
+@login_required
+def api_push_vapid_key():
+    return jsonify({'success': True, 'publicKey': VAPID_PUBLIC_KEY})
+
+
+@app.route('/api/push/subscribe', methods=['POST'])
+@login_required
+def api_push_subscribe():
+    data = request.get_json(force=True)
+    endpoint = (data or {}).get('endpoint', '')
+    if not data or not endpoint:
+        return jsonify({'success': False, 'error': 'Subscription non valida'}), 400
+    save_push_subscription(int(current_user.id), json.dumps(data), endpoint)
+    return jsonify({'success': True})
+
+
+@app.route('/api/push/unsubscribe', methods=['POST'])
+@login_required
+def api_push_unsubscribe():
+    endpoint = (request.get_json(silent=True) or {}).get('endpoint', '')
+    if endpoint:
+        delete_push_subscription(endpoint)
+    return jsonify({'success': True})
+
+
+# ─── NOTIFICHE AUTOMATICHE GIORNALIERE ──────────────────────────────────────
+
+def _job_promemoria_temperature(momento):
+    push_to_all(
+        'Temperature da controllare',
+        f'Ricordati di registrare le temperature di {momento}',
+        url='/?goto=temperature', tag=f'promemoria-temp-{momento}'
+    )
+
+
+def _job_scadenze_oggi_domani():
+    scadenze = [a for a in get_alerts()['scadenze'] if a['giorni'] in (0, 1)]
+    if not scadenze:
+        return
+    nomi = ', '.join(a['prodotto'] for a in scadenze[:10])
+    if len(scadenze) > 10:
+        nomi += f' e altri {len(scadenze) - 10}'
+    push_to_all('Prodotti in scadenza', nomi, url='/?goto=alert', tag='scadenze-giorno')
+
+
+def _job_sotto_scorta():
+    scorte = get_alerts()['scorte']
+    if not scorte:
+        return
+    nomi = ', '.join(s['prodotto'] for s in scorte[:10])
+    if len(scorte) > 10:
+        nomi += f' e altri {len(scorte) - 10}'
+    push_to_all('Prodotti sotto scorta minima', nomi, url='/?goto=alert', tag='sotto-scorta')
+
+
+_scheduler = BackgroundScheduler(timezone=TZ_ITALIA)
+_scheduler.add_job(lambda: _job_promemoria_temperature('mattina'),
+                    CronTrigger(hour=7, minute=30, timezone=TZ_ITALIA), id='promemoria_temp_mattina')
+_scheduler.add_job(lambda: _job_promemoria_temperature('sera'),
+                    CronTrigger(hour=20, minute=30, timezone=TZ_ITALIA), id='promemoria_temp_sera')
+_scheduler.add_job(_job_scadenze_oggi_domani,
+                    CronTrigger(hour=8, minute=0, timezone=TZ_ITALIA), id='scadenze_giorno')
+_scheduler.add_job(_job_sotto_scorta,
+                    CronTrigger(hour=8, minute=0, timezone=TZ_ITALIA), id='sotto_scorta')
+_scheduler.start()
+
+
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 10000))
-    app.run(debug=True, host='0.0.0.0', port=port)
+    # use_reloader=False: con il reloader di Werkzeug l'intero modulo (quindi
+    # anche l'avvio di _scheduler sopra) verrebbe eseguito due volte,
+    # duplicando ogni notifica push programmata.
+    app.run(debug=True, use_reloader=False, host='0.0.0.0', port=port)

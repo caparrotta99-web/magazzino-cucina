@@ -108,3 +108,40 @@ async function cacheFirst(request) {
     return new Response('', { status: 404 });
   }
 }
+
+// ── PUSH: notifica ricevuta dal server ────────────────────────────────────
+self.addEventListener('push', event => {
+  let data = { title: 'Brigade', body: '', url: '/', tag: '' };
+  try {
+    data = { ...data, ...event.data.json() };
+  } catch {
+    if (event.data) data.body = event.data.text();
+  }
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: '/static/icon-192.png',
+      badge: '/static/icon-192.png',
+      tag: data.tag || undefined,
+      data: { url: data.url || '/' },
+    })
+  );
+});
+
+// ── NOTIFICATIONCLICK: apre/porta in primo piano l'app sulla pagina giusta ─
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const url = (event.notification.data && event.notification.data.url) || '/';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clientsList => {
+      for (const client of clientsList) {
+        if ('focus' in client) {
+          client.postMessage({ type: 'push-click', url });
+          client.navigate(url).catch(() => {});
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow(url);
+    })
+  );
+});

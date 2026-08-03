@@ -106,7 +106,96 @@
     </form>
   </div>
 
+  <div class="card">
+    <div class="section-title" style="margin-top:0">Notifiche</div>
+    <div class="form-group">
+      <button type="button" class="btn-secondary" id="btn-notifiche" onclick="toggleNotifiche()">Attiva notifiche</button>
+      <span class="hint" id="notifiche-status"></span>
+    </div>
+  </div>
+
 </main>
+
+<script>
+const VAPID_PUBLIC_KEY = "{{ vapid_public_key }}";
+
+function _pushUrlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64  = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
+async function _apiJson(url, options) {
+  const res = await fetch(url, {
+    method: options.method || 'GET',
+    headers: { 'Content-Type': 'application/json' },
+    body: options.body ? JSON.stringify(options.body) : undefined,
+  });
+  return res.json();
+}
+
+async function _getPushSubscription() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return null;
+  const reg = await navigator.serviceWorker.register('/static/sw.js', { scope: '/' });
+  return reg.pushManager.getSubscription();
+}
+
+async function toggleNotifiche() {
+  const btn = document.getElementById('btn-notifiche');
+  btn.disabled = true;
+  try {
+    const existing = await _getPushSubscription();
+    if (existing) {
+      await _apiJson('/api/push/unsubscribe', { method: 'POST', body: { endpoint: existing.endpoint } });
+      await existing.unsubscribe();
+      refreshNotificheStatus();
+      return;
+    }
+    if (Notification.permission === 'denied') {
+      document.getElementById('notifiche-status').textContent =
+        'Notifiche bloccate dal browser — abilitale dalle impostazioni del dispositivo.';
+      return;
+    }
+    const perm = await Notification.requestPermission();
+    if (perm !== 'granted') { refreshNotificheStatus(); return; }
+    const reg = await navigator.serviceWorker.register('/static/sw.js', { scope: '/' });
+    const sub = await reg.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: _pushUrlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+    });
+    await _apiJson('/api/push/subscribe', { method: 'POST', body: sub.toJSON() });
+    localStorage.setItem('pushAsked', '1');
+    refreshNotificheStatus();
+  } catch (e) {
+    document.getElementById('notifiche-status').textContent = 'Impossibile attivare le notifiche su questo dispositivo.';
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function refreshNotificheStatus() {
+  const btn    = document.getElementById('btn-notifiche');
+  const status = document.getElementById('notifiche-status');
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
+    btn.disabled = true;
+    status.textContent = 'Le notifiche non sono supportate su questo dispositivo/browser.';
+    return;
+  }
+  const sub = await _getPushSubscription();
+  if (sub) {
+    btn.textContent = 'Disattiva notifiche';
+    status.textContent = 'Notifiche attive su questo dispositivo.';
+  } else {
+    btn.textContent = 'Attiva notifiche';
+    status.textContent = Notification.permission === 'denied'
+      ? 'Notifiche bloccate dal browser.'
+      : 'Ricevi avvisi su temperature, scadenze e messaggi in chat.';
+  }
+}
+
+refreshNotificheStatus();
+</script>
 
 </body>
 </html>

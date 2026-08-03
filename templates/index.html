@@ -17,14 +17,21 @@
   margin: 0; padding: 0; box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
 }
-html { height: -webkit-fill-available; }
+html {
+  height: 100%;
+  background: var(--bg);
+}
 body {
   font-family: 'Inter', system-ui, -apple-system, sans-serif;
   background: var(--bg);
   color: var(--text);
   min-height: 100dvh;
-  min-height: -webkit-fill-available;
   overflow-x: hidden;
+  /* Evita che il "rubber-band bounce" di iOS Safari scopra lo sfondo di
+     <html> sotto il contenuto, visibile come una linea scura in fondo
+     allo schermo all'apertura dell'app. */
+  overscroll-behavior-y: none;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
   -webkit-font-smoothing: antialiased;
   transition: background .25s ease, color .25s ease;
 }
@@ -1967,11 +1974,6 @@ body.chat-active main { height: calc(100dvh - var(--hdr-h) - env(safe-area-inset
               <ul class="home-dash-simple-list" id="home-dash-docks-list"></ul>
             </div>
 
-            <button type="button" class="home-dash-pdf-btn" onclick="navTo('export')">
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-              Scarica PDF
-            </button>
-
             {% if current_user.puo_accedere_chat %}
             <div class="home-dash-card" onclick="navTo('chat')">
               <div class="home-dash-card-top">
@@ -1982,6 +1984,11 @@ body.chat-active main { height: calc(100dvh - var(--hdr-h) - env(safe-area-inset
               <button type="button" class="home-dash-pdf-btn" style="margin-top:12px;margin-bottom:0" onclick="event.stopPropagation(); navTo('chat')">Apri chat</button>
             </div>
             {% endif %}
+
+            <button type="button" class="home-dash-pdf-btn" onclick="navTo('export')">
+              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              Scarica PDF
+            </button>
           </div>
         </div>
 
@@ -3364,6 +3371,7 @@ const TUTORIAL_VISTO = {{ 'true' if current_user.is_authenticated and current_us
 const CAN_CHAT = {{ 'true' if current_user.is_authenticated and current_user.puo_accedere_chat else 'false' }};
 const CURRENT_USER_ID = {{ current_user.id if current_user.is_authenticated else 0 }};
 const IS_ADMIN = {{ 'true' if current_user.is_authenticated and current_user.role == 'admin' else 'false' }};
+const VAPID_PUBLIC_KEY = "{{ vapid_public_key }}";
 
 // ── STATE ────────────────────────────────────────────────────────────────
 const S = {
@@ -3462,7 +3470,7 @@ async function init() {
   animHomeCards();
   _initGiacSwipe();
   _initHomeSwipe();
-  _setHomePage(1, false);
+  _setHomePage(IS_ADMIN ? 0 : 1, false);
   await Promise.all([loadCategorie(), loadProdottiCarico(), loadGiacenze(), loadAlerts(), loadListaSpesa(), loadInUso(), loadApparecchi(), loadStoricoTemperature(), loadLocks()]);
   setInterval(loadLocks, 20000);
   renderInUsoProdotti();
@@ -7268,6 +7276,52 @@ async function loadChatUnreadBadge() {
   if (badge) { badge.textContent = count > 0 ? count : ''; badge.classList.toggle('show', count > 0); }
 }
 
+// ── PUSH NOTIFICATIONS ──────────────────────────────────────────────────
+function _pushUrlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - base64String.length % 4) % 4);
+  const base64  = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = atob(base64);
+  return Uint8Array.from([...raw].map(c => c.charCodeAt(0)));
+}
+
+async function ensurePushSubscription() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !VAPID_PUBLIC_KEY) return false;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    let sub = await reg.pushManager.getSubscription();
+    if (!sub) {
+      sub = await reg.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: _pushUrlBase64ToUint8Array(VAPID_PUBLIC_KEY),
+      });
+    }
+    await api('/api/push/subscribe', { method: 'POST', body: sub.toJSON() });
+    return true;
+  } catch (e) {
+    console.warn('[Push] subscribe failed', e);
+    return false;
+  }
+}
+
+async function requestPushPermission() {
+  if (!('Notification' in window)) return false;
+  const perm = await Notification.requestPermission();
+  return perm === 'granted' ? ensurePushSubscription() : false;
+}
+
+function initPushNotifications() {
+  if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
+  if (Notification.permission === 'granted') {
+    ensurePushSubscription();
+  } else if (Notification.permission === 'default' && !localStorage.getItem('pushAsked')) {
+    // Al primo accesso dopo il login chiediamo il permesso una sola volta:
+    // se l'utente nega, il browser stesso non richiederà più il prompt e
+    // pushAsked evita che lo richiediamo noi ad ogni apertura dell'app.
+    localStorage.setItem('pushAsked', '1');
+    requestPushPermission();
+  }
+}
+
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { closeLotDetail(); closeModificaLotto(); closeDrawer(); closeApparecchioModal(); closeRegistraTempModal(); closeNuovaPreparazione(); closePrepEtichetta(); closeScaricoModal(); closeNuovaPrenotazione(); closePrenDetail(); closeNuovaSala(); closeTavoloForm(); closeTavoloSheet(); closeChatAzioni(); }
 });
@@ -7275,10 +7329,27 @@ document.addEventListener('keydown', e => {
 // ── BOOT ─────────────────────────────────────────────────────────────────
 init();
 
+// Se l'app è stata aperta dal tap su una notifica push (?goto=pagina),
+// naviga direttamente lì invece della home.
+(function () {
+  const goto = new URLSearchParams(location.search).get('goto');
+  if (goto && document.getElementById(`page-${goto}`)) {
+    history.replaceState(null, '', location.pathname);
+    navTo(goto);
+  }
+})();
+
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('/static/sw.js', { scope: '/' })
+      .then(() => { if (CURRENT_USER_ID) initPushNotifications(); })
       .catch(e => console.warn('[SW]', e));
+  });
+  navigator.serviceWorker.addEventListener('message', e => {
+    if (e.data && e.data.type === 'push-click' && e.data.url) {
+      const goto = new URLSearchParams(e.data.url.split('?')[1] || '').get('goto');
+      if (goto && document.getElementById(`page-${goto}`)) navTo(goto);
+    }
   });
 }
 

@@ -394,7 +394,7 @@ main {
 .home-swipe-track {
   display: flex; align-items: flex-start;
   will-change: transform;
-  transition: transform .32s cubic-bezier(.22,.61,.36,1);
+  transition: transform .3s ease-out;
 }
 .home-swipe-page { flex: 0 0 100%; width: 100%; min-width: 100%; }
 .home-actions { padding: calc(20px + env(safe-area-inset-top)) 16px 90px; max-width: 600px; margin: 0 auto; }
@@ -1682,8 +1682,20 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
 /* ─── CHAT (stile Discord) ──────────────────────────────────────────────────
    Pagina a layout fisso (come la Dashboard): back-bar in cima, sotto una
    shell a due colonne (sidebar canali + area messaggi) che riempie tutto
-   lo spazio restante. */
-body.chat-active main { height: calc(100dvh - var(--hdr-h) - env(safe-area-inset-top)); overflow: hidden; }
+   lo spazio restante. La barra di input è l'ultimo figlio flex non
+   scrollabile di questa colonna: non scorre mai con i messaggi (solo
+   .chat-messages scorre). --app-vvh (impostata via JS dal Visual Viewport)
+   tiene l'altezza agganciata allo spazio davvero visibile: su iOS/Android
+   dvh non si riduce in modo affidabile quando compare la tastiera, quindi
+   senza questo la barra di input resterebbe nascosta sotto la tastiera. */
+/* min-height: 0 azzera il min-height calcolato dalla regola base di main
+   (che usa sempre 100dvh): senza, quando la tastiera si apre e --app-vvh
+   si riduce, quel min-height più alto vincerebbe su height e vanificherebbe
+   il calcolo qui sopra, lasciando la barra di input sotto la tastiera. */
+body.chat-active main { height: calc(var(--app-vvh, 100dvh) - var(--hdr-h) - env(safe-area-inset-top)); min-height: 0; overflow: hidden; }
+/* Blocca il pinch-to-zoom in chat: pan-y permette solo lo scroll verticale
+   nativo (liste, messaggi), niente pinch-zoom né pan orizzontale accidentale. */
+#page-chat, #page-chat * { touch-action: pan-y; }
 #page-chat.page { padding: 0; max-width: none; }
 #page-chat.page.active {
   display: flex; flex-direction: column;
@@ -1785,7 +1797,8 @@ body.chat-active main { height: calc(100dvh - var(--hdr-h) - env(safe-area-inset
 .chat-edit-textarea {
   width: 100%; min-height: 44px; resize: none; border-radius: 10px;
   border: 1px solid var(--border); padding: 8px 10px; font-family: 'Inter', sans-serif;
-  font-size: 14px; background: var(--surface-3); color: var(--text);
+  /* min 16px: sotto questa soglia iOS Safari fa zoom automatico sul focus */
+  font-size: 16px; background: var(--surface-3); color: var(--text);
 }
 .chat-edit-actions { display: flex; gap: 8px; justify-content: flex-end; }
 .chat-edit-actions button {
@@ -1822,7 +1835,8 @@ body.chat-active main { height: calc(100dvh - var(--hdr-h) - env(safe-area-inset
   flex: 1; height: 40px; max-height: 120px; min-height: 40px;
   border-radius: 20px; border: 1.5px solid var(--border);
   background: var(--surface-3); color: var(--text); padding: 10px 16px;
-  font-family: 'Inter', sans-serif; font-size: 15px; line-height: 1.25;
+  font-family: 'Inter', sans-serif; font-size: 16px; line-height: 1.25;
+  /* min 16px: sotto questa soglia iOS Safari fa zoom automatico sul focus */
   outline: none; resize: none; overflow-y: auto;
 }
 .chat-text-input:focus { border-color: rgba(var(--action-rgb),.5); }
@@ -7653,6 +7667,21 @@ function dismissNotifBanner() {
 document.addEventListener('keydown', e => {
   if (e.key === 'Escape') { closeLotDetail(); closeModificaLotto(); closeDrawer(); closeApparecchioModal(); closeRegistraTempModal(); closeNuovaPreparazione(); closePrepEtichetta(); closeScaricoModal(); closeNuovaPrenotazione(); closePrenDetail(); closeNuovaSala(); closeTavoloForm(); closeTavoloSheet(); closeChatAzioni(); closeChatPhotoViewer(); }
 });
+
+// ── VISUAL VIEWPORT (tastiera mobile) ───────────────────────────────────
+// Espone l'altezza realmente visibile (esclusa la tastiera su iOS/Android)
+// come --app-vvh, usata dal layout fisso della chat per tenere la barra di
+// input sempre sopra la tastiera invece che nascosta sotto di essa.
+function _updateAppVvh() {
+  const h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  document.documentElement.style.setProperty('--app-vvh', h + 'px');
+}
+_updateAppVvh();
+if (window.visualViewport) {
+  window.visualViewport.addEventListener('resize', _updateAppVvh);
+  window.visualViewport.addEventListener('scroll', _updateAppVvh);
+}
+window.addEventListener('load', _updateAppVvh);
 
 // ── BOOT ─────────────────────────────────────────────────────────────────
 init();

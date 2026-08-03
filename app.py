@@ -9,7 +9,7 @@ import threading
 from datetime import datetime, timedelta
 from functools import wraps
 
-from timezone_utils import now_it
+from timezone_utils import now_it, today_it
 
 from flask import (
     Flask, render_template, request, jsonify,
@@ -39,6 +39,7 @@ from database import (
     get_chat_messaggi, get_chat_preview, get_chat_messaggio_by_id, insert_chat_messaggio,
     update_chat_messaggio, elimina_chat_messaggio, get_chat_unread_count,
     log_chat_azione, get_log_chat_messaggi,
+    RIFIUTI_ZONE_INFO, get_impostazione, set_impostazione, get_raccolta_calendario,
     get_lista_spesa, add_lista_spesa_item, update_lista_spesa_completato,
     update_lista_spesa_fornitore, delete_lista_spesa_item, clear_lista_spesa,
     get_lista_spesa_item_by_id,
@@ -2121,6 +2122,34 @@ def api_chat_letto():
 @controllo_required
 def api_controllo_log_chat():
     return jsonify({'success': True, 'log': get_log_chat_messaggi()})
+
+
+# ─── RACCOLTA RIFIUTI ───────────────────────────────────────────────────────
+
+@app.route('/api/rifiuti/oggi')
+@login_required
+def api_rifiuti_oggi():
+    zona = get_impostazione('zona_rifiuti', '')
+    info = RIFIUTI_ZONE_INFO.get(zona)
+    if not info:
+        return jsonify({'success': True, 'zona': '', 'zona_label': '', 'tipi': []})
+    oggi = today_it()
+    giorno_esposto = oggi + timedelta(days=1) if info['espone_sera_precedente'] else oggi
+    calendario = get_raccolta_calendario(zona)
+    tipi = [r['tipo_rifiuto'] for r in calendario if r['giorno_settimana'] == giorno_esposto.weekday()]
+    return jsonify({'success': True, 'zona': zona, 'zona_label': info['label'], 'tipi': tipi})
+
+
+@app.route('/api/rifiuti/zona', methods=['POST'])
+@login_required
+@admin_required
+def api_rifiuti_set_zona():
+    data = request.get_json(silent=True) or {}
+    zona = data.get('zona', '')
+    if zona not in RIFIUTI_ZONE_INFO:
+        return jsonify({'success': False, 'error': 'Zona non valida'}), 400
+    set_impostazione('zona_rifiuti', zona)
+    return jsonify({'success': True})
 
 
 if __name__ == '__main__':

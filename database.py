@@ -43,6 +43,49 @@ PRANZO_CENA_CUTOFF = '17:00'
 # scada automaticamente e torni disponibile per un altro utente.
 LOCK_DURATA_MINUTI = 10
 
+# ─── RACCOLTA RIFIUTI ────────────────────────────────────────────────────────
+# Calendario settimanale porta a porta ASM Vigevano 2026 (fonte: asmisa.it).
+# giorno_settimana segue date.weekday(): 0=lunedì ... 6=domenica.
+RIFIUTI_ZONE_INFO = {
+    'centro_ristoranti': {
+        'label': 'Centro città — Ristoranti e Bar',
+        # esposizione la sera stessa del giorno di raccolta
+        'espone_sera_precedente': False,
+    },
+    'centro_negozi': {
+        'label': 'Centro città — Negozi',
+        'espone_sera_precedente': False,
+    },
+    'citta': {
+        'label': 'Città',
+        # esposizione dalle 21.00 del giorno precedente la raccolta
+        'espone_sera_precedente': True,
+    },
+}
+
+RACCOLTA_RIFIUTI_SEED = [
+    ('centro_ristoranti', 0, 'plastica'), ('centro_ristoranti', 0, 'vetro'),
+    ('centro_ristoranti', 1, 'secco'),    ('centro_ristoranti', 1, 'organico'),
+    ('centro_ristoranti', 2, 'carta'),    ('centro_ristoranti', 2, 'vetro'),
+    ('centro_ristoranti', 3, 'organico'),
+    ('centro_ristoranti', 4, 'carta'),    ('centro_ristoranti', 4, 'vetro'),
+    ('centro_ristoranti', 6, 'organico'),
+
+    ('centro_negozi', 0, 'plastica'),
+    ('centro_negozi', 1, 'secco'),
+    ('centro_negozi', 2, 'vetro'),
+    ('centro_negozi', 3, 'organico'),
+    ('centro_negozi', 4, 'carta'),
+    ('centro_negozi', 6, 'organico'),
+
+    ('citta', 0, 'organico'),
+    ('citta', 1, 'carta'),
+    ('citta', 2, 'secco'),
+    ('citta', 3, 'plastica'),
+    ('citta', 4, 'organico'),
+    ('citta', 5, 'vetro'),
+]
+
 if _USE_PG:
     import psycopg2
     import psycopg2.extras
@@ -355,6 +398,17 @@ def db_init():
                 operatore        TEXT NOT NULL DEFAULT '',
                 quando           TEXT NOT NULL DEFAULT ''
             )""",
+            f"""CREATE TABLE IF NOT EXISTS impostazioni_app (
+                chiave TEXT PRIMARY KEY,
+                valore TEXT NOT NULL DEFAULT ''
+            )""",
+            f"""CREATE TABLE IF NOT EXISTS raccolta_rifiuti_calendario (
+                id               {pk},
+                zona             TEXT NOT NULL,
+                giorno_settimana INTEGER NOT NULL,
+                tipo_rifiuto     TEXT NOT NULL,
+                UNIQUE(zona, giorno_settimana, tipo_rifiuto)
+            )""",
             "CREATE INDEX IF NOT EXISTS idx_reg_prod_lotto ON registro(prodotto, lotto)",
             "CREATE INDEX IF NOT EXISTS idx_reg_prod_lotto_tipo ON registro(prodotto, lotto, tipo)",
             "CREATE INDEX IF NOT EXISTS idx_reg_data       ON registro(data)",
@@ -368,10 +422,18 @@ def db_init():
             "CREATE INDEX IF NOT EXISTS idx_lock_prod_lotto  ON lock_movimenti(prodotto, lotto)",
             "CREATE INDEX IF NOT EXISTS idx_lock_apparecchio ON lock_movimenti(apparecchio_id)",
             "CREATE INDEX IF NOT EXISTS idx_chat_canale ON chat_messaggi(canale)",
+            "CREATE INDEX IF NOT EXISTS idx_raccolta_zona ON raccolta_rifiuti_calendario(zona)",
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_email    ON users(email)",
             "CREATE UNIQUE INDEX IF NOT EXISTS idx_users_telefono ON users(telefono)",
         ]:
             conn.execute(stmt)
+
+    with get_conn() as conn:
+        conn.executemany(
+            "INSERT OR IGNORE INTO raccolta_rifiuti_calendario "
+            "(zona, giorno_settimana, tipo_rifiuto) VALUES (?, ?, ?)",
+            RACCOLTA_RIFIUTI_SEED
+        )
 
     # ── Step 2: migrations — each in its own connection/transaction ────────────
     # On PostgreSQL a failed statement aborts the whole transaction, so we use
@@ -1246,6 +1308,31 @@ def get_log_chat_messaggi(limit=200):
     with get_conn() as conn:
         cur = conn.execute(
             "SELECT * FROM log_chat_messaggi ORDER BY id DESC LIMIT ?", (limit,)
+        )
+        return _rows(cur)
+
+
+# ─── RACCOLTA RIFIUTI ────────────────────────────────────────────────────────
+
+def get_impostazione(chiave, default=''):
+    with get_conn() as conn:
+        cur = conn.execute("SELECT valore FROM impostazioni_app WHERE chiave = ?", (chiave,))
+        row = _row(cur)
+        return row['valore'] if row else default
+
+
+def set_impostazione(chiave, valore):
+    with get_conn() as conn:
+        conn.execute("INSERT OR IGNORE INTO impostazioni_app (chiave, valore) VALUES (?, '')", (chiave,))
+        conn.execute("UPDATE impostazioni_app SET valore = ? WHERE chiave = ?", (valore, chiave))
+
+
+def get_raccolta_calendario(zona):
+    with get_conn() as conn:
+        cur = conn.execute(
+            "SELECT giorno_settimana, tipo_rifiuto FROM raccolta_rifiuti_calendario "
+            "WHERE zona = ? ORDER BY giorno_settimana",
+            (zona,)
         )
         return _rows(cur)
 

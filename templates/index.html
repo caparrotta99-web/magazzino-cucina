@@ -1679,47 +1679,109 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
 .tutorial-nav-next { background: #10b981; color: #fff; font-weight: 700; margin-left: auto; box-shadow: 0 4px 14px rgba(16,185,129,.3); }
 .tutorial-nav-next:active { background: #0ea271; }
 
-/* ─── CHAT ────────────────────────────────────────────────────────────────
-   Pagina a layout fisso (come la Dashboard): header/tab in cima, messaggi
-   che scorrono internamente, barra di input sempre ancorata in basso. */
+/* ─── CHAT (stile Discord) ──────────────────────────────────────────────────
+   Pagina a layout fisso (come la Dashboard): back-bar in cima, sotto una
+   shell a due colonne (sidebar canali + area messaggi) che riempie tutto
+   lo spazio restante. */
 body.chat-active main { height: calc(100dvh - var(--hdr-h) - env(safe-area-inset-top)); overflow: hidden; }
 #page-chat.page { padding: 0; max-width: none; }
 #page-chat.page.active {
   display: flex; flex-direction: column;
   height: 100%;
 }
-.chat-header { padding: 16px 16px 0; flex-shrink: 0; }
-.chat-tabs {
-  display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none;
-  padding: 12px 16px; flex-shrink: 0;
+.chat-topbar { padding: 16px 16px 0; flex-shrink: 0; }
+
+.chat-shell { flex: 1; display: flex; min-height: 0; }
+
+/* ── Sidebar canali: intenzionalmente più scura del contenuto principale ── */
+.chat-sidebar {
+  width: 100px; flex-shrink: 0; height: 100%;
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
+  background: var(--chat-sidebar-bg);
+  border-right: 1px solid var(--border);
+  padding: 12px 6px calc(12px + env(safe-area-inset-bottom, 0px));
 }
-.chat-tabs::-webkit-scrollbar { display: none; }
+:root { --chat-sidebar-bg: #e6e8eb; }
+:root[data-theme="dark"] { --chat-sidebar-bg: #081418; }
+.chat-sidebar-title {
+  font-size: 10px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase;
+  color: var(--muted-2); padding: 2px 8px 10px;
+}
+.chat-channel-item {
+  width: 100%; display: flex; align-items: center; gap: 5px;
+  padding: 9px 7px; border-radius: 8px; border: none; background: none; cursor: pointer;
+  font-family: 'Inter', sans-serif; color: var(--muted); text-align: left; margin-bottom: 3px;
+}
+.chat-channel-item:active { background: var(--surface-2); }
+.chat-channel-item.active { background: rgba(var(--action-rgb),.16); color: var(--text); }
+.chat-channel-hash { font-weight: 700; font-size: 13px; opacity: .55; flex-shrink: 0; }
+.chat-channel-item.active .chat-channel-hash { color: var(--action); opacity: 1; }
+.chat-channel-name {
+  font-size: 12px; font-weight: 700; flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.chat-channel-badge {
+  background: var(--error); color: #fff; font-size: 9.5px; font-weight: 800;
+  min-width: 16px; height: 16px; border-radius: 100px;
+  display: flex; align-items: center; justify-content: center; padding: 0 4px; flex-shrink: 0;
+}
+
+/* ── Area principale: header canale + messaggi + input ── */
+.chat-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+
+.chat-channel-header {
+  padding: 10px 16px; border-bottom: 1px solid var(--border); flex-shrink: 0;
+}
+.chat-channel-header-name {
+  font-size: 15px; font-weight: 800; color: var(--text);
+}
+.chat-channel-header-name::before { content: '#'; color: var(--muted-2); margin-right: 3px; font-weight: 700; }
+.chat-channel-header-desc { font-size: 11.5px; color: var(--muted); margin-top: 1px; }
 
 .chat-messages {
   flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
-  padding: 8px 14px; display: flex; flex-direction: column; gap: 10px;
+  padding: 6px 12px 10px;
+}
+.chat-empty-hint { text-align: center; color: var(--muted-2); font-size: 13px; padding: 40px 20px; }
+
+.chat-date-sep { display: flex; align-items: center; gap: 10px; margin: 16px 4px 10px; }
+.chat-date-sep::before, .chat-date-sep::after { content: ''; flex: 1; height: 1px; background: var(--border); }
+.chat-date-sep span { font-size: 11px; font-weight: 700; color: var(--muted-2); white-space: nowrap; }
+
+.chat-msg-row {
+  display: flex; gap: 10px; padding: 2px 6px; border-radius: 6px; cursor: pointer;
+  -webkit-user-select: none; user-select: none;
+}
+.chat-msg-row:active { background: var(--surface-2); }
+.chat-msg-row.chat-msg-first { margin-top: 12px; }
+.chat-messages > .chat-msg-row.chat-msg-first:first-child,
+.chat-date-sep + .chat-msg-row.chat-msg-first { margin-top: 0; }
+
+.chat-avatar-slot { width: 36px; flex-shrink: 0; display: flex; justify-content: center; }
+.chat-avatar {
+  width: 36px; height: 36px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 14px; font-weight: 800; color: #fff;
+}
+.chat-msg-time-gutter {
+  width: 36px; flex-shrink: 0; text-align: center; padding-top: 4px;
+  font-size: 9.5px; color: var(--muted-2);
 }
 
-.chat-bubble-row { display: flex; flex-direction: column; max-width: 78%; }
-.chat-bubble-row.own { align-self: flex-end; align-items: flex-end; }
-.chat-bubble-row.other { align-self: flex-start; align-items: flex-start; }
-.chat-bubble-nome { font-size: 11px; font-weight: 700; color: var(--muted); margin: 0 4px 3px; }
-.chat-bubble {
-  border-radius: 16px; padding: 9px 12px; position: relative;
-  font-size: 14.5px; line-height: 1.4; word-break: break-word;
-  box-shadow: var(--shadow); cursor: pointer; -webkit-user-select: none; user-select: none;
+.chat-msg-content { flex: 1; min-width: 0; }
+.chat-msg-meta { display: flex; align-items: baseline; gap: 6px; flex-wrap: wrap; margin-bottom: 1px; }
+.chat-msg-author { font-size: 13.5px; font-weight: 700; color: var(--text); }
+.chat-msg-badge { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: .2px; }
+.chat-msg-time { font-size: 10.5px; color: var(--muted-2); }
+.chat-msg-text { font-size: 14px; line-height: 1.45; color: var(--text); word-break: break-word; white-space: pre-wrap; }
+.chat-msg-text.deleted { font-style: italic; color: var(--muted-2); }
+.chat-msg-edited { font-size: 10.5px; color: var(--muted-2); font-style: italic; margin-left: 4px; }
+.chat-msg-photo {
+  max-width: min(280px, 68vw); max-height: 260px; object-fit: cover;
+  border-radius: 10px; margin-top: 5px; display: block; cursor: zoom-in;
 }
-.chat-bubble-row.own .chat-bubble { background: #10b981; color: #fff; border-bottom-right-radius: 4px; }
-.chat-bubble-row.other .chat-bubble { background: var(--card); border: 1px solid var(--border); color: var(--text); border-bottom-left-radius: 4px; }
-:root[data-theme="dark"] .chat-bubble-row.other .chat-bubble { backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); }
-.chat-bubble.deleted { font-style: italic; opacity: .65; }
-.chat-bubble img { max-width: 100%; border-radius: 10px; display: block; margin-bottom: 6px; }
-.chat-bubble-meta { font-size: 10px; margin-top: 4px; text-align: right; }
-.chat-bubble-row.own .chat-bubble-meta { color: rgba(255,255,255,.75); }
-.chat-bubble-row.other .chat-bubble-meta { color: var(--muted-2); }
-.chat-bubble-edited { font-style: italic; opacity: .8; }
 
-.chat-edit-wrap { display: flex; flex-direction: column; gap: 6px; min-width: 180px; }
+.chat-edit-wrap { display: flex; flex-direction: column; gap: 6px; margin-top: 2px; }
 .chat-edit-textarea {
   width: 100%; min-height: 44px; resize: none; border-radius: 10px;
   border: 1px solid var(--border); padding: 8px 10px; font-family: 'Inter', sans-serif;
@@ -1745,7 +1807,7 @@ body.chat-active main { height: calc(100dvh - var(--hdr-h) - env(safe-area-inset
 }
 
 .chat-input-bar {
-  flex-shrink: 0; display: flex; align-items: center; gap: 8px;
+  flex-shrink: 0; display: flex; align-items: flex-end; gap: 8px;
   padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--border); background: var(--card);
 }
@@ -1757,11 +1819,14 @@ body.chat-active main { height: calc(100dvh - var(--hdr-h) - env(safe-area-inset
 }
 .chat-icon-btn.chat-send-btn { background: #10b981; color: #fff; }
 .chat-text-input {
-  flex: 1; height: 40px; border-radius: 20px; border: 1.5px solid var(--border);
-  background: var(--surface-3); color: var(--text); padding: 0 16px;
-  font-family: 'Inter', sans-serif; font-size: 15px; outline: none;
+  flex: 1; height: 40px; max-height: 120px; min-height: 40px;
+  border-radius: 20px; border: 1.5px solid var(--border);
+  background: var(--surface-3); color: var(--text); padding: 10px 16px;
+  font-family: 'Inter', sans-serif; font-size: 15px; line-height: 1.25;
+  outline: none; resize: none; overflow-y: auto;
 }
 .chat-text-input:focus { border-color: rgba(var(--action-rgb),.5); }
+.chat-text-input::placeholder { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 .chat-action-opt {
   width: 100%; padding: 16px; border: none; background: none; cursor: pointer;
@@ -1772,6 +1837,20 @@ body.chat-active main { height: calc(100dvh - var(--hdr-h) - env(safe-area-inset
 .chat-action-opt:active { background: var(--surface-2); }
 .chat-action-delete { color: var(--red); }
 .chat-action-opt.selected { color: var(--action); }
+
+/* ── Lightbox foto (tap sull'anteprima inline) ── */
+.chat-photo-viewer-backdrop {
+  display: none; position: fixed; inset: 0; z-index: 400;
+  background: rgba(0,0,0,.92); align-items: center; justify-content: center; padding: 24px;
+}
+.chat-photo-viewer-backdrop.open { display: flex; }
+.chat-photo-viewer-backdrop img { max-width: 100%; max-height: 100%; border-radius: 10px; }
+.chat-photo-viewer-close {
+  position: absolute; top: calc(16px + env(safe-area-inset-top)); right: 16px; z-index: 1;
+  width: 40px; height: 40px; border-radius: 50%; border: none; cursor: pointer;
+  background: rgba(255,255,255,.15); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+}
 </style>
 </head>
 <body class="home-active">
@@ -2341,41 +2420,62 @@ body.chat-active main { height: calc(100dvh - var(--hdr-h) - env(safe-area-inset
     <div id="temp-storico-list"></div>
   </section>
 
-  <!-- CHAT -->
+  <!-- CHAT (stile Discord: sidebar canali + area messaggi) -->
   {% if current_user.is_authenticated and current_user.puo_accedere_chat %}
+  {% set chat_canale_desc = {
+    'generale': 'Canale generale per tutto lo staff',
+    'cucina':   'Solo per il reparto Cucina',
+    'sala':     'Solo per il reparto Sala',
+    'pizzeria': 'Solo per il reparto Pizzeria',
+  } %}
   <section class="page" id="page-chat">
-    <div class="chat-header">
+    <div class="chat-topbar">
       <div class="back-bar" onclick="navTo('home')" style="margin-bottom:0">
         <div class="back-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
         <span class="back-label">Chat</span>
       </div>
     </div>
 
-    <div class="chat-tabs" id="chat-tabs">
-      <button type="button" class="fpill active" data-canale="generale" onclick="setChatCanale('generale', this)">Generale</button>
-      <button type="button" class="fpill" data-canale="cucina" onclick="setChatCanale('cucina', this)">Cucina</button>
-      <button type="button" class="fpill" data-canale="sala" onclick="setChatCanale('sala', this)">Sala</button>
-      <button type="button" class="fpill" data-canale="pizzeria" onclick="setChatCanale('pizzeria', this)">Pizzeria</button>
-    </div>
+    <div class="chat-shell">
+      <div class="chat-sidebar">
+        <div class="chat-sidebar-title">Canali</div>
+        <div id="chat-channel-list">
+          {% for canale in current_user.canali_chat %}
+          <button type="button" class="chat-channel-item{{ ' active' if loop.first else '' }}" data-canale="{{ canale }}" onclick="setChatCanale('{{ canale }}', this)">
+            <span class="chat-channel-hash">#</span>
+            <span class="chat-channel-name">{{ canale }}</span>
+            <span class="chat-channel-badge" id="chat-badge-{{ canale }}" style="display:none">0</span>
+          </button>
+          {% endfor %}
+        </div>
+      </div>
 
-    <div class="chat-messages" id="chat-messages"></div>
+      <div class="chat-main">
+        <div class="chat-channel-header">
+          <div class="chat-channel-header-name" id="chat-channel-header-name">generale</div>
+          <div class="chat-channel-header-desc" id="chat-channel-header-desc">{{ chat_canale_desc['generale'] }}</div>
+        </div>
 
-    <div class="chat-photo-preview" id="chat-photo-preview" style="display:none">
-      <img id="chat-photo-preview-img" alt="">
-      <button type="button" class="chat-photo-preview-remove" onclick="cancelChatPhoto()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-      </button>
-    </div>
+        <div class="chat-messages" id="chat-messages"></div>
 
-    <div class="chat-input-bar">
-      <button type="button" class="chat-icon-btn" onclick="document.getElementById('chat-photo-input').click()" aria-label="Allega foto">
-        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-      </button>
-      <input type="file" id="chat-photo-input" accept="image/*" capture="environment" style="display:none" onchange="onChatPhotoSelected(event)">
-      <input type="text" class="chat-text-input" id="chat-text-input" placeholder="Scrivi un messaggio…" autocomplete="off">
-      <button type="button" class="chat-icon-btn chat-send-btn" onclick="sendChatMessage()" aria-label="Invia">
-        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-      </button>
+        <div class="chat-photo-preview" id="chat-photo-preview" style="display:none">
+          <img id="chat-photo-preview-img" alt="">
+          <button type="button" class="chat-photo-preview-remove" onclick="cancelChatPhoto()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+
+        <div class="chat-input-bar">
+          <button type="button" class="chat-icon-btn" onclick="document.getElementById('chat-photo-input').click()" aria-label="Allega foto">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+          </button>
+          <input type="file" id="chat-photo-input" accept="image/*" capture="environment" style="display:none" onchange="onChatPhotoSelected(event)">
+          <textarea class="chat-text-input" id="chat-text-input" rows="1" placeholder="Scrivi un messaggio in #generale…"></textarea>
+          <button type="button" class="chat-icon-btn chat-send-btn" onclick="sendChatMessage()" aria-label="Invia">
+            <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </div>
+      </div>
     </div>
 
     <!-- Azioni su messaggio (tap prolungato): Modifica/Elimina -->
@@ -2385,6 +2485,14 @@ body.chat-active main { height: calc(100dvh - var(--hdr-h) - env(safe-area-inset
         <button type="button" class="chat-action-opt" onclick="startEditChatMessage()">Modifica</button>
         <button type="button" class="chat-action-opt chat-action-delete" onclick="confirmDeleteChatMessage()">Elimina</button>
       </div>
+    </div>
+
+    <!-- Lightbox foto: tap sull'anteprima inline per vederla a schermo intero -->
+    <div class="chat-photo-viewer-backdrop" id="modal-chat-photo-viewer" onclick="closeChatPhotoViewer()">
+      <button type="button" class="chat-photo-viewer-close" onclick="closeChatPhotoViewer()" aria-label="Chiudi">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+      <img id="chat-photo-viewer-img" src="" alt="" onclick="event.stopPropagation()">
     </div>
   </section>
   {% endif %}
@@ -3433,6 +3541,15 @@ const CAN_CHAT = {{ 'true' if current_user.is_authenticated and current_user.puo
 const CURRENT_USER_ID = {{ current_user.id if current_user.is_authenticated else 0 }};
 const IS_ADMIN = {{ 'true' if current_user.is_authenticated and current_user.role == 'admin' else 'false' }};
 const VAPID_PUBLIC_KEY = "{{ vapid_public_key }}";
+const CHAT_MIE_CANALI = {{ (current_user.canali_chat if current_user.is_authenticated else []) | tojson }};
+const CHAT_CANALE_DESC = {
+  generale: 'Canale generale per tutto lo staff',
+  cucina:   'Solo per il reparto Cucina',
+  sala:     'Solo per il reparto Sala',
+  pizzeria: 'Solo per il reparto Pizzeria',
+};
+const CHAT_BADGE_COLORS = { Admin: '#eab308', Cucina: '#f97316', Sala: '#8b5cf6', Pizzeria: '#0d9488' };
+const CHAT_AVATAR_PALETTE = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#0d9488', '#3b82f6', '#8b5cf6', '#ec4899'];
 
 // ── STATE ────────────────────────────────────────────────────────────────
 const S = {
@@ -7152,10 +7269,11 @@ async function generaExportPdf() {
   }
 }
 
-// ── CHAT ─────────────────────────────────────────────────────────────────
+// ── CHAT (stile Discord) ────────────────────────────────────────────────
 let _chatPollTimer  = null;
 let _chatPhotoData  = null;   // data URL della foto selezionata, in attesa di invio
 let _chatLongPressT = null;
+let _chatLongPressFired = 0; // timestamp dell'ultimo tap prolungato, per non aprire anche il lightbox sulla foto
 let _chatActionMsgId = null;  // messaggio bersaglio del foglio Modifica/Elimina
 let _chatEditingId   = null;  // messaggio attualmente in modifica inline
 
@@ -7164,17 +7282,40 @@ function _fmtChatBubbleOra(iso) {
   return new Date(iso).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
 }
 
+function _fmtChatDateSep(iso) {
+  const d = new Date(iso);
+  const oggi = new Date();
+  const ieri = new Date(oggi); ieri.setDate(oggi.getDate() - 1);
+  const stessoGiorno = (a, b) => a.toDateString() === b.toDateString();
+  if (stessoGiorno(d, oggi)) return 'Oggi';
+  if (stessoGiorno(d, ieri)) return 'Ieri';
+  return d.toLocaleDateString('it-IT', {
+    day: 'numeric', month: 'long',
+    year: d.getFullYear() !== oggi.getFullYear() ? 'numeric' : undefined,
+  });
+}
+
+function _chatAvatarColor(nome) {
+  let hash = 0;
+  for (let i = 0; i < nome.length; i++) hash = nome.charCodeAt(i) + ((hash << 5) - hash);
+  return CHAT_AVATAR_PALETTE[Math.abs(hash) % CHAT_AVATAR_PALETTE.length];
+}
+
 function initChatPage() {
-  api('/api/chat/letto', { method: 'POST' }).then(loadChatUnreadBadge);
+  markChatCanaleLetto(S.chatCanale);
   loadChatMessages(true);
+  loadChatChannelBadges();
   stopChatPolling();
-  _chatPollTimer = setInterval(() => { if (_chatEditingId === null) loadChatMessages(false); }, 10000);
+  _chatPollTimer = setInterval(() => {
+    if (_chatEditingId === null) { loadChatMessages(false); loadChatChannelBadges(); }
+  }, 10000);
   const input = document.getElementById('chat-text-input');
   if (input && !input.dataset.enterBound) {
     input.dataset.enterBound = '1';
     input.addEventListener('keydown', e => {
-      if (e.key === 'Enter') { e.preventDefault(); sendChatMessage(); }
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendChatMessage(); }
     });
+    input.addEventListener('input', () => _autoGrowChatInput(input));
   }
 }
 
@@ -7185,9 +7326,33 @@ function stopChatPolling() {
 function setChatCanale(canale, btn) {
   S.chatCanale = canale;
   _chatEditingId = null;
-  document.querySelectorAll('#chat-tabs .fpill').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.chat-channel-item').forEach(p => p.classList.remove('active'));
   btn.classList.add('active');
+  document.getElementById('chat-channel-header-name').textContent = canale;
+  document.getElementById('chat-channel-header-desc').textContent = CHAT_CANALE_DESC[canale] || '';
+  const input = document.getElementById('chat-text-input');
+  if (input) input.placeholder = `Scrivi un messaggio in #${canale}…`;
   loadChatMessages(true);
+  markChatCanaleLetto(canale);
+}
+
+async function markChatCanaleLetto(canale) {
+  await api('/api/chat/letto', { method: 'POST', body: { canale } });
+  const badge = document.getElementById(`chat-badge-${canale}`);
+  if (badge) badge.style.display = 'none';
+  loadChatUnreadBadge();
+}
+
+async function loadChatChannelBadges() {
+  const data = await api('/api/chat/unread-count');
+  const counts = data.counts || {};
+  CHAT_MIE_CANALI.forEach(c => {
+    const badge = document.getElementById(`chat-badge-${c}`);
+    if (!badge) return;
+    const n = c === S.chatCanale ? 0 : (counts[c] || 0);
+    badge.textContent = n > 99 ? '99+' : n;
+    badge.style.display = n > 0 ? 'flex' : 'none';
+  });
 }
 
 async function loadChatMessages(scrollToBottom) {
@@ -7201,30 +7366,75 @@ function renderChatMessages(scrollToBottom) {
   if (!el) return;
   const eraInFondo = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
 
-  el.innerHTML = S.chatMessaggi.map(m => {
-    const own = m.utente_id === CURRENT_USER_ID;
+  let html = '';
+  let lastDateKey  = null;
+  let lastAuthorId = null;
+  let lastTime     = 0;
+
+  S.chatMessaggi.forEach(m => {
+    const d = new Date(m.creato_il);
+    const dateKey = d.toDateString();
+    if (dateKey !== lastDateKey) {
+      html += `<div class="chat-date-sep"><span>${_fmtChatDateSep(m.creato_il)}</span></div>`;
+      lastDateKey  = dateKey;
+      lastAuthorId = null;
+    }
+
+    const isNewGroup = m.eliminato || m.utente_id !== lastAuthorId || (d.getTime() - lastTime) > 5 * 60 * 1000;
+    lastAuthorId = m.eliminato ? null : m.utente_id;
+    lastTime     = d.getTime();
+    const ora    = _fmtChatBubbleOra(m.creato_il);
+
     if (m.eliminato) {
-      return `
-        <div class="chat-bubble-row ${own ? 'own' : 'other'}">
-          ${!own ? `<div class="chat-bubble-nome">${esc(m.utente_nome)}</div>` : ''}
-          <div class="chat-bubble deleted">Messaggio eliminato</div>
+      html += `
+        <div class="chat-msg-row chat-msg-first">
+          <div class="chat-avatar-slot"><div class="chat-avatar" style="background:${_chatAvatarColor(m.utente_nome)}">${esc((m.utente_nome[0] || '?').toUpperCase())}</div></div>
+          <div class="chat-msg-content">
+            <div class="chat-msg-meta"><span class="chat-msg-author">${esc(m.utente_nome)}</span><span class="chat-msg-time">${ora}</span></div>
+            <div class="chat-msg-text deleted">Messaggio eliminato</div>
+          </div>
+        </div>`;
+      return;
+    }
+
+    const canEdit = (m.utente_id === CURRENT_USER_ID) || IS_ADMIN;
+    const fotoHtml = m.foto
+      ? `<img class="chat-msg-photo" src="${esc(m.foto)}" alt="" onclick="_onChatPhotoClick(event, '${esc(m.foto)}')">`
+      : '';
+    const testoHtml  = m.testo ? `<div class="chat-msg-text">${esc(m.testo)}</div>` : '';
+    const editedHtml = m.modificato ? '<span class="chat-msg-edited">(modificato)</span>' : '';
+    const badgeColor = CHAT_BADGE_COLORS[m.autore_badge] || 'var(--muted)';
+    const badgeHtml  = m.autore_badge ? `<span class="chat-msg-badge" style="color:${badgeColor}">${esc(m.autore_badge)}</span>` : '';
+
+    if (isNewGroup) {
+      html += `
+        <div class="chat-msg-row chat-msg-first" data-id="${m.id}" data-can-edit="${canEdit ? '1' : '0'}">
+          <div class="chat-avatar-slot"><div class="chat-avatar" style="background:${_chatAvatarColor(m.utente_nome)}">${esc((m.utente_nome[0] || '?').toUpperCase())}</div></div>
+          <div class="chat-msg-content">
+            <div class="chat-msg-meta">
+              <span class="chat-msg-author">${esc(m.utente_nome)}</span>
+              ${badgeHtml}
+              <span class="chat-msg-time">${ora}</span>
+            </div>
+            ${testoHtml}${editedHtml}
+            ${fotoHtml}
+          </div>
+        </div>`;
+    } else {
+      html += `
+        <div class="chat-msg-row chat-msg-cont" data-id="${m.id}" data-can-edit="${canEdit ? '1' : '0'}">
+          <div class="chat-avatar-slot"><div class="chat-msg-time-gutter">${ora}</div></div>
+          <div class="chat-msg-content">
+            ${testoHtml}${editedHtml}
+            ${fotoHtml}
+          </div>
         </div>`;
     }
-    const canEdit = own || IS_ADMIN;
-    const foto = m.foto ? `<img src="${esc(m.foto)}" alt="">` : '';
-    const testo = m.testo ? esc(m.testo) : '';
-    const editedTag = m.modificato ? ' <span class="chat-bubble-edited">(modificato)</span>' : '';
-    return `
-      <div class="chat-bubble-row ${own ? 'own' : 'other'}">
-        ${!own ? `<div class="chat-bubble-nome">${esc(m.utente_nome)}</div>` : ''}
-        <div class="chat-bubble" data-id="${m.id}" data-can-edit="${canEdit ? '1' : '0'}">
-          ${foto}${testo}${editedTag}
-          <div class="chat-bubble-meta">${_fmtChatBubbleOra(m.creato_il)}</div>
-        </div>
-      </div>`;
-  }).join('');
+  });
 
-  document.querySelectorAll('.chat-bubble[data-can-edit="1"]').forEach(_attachChatLongPress);
+  el.innerHTML = html || '<div class="chat-empty-hint">Nessun messaggio ancora. Scrivi il primo!</div>';
+
+  document.querySelectorAll('.chat-msg-row[data-can-edit="1"]').forEach(_attachChatLongPress);
 
   if (scrollToBottom || eraInFondo) el.scrollTop = el.scrollHeight;
 }
@@ -7236,12 +7446,32 @@ function _attachChatLongPress(el) {
   const cancel = () => clearTimeout(_chatLongPressT);
   el.addEventListener('pointerdown', e => {
     sx = e.clientX; sy = e.clientY;
-    _chatLongPressT = setTimeout(() => openChatAzioni(parseInt(el.dataset.id, 10)), 480);
+    _chatLongPressT = setTimeout(() => {
+      _chatLongPressFired = Date.now();
+      openChatAzioni(parseInt(el.dataset.id, 10));
+    }, 480);
   });
   el.addEventListener('pointermove', e => {
     if (Math.abs(e.clientX - sx) > 10 || Math.abs(e.clientY - sy) > 10) cancel();
   });
   ['pointerup', 'pointercancel', 'pointerleave'].forEach(evt => el.addEventListener(evt, cancel));
+}
+
+function _onChatPhotoClick(event, url) {
+  event.stopPropagation();
+  // Sopprime solo il click che segue immediatamente lo stesso gesto di tap
+  // prolungato (evita di aprire anche il lightbox); un tap successivo,
+  // anche a distanza di pochi istanti, deve aprirlo normalmente.
+  if (Date.now() - _chatLongPressFired < 500) return;
+  openChatPhotoViewer(url);
+}
+
+function openChatPhotoViewer(url) {
+  document.getElementById('chat-photo-viewer-img').src = url;
+  document.getElementById('modal-chat-photo-viewer').classList.add('open');
+}
+function closeChatPhotoViewer() {
+  document.getElementById('modal-chat-photo-viewer').classList.remove('open');
 }
 
 function openChatAzioni(msgId) {
@@ -7257,9 +7487,11 @@ function startEditChatMessage() {
   const msg = S.chatMessaggi.find(m => m.id === msgId);
   if (!msg) return;
   _chatEditingId = msgId;
-  const bubble = document.querySelector(`.chat-bubble[data-id="${msgId}"]`);
-  if (!bubble) return;
-  bubble.innerHTML = `
+  const row = document.querySelector(`.chat-msg-row[data-id="${msgId}"]`);
+  if (!row) return;
+  const content = row.querySelector('.chat-msg-content');
+  const meta = content.querySelector('.chat-msg-meta');
+  content.innerHTML = (meta ? meta.outerHTML : '') + `
     <div class="chat-edit-wrap">
       <textarea class="chat-edit-textarea" id="chat-edit-textarea">${esc(msg.testo)}</textarea>
       <div class="chat-edit-actions">
@@ -7294,6 +7526,11 @@ function confirmDeleteChatMessage() {
   });
 }
 
+function _autoGrowChatInput(el) {
+  el.style.height = 'auto';
+  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+}
+
 async function sendChatMessage() {
   const input = document.getElementById('chat-text-input');
   const testo = input.value.trim();
@@ -7301,6 +7538,7 @@ async function sendChatMessage() {
   if (!testo && !foto) return;
 
   input.value = '';
+  _autoGrowChatInput(input);
   cancelChatPhoto();
 
   const res = await api('/api/chat', {
@@ -7413,7 +7651,7 @@ function dismissNotifBanner() {
 }
 
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeLotDetail(); closeModificaLotto(); closeDrawer(); closeApparecchioModal(); closeRegistraTempModal(); closeNuovaPreparazione(); closePrepEtichetta(); closeScaricoModal(); closeNuovaPrenotazione(); closePrenDetail(); closeNuovaSala(); closeTavoloForm(); closeTavoloSheet(); closeChatAzioni(); }
+  if (e.key === 'Escape') { closeLotDetail(); closeModificaLotto(); closeDrawer(); closeApparecchioModal(); closeRegistraTempModal(); closeNuovaPreparazione(); closePrepEtichetta(); closeScaricoModal(); closeNuovaPrenotazione(); closePrenDetail(); closeNuovaSala(); closeTavoloForm(); closeTavoloSheet(); closeChatAzioni(); closeChatPhotoViewer(); }
 });
 
 // ── BOOT ─────────────────────────────────────────────────────────────────

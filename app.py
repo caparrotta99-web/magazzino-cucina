@@ -38,9 +38,10 @@ from database import (
     create_reset_token, get_reset_token, use_reset_token, update_user_password,
     update_user_profile, update_user_reparto, update_user_tema, update_user_home_card, is_username_taken,
     update_user_dash_cards, get_ultimo_carico, update_user_tutorial_visto,
-    CHAT_CANALI, update_user_chat_permesso, update_user_chat_last_seen,
+    CHAT_CANALI, update_user_chat_permesso,
     get_chat_messaggi, get_chat_preview, get_chat_messaggio_by_id, insert_chat_messaggio,
-    update_chat_messaggio, elimina_chat_messaggio, get_chat_unread_count,
+    update_chat_messaggio, elimina_chat_messaggio,
+    set_chat_canale_letto, get_chat_unread_counts,
     log_chat_azione, get_log_chat_messaggi,
     RIFIUTI_ZONE_INFO, get_impostazione, set_impostazione, get_raccolta_calendario,
     get_or_create_vapid_keys, save_push_subscription, delete_push_subscription,
@@ -110,7 +111,6 @@ class User(UserMixin):
         self.puo_vedere_controllo = bool(data.get('puo_vedere_controllo'))
         self.puo_eliminare_carichi_raw = bool(data.get('puo_eliminare_carichi'))
         self.puo_chat_raw = bool(data.get('puo_chat'))
-        self.chat_last_seen = data.get('chat_last_seen') or ''
 
     @property
     def puo_gestire_apparecchi(self):
@@ -131,6 +131,18 @@ class User(UserMixin):
     @property
     def puo_accedere_chat(self):
         return self.role == 'admin' or self.puo_chat_raw
+
+    @property
+    def canali_chat(self):
+        """Canali chat visibili/accessibili: #generale per tutti, il canale
+        del proprio reparto per lo staff, tutti per l'admin."""
+        if not self.puo_accedere_chat:
+            return []
+        if self.role == 'admin':
+            return list(CHAT_CANALI)
+        canali = ['generale']
+        canali += [c for c, reparto in CHAT_CANALE_REPARTO.items() if reparto == self.reparto]
+        return canali
 
 
 @login_manager.user_loader
@@ -2060,6 +2072,7 @@ def api_locks_list():
 
 # ─── CHAT ─────────────────────────────────────────────────────────────────────
 CHAT_UPLOAD_DIR = os.path.join(app.root_path, 'static', 'chat_uploads')
+CHAT_CANALE_REPARTO = {'cucina': 'Cucina', 'sala': 'Sala', 'pizzeria': 'Pizzeria'}
 
 
 def _salva_foto_chat(foto_b64):
@@ -2081,7 +2094,7 @@ def _salva_foto_chat(foto_b64):
 @chat_required
 def api_chat_list():
     canale = (request.args.get('canale') or 'generale').strip()
-    if canale not in CHAT_CANALI:
+    if canale not in current_user.canali_chat:
         return jsonify({'success': False, 'error': 'Canale non valido'}), 400
     return jsonify({'success': True, 'messaggi': get_chat_messaggi(canale)})
 
@@ -2094,18 +2107,24 @@ def api_chat_invia():
     canale = (d.get('canale') or 'generale').strip()
     testo  = (d.get('testo') or '').strip()
     foto_b64 = d.get('foto') or ''
-    if canale not in CHAT_CANALI:
+    if canale not in current_user.canali_chat:
         return jsonify({'success': False, 'error': 'Canale non valido'}), 400
     if not testo and not foto_b64:
         return jsonify({'success': False, 'error': 'Messaggio vuoto'}), 400
 
     foto_url = _salva_foto_chat(foto_b64)
-    msg_id = insert_chat_messaggio(canale, int(current_user.id), current_user.nome, testo, foto_url)
+    autore_badge = 'Admin' if current_user.role == 'admin' else current_user.reparto
+    msg_id = insert_chat_messaggio(
+        canale, int(current_user.id), current_user.nome, testo, foto_url, autore_badge
+    )
 
+    # Notifica solo gli utenti che vedono davvero questo canale (stesso
+    # reparto o admin), non tutti gli abilitati alla chat.
     dest = [u['id'] for u in get_all_users()
-            if u['stato'] == 'attivo' and (u['role'] == 'admin' or u['puo_chat']) and u['id'] != int(current_user.id)]
+            if u['id'] != int(current_user.id) and u['stato'] == 'attivo'
+            and (u['role'] == 'admin' or (u['puo_chat'] and (canale == 'generale' or CHAT_CANALE_REPARTO.get(canale) == u['reparto'])))]
     push_to_users(
-        dest, f'{current_user.nome} in chat',
+        dest, f'{current_user.nome} in #{canale}',
         testo if testo else 'Ha inviato una foto',
         url='/?goto=chat', tag='chat'
     )
@@ -2151,21 +2170,25 @@ def api_chat_elimina(msg_id):
 @login_required
 @chat_required
 def api_chat_preview():
-    return jsonify({'success': True, 'messaggi': get_chat_preview()})
+    return jsonify({'success': True, 'messaggi': get_chat_preview(current_user.canali_chat)})
 
 
 @app.route('/api/chat/unread-count')
 @login_required
 @chat_required
 def api_chat_unread_count():
-    return jsonify({'success': True, 'count': get_chat_unread_count(int(current_user.id), current_user.chat_last_seen)})
+    counts = get_chat_unread_counts(int(current_user.id), current_user.canali_chat)
+    return jsonify({'success': True, 'counts': counts, 'count': sum(counts.values())})
 
 
 @app.route('/api/chat/letto', methods=['POST'])
 @login_required
 @chat_required
 def api_chat_letto():
-    update_user_chat_last_seen(int(current_user.id))
+    canale = (request.get_json(silent=True) or {}).get('canale', '')
+    if canale not in current_user.canali_chat:
+        return jsonify({'success': False, 'error': 'Canale non valido'}), 400
+    set_chat_canale_letto(int(current_user.id), canale)
     return jsonify({'success': True})
 
 

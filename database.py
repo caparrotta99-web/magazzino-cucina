@@ -384,11 +384,18 @@ def db_init():
                 canale       TEXT NOT NULL DEFAULT 'generale',
                 utente_id    INTEGER NOT NULL,
                 utente_nome  TEXT NOT NULL DEFAULT '',
+                autore_badge TEXT NOT NULL DEFAULT '',
                 testo        TEXT NOT NULL DEFAULT '',
                 foto         TEXT NOT NULL DEFAULT '',
                 modificato   INTEGER NOT NULL DEFAULT 0,
                 eliminato    INTEGER NOT NULL DEFAULT 0,
                 creato_il    TEXT NOT NULL DEFAULT ''
+            )""",
+            f"""CREATE TABLE IF NOT EXISTS chat_canale_letto (
+                utente_id INTEGER NOT NULL,
+                canale    TEXT NOT NULL,
+                last_seen TEXT NOT NULL DEFAULT '',
+                PRIMARY KEY (utente_id, canale)
             )""",
             f"""CREATE TABLE IF NOT EXISTS log_chat_messaggi (
                 id               {pk},
@@ -481,6 +488,7 @@ def db_init():
         ('users',        'tutorial_visto', "INTEGER NOT NULL DEFAULT 0"),
         ('users',        'puo_chat', "INTEGER NOT NULL DEFAULT 0"),
         ('users',        'chat_last_seen', "TEXT NOT NULL DEFAULT ''"),
+        ('chat_messaggi', 'autore_badge', "TEXT NOT NULL DEFAULT ''"),
     ]
     for table, col, defn in migrations:
         if _USE_PG:
@@ -1227,13 +1235,6 @@ def update_user_chat_permesso(user_id, permesso):
         )
 
 
-def update_user_chat_last_seen(user_id):
-    with get_conn() as conn:
-        conn.execute(
-            "UPDATE users SET chat_last_seen = ? WHERE id = ?", (now_it().isoformat(), user_id)
-        )
-
-
 def get_chat_messaggi(canale, limit=100):
     """Ultimi `limit` messaggi di un canale, in ordine cronologico crescente."""
     with get_conn() as conn:
@@ -1246,12 +1247,17 @@ def get_chat_messaggi(canale, limit=100):
         return rows
 
 
-def get_chat_preview(limit=4):
-    """Ultimi messaggi non eliminati su tutti i canali, per l'anteprima in dashboard."""
+def get_chat_preview(canali, limit=4):
+    """Ultimi messaggi non eliminati sui canali indicati, per l'anteprima in dashboard."""
+    canali = list(canali)
+    if not canali:
+        return []
+    placeholders = ','.join('?' * len(canali))
     with get_conn() as conn:
         cur = conn.execute(
-            "SELECT * FROM chat_messaggi WHERE eliminato = 0 ORDER BY id DESC LIMIT ?",
-            (limit,)
+            f"SELECT * FROM chat_messaggi WHERE eliminato = 0 AND canale IN ({placeholders}) "
+            f"ORDER BY id DESC LIMIT ?",
+            (*canali, limit)
         )
         rows = _rows(cur)
         rows.reverse()
@@ -1264,12 +1270,12 @@ def get_chat_messaggio_by_id(msg_id):
         return _row(cur)
 
 
-def insert_chat_messaggio(canale, utente_id, utente_nome, testo, foto=''):
+def insert_chat_messaggio(canale, utente_id, utente_nome, testo, foto='', autore_badge=''):
     with get_conn() as conn:
         return conn.execute_insert(
-            "INSERT INTO chat_messaggi (canale, utente_id, utente_nome, testo, foto, creato_il) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
-            (canale, utente_id, utente_nome, testo, foto, now_it().isoformat())
+            "INSERT INTO chat_messaggi (canale, utente_id, utente_nome, testo, foto, autore_badge, creato_il) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (canale, utente_id, utente_nome, testo, foto, autore_badge, now_it().isoformat())
         )
 
 
@@ -1286,22 +1292,51 @@ def elimina_chat_messaggio(msg_id):
         conn.execute("UPDATE chat_messaggi SET eliminato = 1 WHERE id = ?", (msg_id,))
 
 
-def get_chat_unread_count(user_id, last_seen):
-    """Messaggi di altri utenti arrivati dopo l'ultima visita alla chat."""
+def set_chat_canale_letto(utente_id, canale):
     with get_conn() as conn:
-        if last_seen:
-            cur = conn.execute(
-                "SELECT COUNT(*) AS c FROM chat_messaggi "
-                "WHERE eliminato = 0 AND utente_id != ? AND creato_il > ?",
-                (user_id, last_seen)
-            )
-        else:
-            cur = conn.execute(
-                "SELECT COUNT(*) AS c FROM chat_messaggi WHERE eliminato = 0 AND utente_id != ?",
-                (user_id,)
-            )
-        row = _row(cur)
-        return row['c'] if row else 0
+        conn.execute(
+            "INSERT OR IGNORE INTO chat_canale_letto (utente_id, canale, last_seen) VALUES (?, ?, '')",
+            (utente_id, canale)
+        )
+        conn.execute(
+            "UPDATE chat_canale_letto SET last_seen = ? WHERE utente_id = ? AND canale = ?",
+            (now_it().isoformat(), utente_id, canale)
+        )
+
+
+def get_chat_unread_counts(utente_id, canali):
+    """Dict {canale: numero di messaggi di altri utenti arrivati dopo l'ultima
+    visita dell'utente a quel canale}, per i soli canali indicati."""
+    canali = list(canali)
+    if not canali:
+        return {}
+    with get_conn() as conn:
+        placeholders = ','.join('?' * len(canali))
+        cur = conn.execute(
+            f"SELECT canale, last_seen FROM chat_canale_letto "
+            f"WHERE utente_id = ? AND canale IN ({placeholders})",
+            (utente_id, *canali)
+        )
+        seen = {r['canale']: r['last_seen'] for r in _rows(cur)}
+
+        result = {}
+        for canale in canali:
+            last_seen = seen.get(canale, '')
+            if last_seen:
+                cur2 = conn.execute(
+                    "SELECT COUNT(*) AS c FROM chat_messaggi "
+                    "WHERE canale = ? AND eliminato = 0 AND utente_id != ? AND creato_il > ?",
+                    (canale, utente_id, last_seen)
+                )
+            else:
+                cur2 = conn.execute(
+                    "SELECT COUNT(*) AS c FROM chat_messaggi "
+                    "WHERE canale = ? AND eliminato = 0 AND utente_id != ?",
+                    (canale, utente_id)
+                )
+            row = _row(cur2)
+            result[canale] = row['c'] if row else 0
+        return result
 
 
 def log_chat_azione(azione, canale, autore_originale, testo_originale, operatore):

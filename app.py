@@ -876,12 +876,6 @@ def api_carico():
 
     insert_movimento(row)
 
-    if scadenza == oggi:
-        push_to_all(
-            'Prodotto in scadenza oggi', f'{prodotto} (lotto {lotto}) scade oggi',
-            url='/?goto=alert', tag='scadenza-oggi'
-        )
-
     return jsonify({
         'success':      True,
         'movimento_id': movimento_id,
@@ -1239,16 +1233,6 @@ def api_temperature_registra():
 
     insert_temperatura(row)
     registra_controllo_apparecchio(apparecchio_id)
-
-    if fuori_soglia:
-        reparto = app_row.get('reparto') or ''
-        dest = [u['id'] for u in get_all_users()
-                if u['stato'] == 'attivo' and (u['role'] == 'admin' or u['reparto'] == reparto)]
-        push_to_users(
-            dest, 'Temperatura fuori soglia',
-            f"{app_row['nome']}: {temperatura}°C (range {app_row['temp_min']}–{app_row['temp_max']}°C)",
-            url='/?goto=temperature', tag='temp-fuori-soglia'
-        )
 
     return jsonify({'success': True, 'esito': esito, 'warning': warning})
 
@@ -2194,17 +2178,33 @@ def api_controllo_log_chat():
 
 # ─── RACCOLTA RIFIUTI ───────────────────────────────────────────────────────
 
-@app.route('/api/rifiuti/oggi')
-@login_required
-def api_rifiuti_oggi():
+RIFIUTI_TIPI_LABEL = {
+    'organico': 'Organico', 'carta': 'Carta', 'plastica': 'Plastica',
+    'secco': 'Indifferenziato', 'vetro': 'Vetro e lattine',
+}
+
+
+def _calcola_rifiuti_oggi():
+    """Zona configurata, sue info (label/orario di esposizione) e lista dei
+    tipi di rifiuto da esporre stasera, secondo la regola della zona
+    (stesso giorno per i centri, sera precedente per la Città)."""
     zona = get_impostazione('zona_rifiuti', '')
     info = RIFIUTI_ZONE_INFO.get(zona)
     if not info:
-        return jsonify({'success': True, 'zona': '', 'zona_label': '', 'tipi': []})
+        return zona, info, []
     oggi = today_it()
     giorno_esposto = oggi + timedelta(days=1) if info['espone_sera_precedente'] else oggi
     calendario = get_raccolta_calendario(zona)
     tipi = [r['tipo_rifiuto'] for r in calendario if r['giorno_settimana'] == giorno_esposto.weekday()]
+    return zona, info, tipi
+
+
+@app.route('/api/rifiuti/oggi')
+@login_required
+def api_rifiuti_oggi():
+    zona, info, tipi = _calcola_rifiuti_oggi()
+    if not info:
+        return jsonify({'success': True, 'zona': '', 'zona_label': '', 'tipi': []})
     return jsonify({'success': True, 'zona': zona, 'zona_label': info['label'], 'tipi': tipi})
 
 
@@ -2250,43 +2250,17 @@ def api_push_unsubscribe():
 
 # ─── NOTIFICHE AUTOMATICHE GIORNALIERE ──────────────────────────────────────
 
-def _job_promemoria_temperature(momento):
-    push_to_all(
-        'Temperature da controllare',
-        f'Ricordati di registrare le temperature di {momento}',
-        url='/?goto=temperature', tag=f'promemoria-temp-{momento}'
-    )
-
-
-def _job_scadenze_oggi_domani():
-    scadenze = [a for a in get_alerts()['scadenze'] if a['giorni'] in (0, 1)]
-    if not scadenze:
+def _job_promemoria_rifiuti():
+    zona, info, tipi = _calcola_rifiuti_oggi()
+    if not info or not tipi:
         return
-    nomi = ', '.join(a['prodotto'] for a in scadenze[:10])
-    if len(scadenze) > 10:
-        nomi += f' e altri {len(scadenze) - 10}'
-    push_to_all('Prodotti in scadenza', nomi, url='/?goto=alert', tag='scadenze-giorno')
-
-
-def _job_sotto_scorta():
-    scorte = get_alerts()['scorte']
-    if not scorte:
-        return
-    nomi = ', '.join(s['prodotto'] for s in scorte[:10])
-    if len(scorte) > 10:
-        nomi += f' e altri {len(scorte) - 10}'
-    push_to_all('Prodotti sotto scorta minima', nomi, url='/?goto=alert', tag='sotto-scorta')
+    nomi = ', '.join(RIFIUTI_TIPI_LABEL.get(t, t) for t in tipi)
+    push_to_all('Raccolta rifiuti', f'Stasera esponi: {nomi}', url='/?goto=home', tag='promemoria-rifiuti')
 
 
 _scheduler = BackgroundScheduler(timezone=TZ_ITALIA)
-_scheduler.add_job(lambda: _job_promemoria_temperature('mattina'),
-                    CronTrigger(hour=7, minute=30, timezone=TZ_ITALIA), id='promemoria_temp_mattina')
-_scheduler.add_job(lambda: _job_promemoria_temperature('sera'),
-                    CronTrigger(hour=20, minute=30, timezone=TZ_ITALIA), id='promemoria_temp_sera')
-_scheduler.add_job(_job_scadenze_oggi_domani,
-                    CronTrigger(hour=8, minute=0, timezone=TZ_ITALIA), id='scadenze_giorno')
-_scheduler.add_job(_job_sotto_scorta,
-                    CronTrigger(hour=8, minute=0, timezone=TZ_ITALIA), id='sotto_scorta')
+_scheduler.add_job(_job_promemoria_rifiuti,
+                    CronTrigger(hour=18, minute=0, timezone=TZ_ITALIA), id='promemoria_rifiuti')
 _scheduler.start()
 
 

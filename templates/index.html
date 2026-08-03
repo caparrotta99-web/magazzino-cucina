@@ -421,6 +421,40 @@ body.home-p1 .home-swipe-viewport,
 body.home-p1 .home-swipe-track { height: 100%; }
 body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflow-scrolling: touch; }
 
+/* ─── BANNER ATTIVA NOTIFICHE ─────────────────────────────────────────────
+   Mostrato in cima a entrambe le pagine home (Dashboard e Menu) finché le
+   notifiche push non sono attive; nascosto via JS (renderNotifBanner). */
+.notif-banner {
+  display: none; align-items: center; gap: 12px;
+  background: var(--card); border: 1.5px solid rgba(var(--action-rgb),.4);
+  border-radius: 16px; box-shadow: var(--shadow);
+  padding: 14px 14px 14px 16px; margin-bottom: 16px;
+}
+:root[data-theme="dark"] .notif-banner { backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); }
+.notif-banner-text { flex: 1; font-size: 13px; font-weight: 600; color: var(--text); line-height: 1.35; }
+.notif-banner-actions { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+.notif-banner-btn {
+  background: rgba(var(--action-rgb),.12); border: 1.5px solid rgba(var(--action-rgb),.4);
+  color: var(--action); font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 700;
+  padding: 9px 16px; border-radius: 100px; cursor: pointer; white-space: nowrap;
+}
+.notif-banner-btn:active { background: rgba(var(--action-rgb),.22); }
+.notif-banner-close {
+  background: none; border: none; cursor: pointer; color: var(--muted);
+  width: 28px; height: 28px; display: flex; align-items: center; justify-content: center; flex-shrink: 0;
+}
+/* Variante Dashboard (pagina 1): testo bianco su vetro scuro, come .home-dash-card */
+.notif-banner-dash {
+  background: rgba(255,255,255,.10);
+  backdrop-filter: blur(20px) saturate(180%); -webkit-backdrop-filter: blur(20px) saturate(180%);
+  border: 1.5px solid rgba(255,255,255,.35);
+  box-shadow: 0 8px 20px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.15);
+}
+.notif-banner-dash .notif-banner-text  { color: #ffffff; }
+.notif-banner-dash .notif-banner-btn   { background: rgba(0,229,255,.18); border-color: rgba(0,229,255,.5); color: #ffffff; }
+.notif-banner-dash .notif-banner-btn:active { background: rgba(0,229,255,.3); }
+.notif-banner-dash .notif-banner-close { color: rgba(255,255,255,.7); }
+
 /* ─── HOME — DASHBOARD (Pagina 1) ───────────────────────────────────────── */
 .home-dash {
   position: relative; box-sizing: border-box;
@@ -1952,6 +1986,16 @@ body.chat-active main { height: calc(100dvh - var(--hdr-h) - env(safe-area-inset
               <div class="home-dash-datetime"><span id="home-dash-date"></span>&nbsp;·&nbsp;<span id="home-dash-time"></span></div>
             </div>
 
+            <div class="notif-banner notif-banner-dash" id="notif-banner-dash">
+              <div class="notif-banner-text">Attiva le notifiche per ricevere avvisi sui messaggi e la raccolta rifiuti</div>
+              <div class="notif-banner-actions">
+                <button type="button" class="notif-banner-btn" onclick="attivaNotificheBanner()">Attiva</button>
+                <button type="button" class="notif-banner-close" onclick="dismissNotifBanner()" aria-label="Chiudi">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+              </div>
+            </div>
+
             <div class="home-dash-meteo" id="home-dash-meteo">
               <div class="home-dash-meteo-icon" id="home-dash-meteo-icon"></div>
               <div class="home-dash-meteo-info">
@@ -2047,6 +2091,16 @@ body.chat-active main { height: calc(100dvh - var(--hdr-h) - env(safe-area-inset
                     <line x1="3" y1="12" x2="21" y2="12"/>
                     <line x1="3" y1="18" x2="21" y2="18"/>
                   </svg>
+                </button>
+              </div>
+            </div>
+
+            <div class="notif-banner" id="notif-banner-menu">
+              <div class="notif-banner-text">Attiva le notifiche per ricevere avvisi sui messaggi e la raccolta rifiuti</div>
+              <div class="notif-banner-actions">
+                <button type="button" class="notif-banner-btn" onclick="attivaNotificheBanner()">Attiva</button>
+                <button type="button" class="notif-banner-close" onclick="dismissNotifBanner()" aria-label="Chiudi">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
               </div>
             </div>
@@ -3478,6 +3532,7 @@ async function init() {
   _initGiacSwipe();
   _initHomeSwipe();
   _setHomePage(IS_ADMIN ? 0 : 1, false);
+  renderNotifBanner();
   await Promise.all([loadCategorie(), loadProdottiCarico(), loadGiacenze(), loadAlerts(), loadListaSpesa(), loadInUso(), loadApparecchi(), loadStoricoTemperature(), loadLocks()]);
   setInterval(loadLocks, 20000);
   renderInUsoProdotti();
@@ -7317,16 +7372,44 @@ async function requestPushPermission() {
 }
 
 function initPushNotifications() {
-  if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
+  if (!('Notification' in window) || !('serviceWorker' in navigator)) { renderNotifBanner(); return; }
   if (Notification.permission === 'granted') {
-    ensurePushSubscription();
+    ensurePushSubscription().then(renderNotifBanner);
   } else if (Notification.permission === 'default' && !localStorage.getItem('pushAsked')) {
     // Al primo accesso dopo il login chiediamo il permesso una sola volta:
     // se l'utente nega, il browser stesso non richiederà più il prompt e
     // pushAsked evita che lo richiediamo noi ad ogni apertura dell'app.
     localStorage.setItem('pushAsked', '1');
-    requestPushPermission();
+    requestPushPermission().then(renderNotifBanner);
+  } else {
+    renderNotifBanner();
   }
+}
+
+// ── BANNER "ATTIVA NOTIFICHE" (home, entrambe le pagine) ─────────────────
+function renderNotifBanner() {
+  const show = ('Notification' in window) &&
+               Notification.permission !== 'granted' &&
+               !localStorage.getItem('notifBannerDismissed');
+  document.querySelectorAll('.notif-banner').forEach(el => {
+    el.style.display = show ? 'flex' : 'none';
+  });
+}
+
+async function attivaNotificheBanner() {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'denied') {
+    toast('Notifiche bloccate dal browser — abilitale dalle impostazioni del dispositivo.', 'error');
+    return;
+  }
+  await requestPushPermission();
+  localStorage.setItem('pushAsked', '1');
+  renderNotifBanner();
+}
+
+function dismissNotifBanner() {
+  localStorage.setItem('notifBannerDismissed', '1');
+  renderNotifBanner();
 }
 
 document.addEventListener('keydown', e => {

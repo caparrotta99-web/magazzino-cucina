@@ -2,7 +2,7 @@
 <html lang="it" data-theme="{{ 'dark' if (current_user.is_authenticated and current_user.tema == 'scuro') else 'light' }}">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <meta name="theme-color" content="{{ '#0f2c35' if (current_user.is_authenticated and current_user.tema == 'scuro') else '#ffffff' }}">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -16,6 +16,13 @@
 *, *::before, *::after {
   margin: 0; padding: 0; box-sizing: border-box;
   -webkit-tap-highlight-color: transparent;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: manipulation;
+}
+input, textarea {
+  -webkit-user-select: text;
+  user-select: text;
 }
 html {
   height: 100%;

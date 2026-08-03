@@ -4,7 +4,7 @@
   "description": "Gestione inventario cucina con sincronizzazione Google Sheets",
   "start_url": "/",
   "display": "standalone",
-  "orientation": "portrait-primary",
+  "orientation": "portrait",
   "background_color": "#f8f7f4",
   "theme_color": "#c8a020",
   "lang": "it",

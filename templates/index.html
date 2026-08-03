@@ -1752,6 +1752,10 @@ body.chat-active main { height: calc(var(--app-vvh, 100dvh) - var(--hdr-h) - env
 
 .chat-messages {
   flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  /* Impedisce che il rimbalzo a fine scroll si propaghi al genitore
+     (scroll chaining): senza, su iOS il "bounce" può trascinare con sé
+     l'intera pagina, dando l'impressione che la barra di input si muova. */
+  overscroll-behavior-y: contain;
   padding: 6px 12px 10px;
 }
 .chat-empty-hint { text-align: center; color: var(--muted-2); font-size: 13px; padding: 40px 20px; }
@@ -1823,6 +1827,10 @@ body.chat-active main { height: calc(var(--app-vvh, 100dvh) - var(--hdr-h) - env
   flex-shrink: 0; display: flex; align-items: flex-end; gap: 8px;
   padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px));
   border-top: 1px solid var(--border); background: var(--card);
+  /* Rinforzo oltre al flex (che già la tiene fuori dall'area scrollabile):
+     resta ancorata in fondo anche se in futuro .chat-main diventasse
+     scrollabile per qualche motivo. */
+  position: sticky; bottom: 0; z-index: 5;
 }
 :root[data-theme="dark"] .chat-input-bar { backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); }
 .chat-icon-btn {
@@ -3751,7 +3759,7 @@ function renderHomeDashboard() {
 }
 
 // ── METEO VIGEVANO (Open-Meteo, nessuna chiave richiesta) ────────────────
-const METEO_LAT = 45.3156, METEO_LON = 8.8597;
+const METEO_LAT = 45.3167, METEO_LON = 8.8500;
 let _meteoLoaded = false;
 
 // Icone SVG minimal, mappate dai weather_code WMO restituiti da Open-Meteo
@@ -3776,14 +3784,22 @@ async function loadMeteoVigevano() {
   if (_meteoLoaded) return;
   _meteoLoaded = true;
   try {
-    const cached = sessionStorage.getItem('meteoVigevanoV2');
+    const cached = sessionStorage.getItem('meteoVigevanoV3');
     if (cached) {
       const { t, data } = JSON.parse(cached);
       if (Date.now() - t < 10 * 60 * 1000) { _renderMeteo(data); return; }
     }
-    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${METEO_LAT}&longitude=${METEO_LON}&current=temperature_2m,weather_code&daily=temperature_2m_max,temperature_2m_min&timezone=Europe%2FRome&forecast_days=1`);
+    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${METEO_LAT}&longitude=${METEO_LON}&current=temperature_2m,weather_code,apparent_temperature&daily=temperature_2m_max,temperature_2m_min&timezone=Europe%2FRome&forecast_days=1`);
     const data = await res.json();
-    sessionStorage.setItem('meteoVigevanoV2', JSON.stringify({ t: Date.now(), data }));
+    console.log('[Meteo Vigevano] risposta API Open-Meteo:', {
+      rilevato_alle:      data.current && data.current.time,
+      temperatura_attuale: data.current && data.current.temperature_2m,
+      percepita:           data.current && data.current.apparent_temperature,
+      weather_code:        data.current && data.current.weather_code,
+      max_oggi:            data.daily && data.daily.temperature_2m_max && data.daily.temperature_2m_max[0],
+      min_oggi:            data.daily && data.daily.temperature_2m_min && data.daily.temperature_2m_min[0],
+    });
+    sessionStorage.setItem('meteoVigevanoV3', JSON.stringify({ t: Date.now(), data }));
     _renderMeteo(data);
   } catch (e) {
     const cond = document.getElementById('home-dash-meteo-cond');
@@ -7673,14 +7689,26 @@ document.addEventListener('keydown', e => {
 // come --app-vvh, usata dal layout fisso della chat per tenere la barra di
 // input sempre sopra la tastiera invece che nascosta sotto di essa.
 function _updateAppVvh() {
-  const h = window.visualViewport ? window.visualViewport.height : window.innerHeight;
+  const vv      = window.visualViewport;
+  const layoutH = window.innerHeight;          // stabile: ignora la tastiera
+  const visualH = vv ? vv.height : layoutH;     // si riduce anche per la tastiera
+  // Sotto questa soglia la differenza è dovuta alla barra degli indirizzi del
+  // browser che si nasconde/mostra durante lo scroll, non alla tastiera:
+  // ignorarla evita che il layout della chat "salti" (e la barra di input
+  // sembri muoversi) mentre si scorrono i messaggi. Una tastiera reale
+  // riduce l'altezza molto di più.
+  const shrink = layoutH - visualH;
+  const h = shrink > 150 ? visualH : layoutH;
   document.documentElement.style.setProperty('--app-vvh', h + 'px');
 }
 _updateAppVvh();
+// Deliberatamente NESSUN listener su 'scroll' del visualViewport: scorrere i
+// messaggi genera comunque eventi scroll che non c'entrano con la tastiera
+// e causerebbero lo stesso "salto" che questo fix vuole eliminare.
 if (window.visualViewport) {
   window.visualViewport.addEventListener('resize', _updateAppVvh);
-  window.visualViewport.addEventListener('scroll', _updateAppVvh);
 }
+window.addEventListener('resize', _updateAppVvh);
 window.addEventListener('load', _updateAppVvh);
 
 // ── BOOT ─────────────────────────────────────────────────────────────────

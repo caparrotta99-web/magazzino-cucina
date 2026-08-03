@@ -46,6 +46,7 @@ from database import (
     RIFIUTI_ZONE_INFO, get_impostazione, set_impostazione, get_raccolta_calendario,
     get_or_create_vapid_keys, save_push_subscription, delete_push_subscription,
     get_push_subscriptions_by_users, get_all_push_subscriptions,
+    log_meteo_lettura,
     get_lista_spesa, add_lista_spesa_item, update_lista_spesa_completato,
     update_lista_spesa_fornitore, delete_lista_spesa_item, clear_lista_spesa,
     get_lista_spesa_item_by_id,
@@ -2268,6 +2269,21 @@ def api_push_unsubscribe():
     endpoint = (request.get_json(silent=True) or {}).get('endpoint', '')
     if endpoint:
         delete_push_subscription(endpoint)
+    return jsonify({'success': True})
+
+
+# ─── METEO ──────────────────────────────────────────────────────────────────
+
+@app.route('/api/meteo/log', methods=['POST'])
+@login_required
+def api_meteo_log():
+    d = request.get_json(force=True)
+    try:
+        temperatura  = float(d.get('temperatura'))
+        weather_code = int(d.get('weather_code'))
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'Dati non validi'}), 400
+    log_meteo_lettura(temperatura, weather_code)
     return jsonify({'success': True})
 
 

@@ -2115,7 +2115,7 @@ html.chat-no-scroll { overflow: hidden; }
                 <span class="home-dash-meteo-temp" id="home-dash-meteo-temp">--°</span>
                 <div class="home-dash-meteo-cond" id="home-dash-meteo-cond">Caricamento meteo…</div>
                 <div class="home-dash-meteo-minmax" id="home-dash-meteo-minmax"></div>
-                <div class="home-dash-meteo-loc">Vigevano</div>
+                <div class="home-dash-meteo-loc">Vigevano<span id="home-dash-meteo-updated"></span></div>
               </div>
             </div>
 
@@ -3799,7 +3799,7 @@ async function loadMeteoVigevano() {
     const cached = sessionStorage.getItem('meteoVigevanoV3');
     if (cached) {
       const { t, data } = JSON.parse(cached);
-      if (Date.now() - t < 10 * 60 * 1000) { _renderMeteo(data); return; }
+      if (Date.now() - t < 10 * 60 * 1000) { _renderMeteo(data, t); return; }
     }
     const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${METEO_LAT}&longitude=${METEO_LON}&current=temperature_2m,weather_code,apparent_temperature&daily=temperature_2m_max,temperature_2m_min&timezone=Europe%2FRome&forecast_days=1`);
     const data = await res.json();
@@ -3811,14 +3811,24 @@ async function loadMeteoVigevano() {
       max_oggi:            data.daily && data.daily.temperature_2m_max && data.daily.temperature_2m_max[0],
       min_oggi:            data.daily && data.daily.temperature_2m_min && data.daily.temperature_2m_min[0],
     });
-    sessionStorage.setItem('meteoVigevanoV3', JSON.stringify({ t: Date.now(), data }));
-    _renderMeteo(data);
+    const t = Date.now();
+    sessionStorage.setItem('meteoVigevanoV3', JSON.stringify({ t, data }));
+    // Log lato server (solo sulle letture fresche, non su quelle da cache):
+    // serve a confrontare nei prossimi giorni la temperatura mostrata con
+    // quella reale di Vigevano e decidere se applicare una correzione.
+    if (data.current) {
+      api('/api/meteo/log', {
+        method: 'POST',
+        body: { temperatura: data.current.temperature_2m, weather_code: data.current.weather_code },
+      }).catch(() => {});
+    }
+    _renderMeteo(data, t);
   } catch (e) {
     const cond = document.getElementById('home-dash-meteo-cond');
     if (cond) cond.textContent = 'Meteo non disponibile';
   }
 }
-function _renderMeteo(data) {
+function _renderMeteo(data, updatedAt) {
   const cur = data && data.current;
   if (!cur) return;
   const info = _meteoInfo(cur.weather_code);
@@ -3832,6 +3842,12 @@ function _renderMeteo(data) {
     minmaxEl.textContent = (daily && daily.temperature_2m_min && daily.temperature_2m_max)
       ? `min ${Math.round(daily.temperature_2m_min[0])}° · max ${Math.round(daily.temperature_2m_max[0])}°`
       : '';
+  }
+
+  const updEl = document.getElementById('home-dash-meteo-updated');
+  if (updEl && updatedAt) {
+    const ora = new Date(updatedAt).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' });
+    updEl.textContent = ` · Aggiornato alle ${ora}`;
   }
 }
 

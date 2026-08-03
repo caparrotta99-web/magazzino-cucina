@@ -1693,6 +1693,18 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
    si riduce, quel min-height più alto vincerebbe su height e vanificherebbe
    il calcolo qui sopra, lasciando la barra di input sotto la tastiera. */
 body.chat-active main { height: calc(var(--app-vvh, 100dvh) - var(--hdr-h) - env(safe-area-inset-top)); min-height: 0; overflow: hidden; }
+/* body ha di suo padding-bottom: env(safe-area-inset-bottom) (per le pagine
+   normali che scorrono a livello di documento): sulla chat questo rende
+   body più alto del viewport, rendendo la pagina scrollabile e scoprendo
+   lo sfondo scuro di body sotto la barra di input, che invece gestisce già
+   da sé quello spazio con il proprio padding. Azzerarlo qui elimina lo
+   spazio nero e impedisce lo scroll indesiderato dell'intera pagina. */
+body.chat-active { padding-bottom: 0; }
+/* <html> è il vero scrollingElement del documento (non <body>): senza
+   bloccarlo esplicitamente, il margin-top di <main> collassa e rende
+   l'intero documento scrollabile di quella quantità, scoprendo lo sfondo
+   sotto la barra di input non appena si scrolla anche solo un po'. */
+html.chat-no-scroll { overflow: hidden; }
 /* Blocca il pinch-to-zoom in chat: pan-y permette solo lo scroll verticale
    nativo (liste, messaggi), niente pinch-zoom né pan orizzontale accidentale. */
 #page-chat, #page-chat * { touch-action: pan-y; }
@@ -4013,6 +4025,11 @@ function navTo(page) {
   if (page === 'help')      closeTutorialSection(); // riparti sempre dal menu principale del tutorial
 
   document.body.classList.toggle('chat-active', page === 'chat');
+  // <html> (non <body>) è il vero elemento di scroll del documento: senza
+  // bloccarlo qui, il margin-top di <main> "collassa" verso l'alto e rende
+  // l'intera pagina scrollabile di quel tanto, scoprendo lo sfondo sotto la
+  // barra di input quando si scrolla (vedi regola html.chat-no-scroll).
+  document.documentElement.classList.toggle('chat-no-scroll', page === 'chat');
   if (page === 'chat') initChatPage(); else stopChatPolling();
 }
 // alias for backward compat

@@ -800,6 +800,11 @@ def admin_debug_notifiche():
                 entry['esito']  = 'errore'
                 entry['errore'] = f"WebPushException status={status}: {e}" + (f" | risposta server push: {body_text}" if body_text else '')
                 print(f"[Push][Debug] invio FALLITO -> ...{endpoint_short}: {entry['errore']}")
+                if status in (404, 410, 401, 403):
+                    delete_push_subscription(s['endpoint'])
+                    entry['rimossa'] = True
+                    print(f"[Push][Debug] subscription rimossa (status {status} — "
+                          f"{'endpoint non più valido' if status in (404, 410) else 'VAPID non valida, probabile mismatch dopo rotazione chiavi'})")
             except Exception as e:
                 entry['esito']  = 'errore'
                 entry['errore'] = f"{type(e).__name__}: {e}"

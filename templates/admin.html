@@ -190,6 +190,7 @@
     <div class="debug-sub {% if r.esito != 'ok' %}debug-warn{% endif %}">
       <span class="debug-mono">...{{ r.endpoint[-24:] }}</span><br>
       {% if r.esito == 'ok' %}✓ inviata con successo{% else %}✕ {{ r.errore }}{% endif %}
+      {% if r.rimossa %}<br><strong>→ subscription rimossa automaticamente: riattiva le notifiche dal profilo per crearne una nuova.</strong>{% endif %}
     </div>
     {% endfor %}
     {% endif %}

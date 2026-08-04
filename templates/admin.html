@@ -212,6 +212,17 @@
     {% endif %}
 
     <div class="debug-row">
+      <span class="debug-label">VAPID sub (contatto)</span>
+      <span class="debug-value {% if d.vapid_sub_sospetto %}debug-warn-text{% endif %}">{{ d.vapid_sub }}</span>
+    </div>
+    {% if d.vapid_sub_sospetto %}
+    <div class="debug-sub debug-warn">
+      Questo indirizzo usa un dominio fittizio/riservato (.local, .example, .test, .invalid o localhost). Apple (web.push.apple.com, cioè Safari/iOS) valida il dominio del claim "sub" più severamente di Google/Mozilla e rifiuta con "BadJwtToken" anche con chiavi corrette e coppia coerente.<br><br>
+      <strong>Fix:</strong> imposta su Render la variabile <span class="debug-mono">VAPID_SUBJECT</span> con un mailto: o https: su un dominio reale (es. <span class="debug-mono">mailto:tuaemail@gmail.com</span>).
+    </div>
+    {% endif %}
+
+    <div class="debug-row">
       <span class="debug-label">Libreria pywebpush</span>
       <span class="debug-value">{{ 'installata (v' + d.pywebpush_versione + ')' if d.pywebpush_ok else 'NON INSTALLATA' }}</span>
     </div>

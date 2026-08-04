@@ -274,7 +274,14 @@ else:
     VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY = get_or_create_vapid_keys()
     VAPID_SOURCE = 'database (impostazioni_app)'
     print('[Push] chiavi VAPID caricate dal database (impostazioni_app)')
-VAPID_CLAIMS_SUB = os.environ.get('VAPID_SUBJECT', 'mailto:info@brigade-app.local')
+# Il claim "sub" del JWT VAPID deve essere un mailto: o https: con un
+# dominio REALE: Apple (web.push.apple.com, usato da Safari/iOS) valida
+# questo dominio in modo più severo di Google/Mozilla e rifiuta con
+# "BadJwtToken" domini fittizi o riservati come .local/.example/.test o
+# @localhost, anche con chiavi e formato perfettamente corretti — è la causa
+# reale del BadJwtToken persistente riscontrato su iOS/Safari, non un
+# problema di formato o abbinamento delle chiavi (già esclusi).
+VAPID_CLAIMS_SUB = os.environ.get('VAPID_SUBJECT', 'mailto:caparrotta99@gmail.com')
 
 try:
     import importlib.metadata as _importlib_metadata
@@ -804,6 +811,18 @@ def admin_debug_notifiche():
             print(f"[Push][Debug] combacia con VAPID_PUBLIC_KEY? {debug['vapid_coppia_combacia']}")
         except Exception as e:
             print(f"[Push][Debug] impossibile derivare la chiave pubblica dalla privata: {e}")
+
+    # Apple (web.push.apple.com, cioè Safari/iOS) valida il dominio del claim
+    # "sub" del JWT più severamente di Google/Mozilla e rifiuta con
+    # "BadJwtToken" domini fittizi/riservati (.local, .example, .test,
+    # .invalid, localhost) — anche con chiavi corrette e coppia coerente.
+    # È una causa di BadJwtToken indipendente dal formato o dall'abbinamento
+    # delle chiavi (controllati sopra), quindi va verificata a parte.
+    debug['vapid_sub'] = VAPID_CLAIMS_SUB
+    debug['vapid_sub_sospetto'] = any(
+        d in VAPID_CLAIMS_SUB.lower() for d in ('.local', '.example', '.test', '.invalid', 'localhost')
+    )
+    print(f"[Push][Debug] VAPID sub={VAPID_CLAIMS_SUB!r} dominio_sospetto={debug['vapid_sub_sospetto']}")
 
     debug['pywebpush_ok']      = PYWEBPUSH_VERSION is not None
     debug['pywebpush_versione'] = PYWEBPUSH_VERSION or 'non importabile'

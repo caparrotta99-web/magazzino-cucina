@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Brigade — Gestionale HACCP con Intelligenza Artificiale per Ristoranti</title>
+<meta name="description" content="Brigade è il primo gestionale HACCP con intelligenza artificiale per ristoranti e pizzerie. Traccia prodotti, registra temperature e gestisci il magazzino dal telefono, sempre conforme alla normativa.">
+<meta name="keywords" content="HACCP, gestionale ristorante, tracciabilità alimentare, registro temperature, software HACCP, app HACCP, magazzino ristorante">
+<meta name="author" content="Brigade">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://brigade-app.example/landing">
+
+<!-- Open Graph -->
+<meta property="og:type" content="website">
+<meta property="og:title" content="Brigade — Il primo gestionale HACCP con intelligenza artificiale">
+<meta property="og:description" content="Traccia ogni prodotto, registra le temperature e gestisci il magazzino del tuo ristorante. Tutto dal telefono, tutto conforme alla normativa.">
+<meta property="og:image" content="/static/icon-512.png">
+<meta property="og:locale" content="it_IT">
+
+<!-- Twitter Card -->
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Brigade — Il primo gestionale HACCP con intelligenza artificiale">
+<meta name="twitter:description" content="Traccia ogni prodotto, registra le temperature e gestisci il magazzino del tuo ristorante. Tutto dal telefono, tutto conforme alla normativa.">
+<meta name="twitter:image" content="/static/icon-512.png">
+
+<meta name="theme-color" content="#0f2c35">
+<link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/static/icon-192.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+<style>
+/* ─────────────────────────────────────────────────────────────────────────
+   RESET & BASE
+───────────────────────────────────────────────────────────────────────── */
+*, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: #0a1f26;
+  color: #f5f5f7;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+  line-height: 1.5;
+}
+img, svg { display: block; max-width: 100%; }
+a { color: inherit; text-decoration: none; }
+button { font-family: inherit; cursor: pointer; }
+ul { list-style: none; }
+
+:root {
+  --bg-1: #0f2c35;
+  --bg-2: #28505c;
+  --bg-3: #3d5f6c;
+  --accent: #00e5ff;
+  --accent-2: #0d9488;
+  --accent-warm: #ffc98c;
+  --text: #f5f5f7;
+  --muted: rgba(255,255,255,.70);
+  --muted-2: rgba(255,255,255,.50);
+  --glass: rgba(255,255,255,.07);
+  --glass-2: rgba(255,255,255,.10);
+  --glass-border: rgba(255,255,255,.16);
+  --glass-blur: blur(24px) saturate(160%);
+  --radius: 20px;
+  --shadow-lg: 0 20px 60px rgba(0,0,0,.35);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   FONDALE ANIMATO — stesso linguaggio visivo dell'app (aurora teal/cyan)
+───────────────────────────────────────────────────────────────────────── */
+.bg-fixed {
+  position: fixed; inset: 0; z-index: -2;
+  background:
+    radial-gradient(circle at 78% 8%, rgba(255,201,140,.16), transparent 40%),
+    radial-gradient(ellipse 130% 55% at 8% -8%, rgba(255,255,255,.10), transparent 50%),
+    radial-gradient(ellipse 120% 70% at 100% 10%, rgba(120,195,210,.28), transparent 55%),
+    radial-gradient(ellipse 150% 80% at 50% 118%, rgba(8,35,42,.85), transparent 62%),
+    linear-gradient(165deg, var(--bg-3) 0%, var(--bg-2) 42%, var(--bg-1) 100%);
+}
+.bg-orbs { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
+.orb {
+  position: absolute; border-radius: 50%; filter: blur(60px); opacity: .35;
+  animation: drift 22s ease-in-out infinite;
+}
+.orb-1 { width: 420px; height: 420px; top: -120px; right: -100px; background: radial-gradient(circle, var(--accent), transparent 70%); animation-delay: 0s; }
+.orb-2 { width: 360px; height: 360px; bottom: -140px; left: -80px; background: radial-gradient(circle, var(--accent-2), transparent 70%); animation-delay: -8s; }
+.orb-3 { width: 280px; height: 280px; top: 40%; left: 60%; background: radial-gradient(circle, var(--accent-warm), transparent 70%); opacity: .18; animation-delay: -14s; }
+@keyframes drift {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33%      { transform: translate(-30px, 40px) scale(1.08); }
+  66%      { transform: translate(24px, -24px) scale(0.95); }
+}
+.bg-grid {
+  position: fixed; inset: 0; z-index: -1; pointer-events: none;
+  background-image: radial-gradient(rgba(255,255,255,.08) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: radial-gradient(ellipse 80% 60% at 50% 0%, #000 40%, transparent 80%);
+}
+
+/* ─────────────────────────────────────────────────────────────────────────
+   LAYOUT HELPERS
+───────────────────────────────────────────────────────────────────────── */
+.wrap { max-width: 1120px; margin: 0 auto; padding: 0 22px; }
+section { position: relative; padding: 90px 0; }
+.eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 12.5px; font-weight: 700; letter-spacing: .5px; text-transform: uppercase;
+  color: var(--accent); background: rgba(0,229,255,.10); border: 1px solid rgba(0,229,255,.28);
+  padding: 7px 14px; border-radius: 100px; margin-bottom: 20px;
+}
+h1, h2, h3 { font-weight: 800; letter-spacing: -.02em; color: var(--text); }
+.section-title { font-size: clamp(26px, 4.2vw, 40px); text-align: center; margin-bottom: 14px; }
+.section-sub { font-size: 16px; color: var(--muted); text-align: center; max-width: 560px; margin: 0 auto 56px; }
+
+/* Glassmorphism card di base */
+.glass {
+  background: var(--glass);
+  backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-lg);
+}
+
+/* Animazioni al reveal */
+.reveal { opacity: 0; transform: translateY(28px); transition: opacity .7s cubic-bezier(.16,1,.3,1), transform .7s cubic-bezier(.16,1,.3,1); }
+.reveal.visible { opacity: 1; transform: translateY(0); }
+.reveal-delay-1.visible { transition-delay: .08s; }
+.reveal-delay-2.visible { transition-delay: .16s; }
+.reveal-delay-3.visible { transition-delay: .24s; }
+.reveal-delay-4.visible { transition-delay: .32s; }
+.reveal-delay-5.visible { transition-delay: .4s; }
+.reveal-delay-6.visible { transition-delay: .48s; }
+
+/* Pulsanti */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+  font-family: 'Inter', sans-serif; font-weight: 700; font-size: 15.5px;
+  padding: 15px 30px; border-radius: 100px; border: none; cursor: pointer;
+  transition: transform .18s ease, box-shadow .18s ease, background .18s ease;
+  white-space: nowrap;
+}
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+  color: #04222a; box-shadow: 0 10px 30px rgba(0,229,255,.28);
+}
+.btn-primary:hover { transform: translateY(-2px); box-shadow: 0 14px 38px rgba(0,229,255,.4); }
+.btn-primary:active { transform: translateY(0); }
+.btn-ghost {
+  background: var(--glass-2); border: 1px solid var(--glass-border); color: var(--text);
+  backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+}
+.btn-ghost:hover { background: rgba(255,255,255,.16); transform: translateY(-2px); }
+.btn-lg { padding: 17px 36px; font-size: 16.5px; }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   NAV
+───────────────────────────────────────────────────────────────────────── */
+.nav {
+  position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 22px;
+  background: rgba(10,26,32,.55);
+  backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%);
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.nav-inner { max-width: 1120px; margin: 0 auto; width: 100%; display: flex; align-items: center; justify-content: space-between; }
+.nav-logo { display: flex; align-items: center; gap: 10px; font-size: 18px; font-weight: 800; }
+.nav-logo-mark {
+  width: 32px; height: 32px; border-radius: 9px;
+  background: linear-gradient(135deg, var(--accent), var(--accent-2));
+  display: flex; align-items: center; justify-content: center;
+  font-family: Georgia, serif; font-weight: 700; color: #04222a; font-size: 16px;
+}
+.nav-links { display: flex; align-items: center; gap: 10px; }
+.nav-links a.btn-ghost { padding: 10px 20px; font-size: 14px; }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   HERO
+───────────────────────────────────────────────────────────────────────── */
+.hero { padding: 168px 0 100px; }
+.hero-grid { display: grid; grid-template-columns: 1.05fr .95fr; gap: 60px; align-items: center; }
+.hero-copy { text-align: left; }
+.hero-logo { display: flex; align-items: center; gap: 14px; margin-bottom: 30px; }
+.hero-logo-mark {
+  width: 60px; height: 60px; border-radius: 16px; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+  display: flex; align-items: center; justify-content: center;
+  font-family: Georgia, serif; font-weight: 700; color: #04222a; font-size: 30px;
+  box-shadow: 0 12px 30px rgba(0,229,255,.3);
+}
+.hero-logo-word { font-size: 26px; font-weight: 800; letter-spacing: -.02em; }
+h1.hero-title {
+  font-size: clamp(34px, 5.2vw, 58px); line-height: 1.08; margin-bottom: 22px;
+  background: linear-gradient(180deg, #ffffff 0%, rgba(255,255,255,.82) 100%);
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+}
+h1.hero-title span { background: linear-gradient(120deg, var(--accent) 0%, var(--accent-2) 100%); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.hero-sub { font-size: 18px; line-height: 1.6; color: var(--muted); max-width: 520px; margin-bottom: 36px; }
+.hero-ctas { display: flex; flex-wrap: wrap; gap: 14px; margin-bottom: 34px; }
+.hero-trust { display: flex; align-items: center; gap: 10px; font-size: 13.5px; color: var(--muted-2); }
+.hero-trust svg { width: 16px; height: 16px; color: var(--accent); flex-shrink: 0; }
+
+/* Mockup iPhone (ricreato in CSS, coerente con la vera dashboard dell'app) */
+.hero-mockup-wrap { display: flex; justify-content: center; position: relative; }
+.phone {
+  width: 272px; height: 560px; border-radius: 46px; padding: 14px;
+  background: linear-gradient(160deg, #1b1f22, #0a0c0d);
+  box-shadow: 0 30px 70px rgba(0,0,0,.5), 0 0 0 1px rgba(255,255,255,.06);
+  position: relative;
+}
+.phone::before {
+  content: ''; position: absolute; top: 14px; left: 50%; transform: translateX(-50%);
+  width: 100px; height: 24px; background: #0a0c0d; border-radius: 14px; z-index: 3;
+}
+.phone-screen {
+  width: 100%; height: 100%; border-radius: 34px; overflow: hidden; position: relative;
+  background:
+    radial-gradient(circle at 78% 8%, rgba(255,201,140,.22), transparent 40%),
+    radial-gradient(ellipse 120% 70% at 100% 10%, rgba(120,195,210,.4), transparent 55%),
+    radial-gradient(ellipse 150% 80% at 50% 118%, rgba(8,35,42,.8), transparent 62%),
+    linear-gradient(165deg, var(--bg-3) 0%, var(--bg-2) 42%, var(--bg-1) 100%);
+  padding: 40px 16px 16px;
+}
+.phone-greeting { font-size: 17px; font-weight: 800; color: #fff; margin-bottom: 2px; }
+.phone-date { font-size: 10px; color: rgba(255,255,255,.55); margin-bottom: 14px; }
+.phone-card {
+  background: rgba(255,255,255,.10); border: 1px solid rgba(255,255,255,.16);
+  border-radius: 14px; padding: 12px; margin-bottom: 10px;
+  display: flex; align-items: center; gap: 10px;
+}
+.phone-card-ico {
+  width: 30px; height: 30px; border-radius: 9px; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; color: #fff;
+}
+.phone-card-txt { font-size: 10.5px; }
+.phone-card-txt strong { display: block; font-size: 12.5px; color: #fff; font-weight: 700; margin-bottom: 1px; }
+.phone-card-txt span { color: rgba(255,255,255,.6); }
+.phone-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 4px; }
+.phone-mini {
+  background: rgba(255,255,255,.09); border: 1px solid rgba(255,255,255,.14);
+  border-radius: 12px; padding: 10px; text-align: left;
+}
+.phone-mini-ico { width: 24px; height: 24px; border-radius: 7px; display: flex; align-items: center; justify-content: center; color: #fff; margin-bottom: 6px; }
+.phone-mini strong { display: block; font-size: 10.5px; color: #fff; font-weight: 700; }
+.phone-mini span { font-size: 8.5px; color: rgba(255,255,255,.55); }
+.phone-float-badge {
+  position: absolute; right: -18px; bottom: 90px; z-index: 4;
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 16px; border-radius: 100px;
+  animation: floaty 4s ease-in-out infinite;
+}
+.phone-float-badge svg { width: 16px; height: 16px; color: var(--accent); }
+.phone-float-badge span { font-size: 12.5px; font-weight: 700; color: #fff; }
+@keyframes floaty { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   PROBLEMA
+───────────────────────────────────────────────────────────────────────── */
+.problem-title { font-size: clamp(26px, 4.2vw, 40px); text-align: center; margin-bottom: 56px; }
+.problem-title .warn { color: #ffb4a2; }
+.problem-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+.problem-card { padding: 30px 26px; text-align: left; }
+.problem-card-ico {
+  width: 46px; height: 46px; border-radius: 13px; margin-bottom: 18px;
+  background: rgba(255,120,100,.14); border: 1px solid rgba(255,120,100,.3);
+  display: flex; align-items: center; justify-content: center; color: #ff9080;
+}
+.problem-card h3 { font-size: 17px; margin-bottom: 8px; }
+.problem-card p { font-size: 14px; color: var(--muted); line-height: 1.6; }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   FEATURES
+───────────────────────────────────────────────────────────────────────── */
+.features-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+.feature-card { padding: 28px 24px; transition: transform .25s ease, background .25s ease; }
+.feature-card:hover { transform: translateY(-6px); background: var(--glass-2); }
+.feature-ico {
+  width: 48px; height: 48px; border-radius: 14px; margin-bottom: 18px;
+  display: flex; align-items: center; justify-content: center; color: #fff;
+}
+.feature-card h3 { font-size: 16.5px; margin-bottom: 8px; }
+.feature-card p { font-size: 13.5px; color: var(--muted); line-height: 1.6; }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   SOCIAL PROOF
+───────────────────────────────────────────────────────────────────────── */
+.proof { padding: 70px 0; }
+.proof-box {
+  padding: 46px 40px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 20px;
+}
+.proof-quote { font-size: clamp(19px, 2.6vw, 25px); font-weight: 600; color: #fff; max-width: 680px; line-height: 1.5; }
+.proof-quote strong { color: var(--accent); }
+.proof-stats { display: flex; gap: 48px; margin-top: 10px; flex-wrap: wrap; justify-content: center; }
+.proof-stat-num { font-size: 38px; font-weight: 800; background: linear-gradient(120deg, var(--accent), var(--accent-2)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+.proof-stat-lbl { font-size: 12.5px; color: var(--muted-2); text-transform: uppercase; letter-spacing: .4px; font-weight: 700; margin-top: 4px; }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   PRICING
+───────────────────────────────────────────────────────────────────────── */
+.pricing-card {
+  max-width: 480px; margin: 0 auto; padding: 44px 40px; text-align: center; position: relative; overflow: hidden;
+}
+.pricing-card::before {
+  content: ''; position: absolute; top: -50%; left: -20%; width: 140%; height: 140%;
+  background: radial-gradient(circle, rgba(0,229,255,.12), transparent 60%); pointer-events: none;
+}
+.pricing-badge {
+  display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase;
+  color: var(--accent); background: rgba(0,229,255,.12); border: 1px solid rgba(0,229,255,.3);
+  padding: 6px 14px; border-radius: 100px; margin-bottom: 18px;
+}
+.pricing-amount { font-size: 58px; font-weight: 800; color: #fff; line-height: 1; }
+.pricing-amount span { font-size: 18px; font-weight: 600; color: var(--muted); }
+.pricing-cycle { font-size: 13.5px; color: var(--muted-2); margin-top: 6px; margin-bottom: 30px; }
+.pricing-features { text-align: left; display: flex; flex-direction: column; gap: 14px; margin-bottom: 34px; }
+.pricing-features li { display: flex; align-items: flex-start; gap: 12px; font-size: 14.5px; color: var(--text); }
+.pricing-features svg { width: 19px; height: 19px; color: var(--accent); flex-shrink: 0; margin-top: 1px; }
+.pricing-card .btn { width: 100%; }
+.pricing-note { font-size: 12px; color: var(--muted-2); margin-top: 16px; }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   FAQ
+───────────────────────────────────────────────────────────────────────── */
+.faq-list { max-width: 720px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+.faq-item { overflow: hidden; }
+.faq-q {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 20px 24px; background: none; border: none; color: #fff;
+  font-size: 15.5px; font-weight: 700; text-align: left;
+}
+.faq-q svg { width: 18px; height: 18px; color: var(--accent); flex-shrink: 0; transition: transform .25s ease; }
+.faq-item.open .faq-q svg { transform: rotate(45deg); }
+.faq-a { max-height: 0; overflow: hidden; transition: max-height .3s ease; }
+.faq-item.open .faq-a { max-height: 200px; }
+.faq-a p { padding: 0 24px 20px; font-size: 14px; color: var(--muted); line-height: 1.6; }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   CTA FINALE
+───────────────────────────────────────────────────────────────────────── */
+.cta-final { text-align: center; padding: 30px 40px 80px; }
+.cta-final-box { padding: 56px 40px; text-align: center; }
+.cta-final h2 { font-size: clamp(24px, 4vw, 34px); margin-bottom: 14px; }
+.cta-final p { font-size: 15.5px; color: var(--muted); margin-bottom: 30px; }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   FOOTER
+───────────────────────────────────────────────────────────────────────── */
+footer { padding: 46px 0 calc(30px + env(safe-area-inset-bottom, 0px)); border-top: 1px solid rgba(255,255,255,.08); }
+.footer-inner { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 22px; }
+.footer-brand { display: flex; align-items: center; gap: 10px; }
+.footer-tag { font-size: 13px; color: var(--muted-2); margin-top: 4px; }
+.footer-links { display: flex; gap: 26px; flex-wrap: wrap; }
+.footer-links a { font-size: 13.5px; color: var(--muted); transition: color .2s ease; }
+.footer-links a:hover { color: var(--accent); }
+
+/* ─────────────────────────────────────────────────────────────────────────
+   RESPONSIVE
+───────────────────────────────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .hero-grid { grid-template-columns: 1fr; text-align: center; }
+  .hero-copy { text-align: center; }
+  .hero-logo, .hero-ctas, .hero-trust { justify-content: center; }
+  .hero-sub { margin-left: auto; margin-right: auto; }
+  .problem-grid, .features-grid { grid-template-columns: 1fr; }
+  .phone { width: 240px; height: 494px; }
+  section { padding: 64px 0; }
+  .hero { padding: 128px 0 60px; }
+}
+@media (max-width: 560px) {
+  .nav-links a.btn-ghost span.nav-text { display: none; }
+  .proof-stats { gap: 30px; }
+  .pricing-card, .cta-final-box { padding: 34px 22px; }
+  .footer-inner { flex-direction: column; align-items: flex-start; }
+}
+</style>
+</head>
+<body>
+
+<div class="bg-fixed" aria-hidden="true"></div>
+<div class="bg-orbs" aria-hidden="true">
+  <div class="orb orb-1"></div>
+  <div class="orb orb-2"></div>
+  <div class="orb orb-3"></div>
+</div>
+<div class="bg-grid" aria-hidden="true"></div>
+
+<!-- ── NAV ── -->
+<nav class="nav">
+  <div class="nav-inner">
+    <div class="nav-logo">
+      <div class="nav-logo-mark">B</div>
+      Brigade
+    </div>
+    <div class="nav-links">
+      <a href="/login" class="btn btn-ghost"><span class="nav-text">Accedi</span></a>
+      <a href="/register" class="btn btn-primary">Inizia gratis</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ── HERO ── -->
+<header class="hero">
+  <div class="wrap hero-grid">
+    <div class="hero-copy reveal visible">
+      <div class="hero-logo">
+        <div class="hero-logo-mark">B</div>
+        <div class="hero-logo-word">Brigade</div>
+      </div>
+      <h1 class="hero-title">Il primo gestionale HACCP con <span>intelligenza artificiale</span></h1>
+      <p class="hero-sub">Traccia ogni prodotto, registra le temperature e gestisci il magazzino del tuo ristorante. Tutto dal telefono, tutto conforme alla normativa.</p>
+      <div class="hero-ctas">
+        <a href="/register" class="btn btn-primary btn-lg">
+          Inizia gratis
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+        </a>
+        <a href="#funzionalita" class="btn btn-ghost btn-lg">Scopri di più</a>
+      </div>
+      <div class="hero-trust">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"/></svg>
+        Conforme alla normativa HACCP · Nessuna carta di credito richiesta
+      </div>
+    </div>
+
+    <div class="hero-mockup-wrap reveal reveal-delay-2 visible">
+      <div class="phone">
+        <div class="phone-screen">
+          <div class="phone-greeting">Buongiorno, Marco!</div>
+          <div class="phone-date">lunedì 3 agosto · 08:14</div>
+
+          <div class="phone-card">
+            <div class="phone-card-ico" style="background:#3b82f6">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+            </div>
+            <div class="phone-card-txt"><strong>Scansione lotto</strong><span>Etichetta letta in 1s</span></div>
+          </div>
+
+          <div class="phone-card">
+            <div class="phone-card-ico" style="background:#0d9488">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0Z"/></svg>
+            </div>
+            <div class="phone-card-txt"><strong>Frigo Cucina 1</strong><span>+3°C · nella norma</span></div>
+          </div>
+
+          <div class="phone-grid">
+            <div class="phone-mini">
+              <div class="phone-mini-ico" style="background:#22c55e">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+              </div>
+              <strong>Carico</strong><span>Registra entrata</span>
+            </div>
+            <div class="phone-mini">
+              <div class="phone-mini-ico" style="background:#8b5cf6">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+              </div>
+              <strong>Giacenze</strong><span>Visualizza scorte</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="phone-float-badge glass">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></svg>
+        <span>100% conforme</span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- ── PROBLEMA ── -->
+<section id="problema">
+  <div class="wrap">
+    <h2 class="problem-title reveal">I controlli ASL non aspettano.<br>Sei pronto?</h2>
+    <div class="problem-grid">
+      <div class="problem-card glass reveal reveal-delay-1">
+        <div class="problem-card-ico">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="9" y1="15" x2="9.01" y2="15"/><line x1="12" y1="15" x2="15" y2="15"/></svg>
+        </div>
+        <h3>Registri cartacei persi</h3>
+        <p>Fogli smarriti, macchiati o dimenticati a casa. Alla prima ispezione, la documentazione che serve non si trova mai al momento giusto.</p>
+      </div>
+      <div class="problem-card glass reveal reveal-delay-2">
+        <div class="problem-card-ico">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0Z"/></svg>
+        </div>
+        <h3>Temperature non registrate</h3>
+        <p>Nei momenti di corsa in cucina, il controllo delle temperature di frigoriferi e abbattitori è la prima cosa che salta.</p>
+      </div>
+      <div class="problem-card glass reveal reveal-delay-3">
+        <div class="problem-card-ico">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+        <h3>Tracciabilità incompleta</h3>
+        <p>Sapere esattamente da dove viene ogni prodotto, con che lotto e con che scadenza, richiede tempo che in cucina non c'è mai.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── FUNZIONALITÀ ── -->
+<section id="funzionalita">
+  <div class="wrap">
+    <div class="eyebrow reveal" style="display:flex;justify-content:center;margin-left:auto;margin-right:auto;width:fit-content">Funzionalità</div>
+    <h2 class="section-title reveal">Tutto quello che serve, in un'unica app</h2>
+    <p class="section-sub reveal">Progettata per il ritmo di una cucina vera, non per un ufficio.</p>
+
+    <div class="features-grid">
+      <div class="feature-card glass reveal reveal-delay-1">
+        <div class="feature-ico" style="background:linear-gradient(135deg,#3b82f6,#2563eb)">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        </div>
+        <h3>Fotocamera AI</h3>
+        <p>Inquadra l'etichetta: l'intelligenza artificiale legge lotto e scadenza da sola, senza digitare nulla.</p>
+      </div>
+      <div class="feature-card glass reveal reveal-delay-2">
+        <div class="feature-ico" style="background:linear-gradient(135deg,#0d9488,#0f766e)">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0Z"/></svg>
+        </div>
+        <h3>Registro temperature</h3>
+        <p>Rilevazioni su frigoriferi e abbattitori con alert immediato non appena una temperatura esce dalla soglia.</p>
+      </div>
+      <div class="feature-card glass reveal reveal-delay-3">
+        <div class="feature-ico" style="background:linear-gradient(135deg,#8b5cf6,#7c3aed)">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+        </div>
+        <h3>Tracciabilità completa</h3>
+        <p>Dal fornitore al piatto: ogni movimento di carico e scarico resta collegato al lotto d'origine.</p>
+      </div>
+      <div class="feature-card glass reveal reveal-delay-4">
+        <div class="feature-ico" style="background:linear-gradient(135deg,#22c55e,#16a34a)">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="9" x2="9" y2="21"/></svg>
+        </div>
+        <h3>Google Sheets integrato</h3>
+        <p>I dati si sincronizzano su un foglio Google di tua proprietà. Restano sempre tuoi, esportabili in ogni momento.</p>
+      </div>
+      <div class="feature-card glass reveal reveal-delay-5">
+        <div class="feature-ico" style="background:linear-gradient(135deg,#00e5ff,#00b8cc)">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 2 7l10 5 10-5-10-5Z"/><path d="m2 17 10 5 10-5"/><path d="m2 12 10 5 10-5"/></svg>
+        </div>
+        <h3>Assistente AI</h3>
+        <p>Fai una domanda su una procedura HACCP e ricevi subito una risposta chiara, direttamente in app.</p>
+      </div>
+      <div class="feature-card glass reveal reveal-delay-6">
+        <div class="feature-ico" style="background:linear-gradient(135deg,#f97316,#ea580c)">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><path d="M12 18v-6M9.5 15.5 12 18l2.5-2.5"/></svg>
+        </div>
+        <h3>Export PDF</h3>
+        <p>Registro completo pronto da stampare o mostrare al controllo ASL in un tocco.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── SOCIAL PROOF ── -->
+<section class="proof">
+  <div class="wrap">
+    <div class="proof-box glass reveal">
+      <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="color:var(--accent)"><path d="M3 21c3-1 5-3 5-6V9a2 2 0 0 1 2-2h1a2 2 0 0 1 2 2v3c0 4-3 7-8 9Zm11 0c3-1 5-3 5-6V9a2 2 0 0 1 2-2h0"/></svg>
+      <p class="proof-quote">Usato ogni giorno al <strong>Ristorante Pizzeria Primavera</strong> di Vigevano — dalla cucina alla sala, senza più un foglio di carta.</p>
+      <div class="proof-stats">
+        <div>
+          <div class="proof-stat-num">6</div>
+          <div class="proof-stat-lbl">Sezioni HACCP</div>
+        </div>
+        <div>
+          <div class="proof-stat-num">1</div>
+          <div class="proof-stat-lbl">App</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── PRICING ── -->
+<section id="prezzi">
+  <div class="wrap">
+    <h2 class="section-title reveal">Un piano solo. Tutto incluso.</h2>
+    <p class="section-sub reveal">Niente livelli nascosti, niente sorprese in fattura.</p>
+
+    <div class="pricing-card glass reveal">
+      <span class="pricing-badge">Piano Ristorante</span>
+      <div class="pricing-amount">79€ <span>/ anno</span></div>
+      <div class="pricing-cycle">Meno di 22 centesimi al giorno</div>
+      <ul class="pricing-features">
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Utenti e reparti illimitati</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Fotocamera AI per lotto e scadenza</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Registro temperature con alert</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Sincronizzazione Google Sheets</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Assistente AI per domande HACCP</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Export PDF illimitati</li>
+        <li><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> Notifiche push su temperature e scadenze</li>
+      </ul>
+      <a href="/register" class="btn btn-primary btn-lg">Abbonati ora</a>
+      <div class="pricing-note">Inizia gratis, nessuna carta richiesta in fase di prova.</div>
+    </div>
+  </div>
+</section>
+
+<!-- ── FAQ ── -->
+<section id="faq">
+  <div class="wrap">
+    <h2 class="section-title reveal">Domande frequenti</h2>
+    <div class="faq-list">
+      <div class="faq-item glass reveal">
+        <button type="button" class="faq-q" onclick="toggleFaq(this)">
+          Funziona su iPhone e Android?
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+        <div class="faq-a"><p>Sì. Brigade è una Progressive Web App: si installa direttamente dal browser, su iPhone e su Android, senza passare da App Store o Play Store.</p></div>
+      </div>
+      <div class="faq-item glass reveal">
+        <button type="button" class="faq-q" onclick="toggleFaq(this)">
+          I miei dati sono al sicuro?
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+        <div class="faq-a"><p>Sì. I dati vengono sincronizzati sul tuo Google Sheets personale e conservati su un database cloud dedicato: restano sempre di tua proprietà e accessibili in ogni momento.</p></div>
+      </div>
+      <div class="faq-item glass reveal">
+        <button type="button" class="faq-q" onclick="toggleFaq(this)">
+          Sostituisce i registri cartacei?
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+        <div class="faq-a"><p>Sì, è riconosciuto dalla normativa: il registro digitale con data, ora e operatore ha lo stesso valore di quello cartaceo, con il vantaggio di non poter andare perso.</p></div>
+      </div>
+      <div class="faq-item glass reveal">
+        <button type="button" class="faq-q" onclick="toggleFaq(this)">
+          Posso provarlo gratis?
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+        </button>
+        <div class="faq-a"><p>Sì, registrati e inizia subito: puoi provare tutte le funzionalità di Brigade prima di decidere se abbonarti.</p></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ── CTA FINALE ── -->
+<section class="cta-final">
+  <div class="wrap">
+    <div class="cta-final-box glass reveal">
+      <h2>Pronto a lasciare la carta in cassetto?</h2>
+      <p>Registrati in un minuto e inizia a gestire il tuo HACCP dal telefono, da oggi.</p>
+      <a href="/register" class="btn btn-primary btn-lg">
+        Inizia gratis
+        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      </a>
+    </div>
+  </div>
+</section>
+
+<!-- ── FOOTER ── -->
+<footer>
+  <div class="wrap footer-inner">
+    <div class="footer-brand">
+      <div class="nav-logo-mark">B</div>
+      <div>
+        <div style="font-weight:800;font-size:15px">Brigade</div>
+        <div class="footer-tag">Sviluppato da uno chef, per i chef</div>
+      </div>
+    </div>
+    <div class="footer-links">
+      <a href="#privacy">Privacy Policy</a>
+      <a href="mailto:caparrotta99@gmail.com">Contatti</a>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Reveal-on-scroll: aggiunge .visible quando l'elemento entra in viewport
+  (function () {
+    var items = document.querySelectorAll('.reveal:not(.visible)');
+    if (!('IntersectionObserver' in window) || items.length === 0) {
+      items.forEach(function (el) { el.classList.add('visible'); });
+      return;
+    }
+    var io = new IntersectionObserver(function (entries) {
+      entries.forEach(function (entry) {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+          io.unobserve(entry.target);
+        }
+      });
+    }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+    items.forEach(function (el) { io.observe(el); });
+  })();
+
+  // FAQ accordion
+  function toggleFaq(btn) {
+    var item = btn.closest('.faq-item');
+    var wasOpen = item.classList.contains('open');
+    document.querySelectorAll('.faq-item.open').forEach(function (el) { el.classList.remove('open'); });
+    if (!wasOpen) item.classList.add('open');
+  }
+</script>
+
+</body>
+</html>

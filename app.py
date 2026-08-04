@@ -632,6 +632,13 @@ def service_worker():
     return resp
 
 
+@app.route('/landing')
+def landing_page():
+    """Landing page pubblica di marketing (file standalone nella root del
+    progetto, non in templates/: nessun rendering Jinja, nessun login richiesto)."""
+    return send_from_directory(app.root_path, 'landing.html')
+
+
 # ─── API LISTINO ─────────────────────────────────────────────────────────────
 
 @app.route('/api/fornitori')

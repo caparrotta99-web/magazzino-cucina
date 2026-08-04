@@ -7680,12 +7680,23 @@ async function ensurePushSubscription() {
     const reg = await navigator.serviceWorker.ready;
     let sub = await reg.pushManager.getSubscription();
     if (!sub) {
+      console.log('[Push] creo una nuova subscription nel browser...');
       sub = await reg.pushManager.subscribe({
         userVisibleOnly: true,
         applicationServerKey: _pushUrlBase64ToUint8Array(VAPID_PUBLIC_KEY),
       });
+      console.log('[Push] subscription creata nel browser:', sub.endpoint);
     }
-    await api('/api/push/subscribe', { method: 'POST', body: sub.toJSON() });
+    const res = await api('/api/push/subscribe', { method: 'POST', body: sub.toJSON() });
+    if (!res || !res.success) {
+      // Senza questo controllo il browser risulta "iscritto" anche quando il
+      // server non ha salvato nulla nel DB — è la causa esatta per cui
+      // l'admin poi vede "nessuna subscription attiva" pur avendo l'utente
+      // "attivato" le notifiche.
+      console.error('[Push] il server non ha confermato il salvataggio della subscription:', res);
+      return false;
+    }
+    console.log('[Push] subscription confermata dal server');
     return true;
   } catch (e) {
     console.warn('[Push] subscribe failed', e);

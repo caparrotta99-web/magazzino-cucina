@@ -144,33 +144,53 @@ async function _getPushSubscription() {
 }
 
 async function toggleNotifiche() {
-  const btn = document.getElementById('btn-notifiche');
+  const btn    = document.getElementById('btn-notifiche');
+  const status = document.getElementById('notifiche-status');
   btn.disabled = true;
   try {
     const existing = await _getPushSubscription();
     if (existing) {
+      console.log('[Push] disattivazione subscription', existing.endpoint);
       await _apiJson('/api/push/unsubscribe', { method: 'POST', body: { endpoint: existing.endpoint } });
       await existing.unsubscribe();
       refreshNotificheStatus();
       return;
     }
     if (Notification.permission === 'denied') {
-      document.getElementById('notifiche-status').textContent =
-        'Notifiche bloccate dal browser — abilitale dalle impostazioni del dispositivo.';
+      console.warn('[Push] permesso notifiche già negato dal browser');
+      status.textContent = 'Notifiche bloccate dal browser — abilitale dalle impostazioni del dispositivo.';
       return;
     }
+    console.log('[Push] richiesta permesso notifiche...');
     const perm = await Notification.requestPermission();
+    console.log('[Push] permesso ricevuto:', perm);
     if (perm !== 'granted') { refreshNotificheStatus(); return; }
+
     const reg = await navigator.serviceWorker.register('/static/sw.js', { scope: '/' });
+    console.log('[Push] service worker pronto, creo la subscription nel browser...');
     const sub = await reg.pushManager.subscribe({
       userVisibleOnly: true,
       applicationServerKey: _pushUrlBase64ToUint8Array(VAPID_PUBLIC_KEY),
     });
-    await _apiJson('/api/push/subscribe', { method: 'POST', body: sub.toJSON() });
+    console.log('[Push] subscription creata nel browser:', sub.endpoint);
+
+    const res = await _apiJson('/api/push/subscribe', { method: 'POST', body: sub.toJSON() });
+    if (!res || !res.success) {
+      // Il browser ha creato la subscription ma il server non l'ha salvata:
+      // senza questo controllo l'utente vedrebbe "Notifiche attive" (lo stato
+      // è calcolato solo lato browser) mentre il DB resta vuoto — è esattamente
+      // il bug per cui l'admin poi vede "nessuna subscription attiva".
+      console.error('[Push] il server non ha confermato il salvataggio della subscription:', res);
+      status.textContent = 'Notifiche create sul dispositivo ma non confermate dal server — riprova.';
+      await sub.unsubscribe().catch(() => {});
+      return;
+    }
+    console.log('[Push] subscription confermata dal server');
     localStorage.setItem('pushAsked', '1');
     refreshNotificheStatus();
   } catch (e) {
-    document.getElementById('notifiche-status').textContent = 'Impossibile attivare le notifiche su questo dispositivo.';
+    console.error('[Push] errore attivazione notifiche', e);
+    status.textContent = 'Impossibile attivare le notifiche su questo dispositivo.';
   } finally {
     btn.disabled = false;
   }

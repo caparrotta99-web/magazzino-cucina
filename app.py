@@ -2351,13 +2351,19 @@ def api_push_vapid_key():
 @app.route('/api/push/subscribe', methods=['POST'])
 @login_required
 def api_push_subscribe():
-    data = request.get_json(force=True)
+    data = request.get_json(silent=True)
     endpoint = (data or {}).get('endpoint', '')
+    print(f"[Push] subscribe ricevuta da utente {current_user.id}: "
+          f"endpoint=...{endpoint[-24:] if endpoint else '(mancante)'}")
     if not data or not endpoint:
-        print(f"[Push] subscribe fallito: dati non validi (utente {current_user.id})")
+        print(f"[Push] subscribe fallito: dati non validi o body non JSON (utente {current_user.id})")
         return jsonify({'success': False, 'error': 'Subscription non valida'}), 400
-    save_push_subscription(int(current_user.id), json.dumps(data), endpoint)
-    print(f"[Push] subscription salvata per utente {current_user.id}: ...{endpoint[-24:]}")
+    try:
+        save_push_subscription(int(current_user.id), json.dumps(data), endpoint)
+    except Exception as e:
+        print(f"[Push] ERRORE salvataggio subscription per utente {current_user.id}: {e}")
+        return jsonify({'success': False, 'error': 'Errore nel salvataggio della subscription'}), 500
+    print(f"[Push] subscription salvata e confermata nel database per utente {current_user.id}: ...{endpoint[-24:]}")
     return jsonify({'success': True})
 
 

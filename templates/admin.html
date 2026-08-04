@@ -111,6 +111,7 @@
   word-break: break-all;
 }
 .debug-sub.debug-warn { color: var(--red); background: rgba(239,68,68,.08); }
+.debug-warn-text { color: var(--red) !important; }
 .debug-mono { font-family: 'Menlo', 'Consolas', monospace; font-size: 11.5px; }
 </style>
 </head>
@@ -174,10 +175,26 @@
       <span class="debug-value">{{ 'presente' if d.vapid_public_presente else 'MANCANTE' }} ({{ d.vapid_source }})</span>
     </div>
     <div class="debug-row">
+      <span class="debug-label">Lunghezza pubblica</span>
+      <span class="debug-value {% if d.vapid_public_len != 87 %}debug-warn-text{% endif %}">{{ d.vapid_public_len }} (attesi 87)</span>
+    </div>
+    {% if d.vapid_public_non_validi %}
+    <div class="debug-row"><span class="debug-label">Caratteri non validi (pubblica)</span>
+      <span class="debug-value debug-warn-text">{{ d.vapid_public_non_validi|join(', ') }}</span></div>
+    {% endif %}
+    <div class="debug-row">
       <span class="debug-label">VAPID key privata</span>
       <span class="debug-value">{{ 'presente' if d.vapid_private_presente else 'MANCANTE' }}</span>
     </div>
-    <div class="debug-sub">chiave pubblica: <span class="debug-mono">{{ d.vapid_public_preview }}</span></div>
+    <div class="debug-row">
+      <span class="debug-label">Lunghezza privata</span>
+      <span class="debug-value {% if d.vapid_private_len != 43 %}debug-warn-text{% endif %}">{{ d.vapid_private_len }} (attesi 43)</span>
+    </div>
+    {% if d.vapid_private_non_validi %}
+    <div class="debug-row"><span class="debug-label">Caratteri non validi (privata)</span>
+      <span class="debug-value debug-warn-text">{{ d.vapid_private_non_validi|join(', ') }}</span></div>
+    {% endif %}
+    <div class="debug-sub">chiave pubblica per intero (non è segreta, il browser la riceve comunque):<br><span class="debug-mono">{{ d.vapid_public_full }}</span></div>
 
     <div class="debug-row">
       <span class="debug-label">Libreria pywebpush</span>

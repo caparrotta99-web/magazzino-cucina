@@ -758,12 +758,25 @@ def admin_debug_notifiche():
         })
     print(f"[Push][Debug] subscription dell'admin {admin_id}: {len(admin_subs)}")
 
+    def _caratteri_non_validi_b64url(s):
+        # Alfabeto base64url: A-Z a-z 0-9 - _  (nessun '=', spazio, virgolette...)
+        return sorted(set(c for c in s if not (c.isalnum() or c in '-_')))
+
     debug['vapid_public_presente']  = bool(VAPID_PUBLIC_KEY)
     debug['vapid_private_presente'] = bool(VAPID_PRIVATE_KEY)
     debug['vapid_source']           = VAPID_SOURCE
-    debug['vapid_public_preview']   = (VAPID_PUBLIC_KEY[:20] + '…') if VAPID_PUBLIC_KEY else '(mancante)'
+    # La chiave pubblica non è segreta (il browser la riceve comunque per
+    # iscriversi): la mostriamo per intero così si può confrontare byte per
+    # byte con quella messa su Render, invece di indovinare da un'anteprima.
+    debug['vapid_public_full']      = VAPID_PUBLIC_KEY or '(mancante)'
+    debug['vapid_public_len']       = len(VAPID_PUBLIC_KEY)
+    debug['vapid_public_non_validi']  = _caratteri_non_validi_b64url(VAPID_PUBLIC_KEY)
+    debug['vapid_private_len']       = len(VAPID_PRIVATE_KEY)
+    debug['vapid_private_non_validi'] = _caratteri_non_validi_b64url(VAPID_PRIVATE_KEY)
     print(f"[Push][Debug] VAPID pubblica presente={debug['vapid_public_presente']} "
-          f"privata presente={debug['vapid_private_presente']} fonte={VAPID_SOURCE}")
+          f"len={debug['vapid_public_len']} (atteso 87) caratteri_non_validi={debug['vapid_public_non_validi']} "
+          f"| privata presente={debug['vapid_private_presente']} len={debug['vapid_private_len']} "
+          f"(atteso 43) caratteri_non_validi={debug['vapid_private_non_validi']} fonte={VAPID_SOURCE}")
 
     debug['pywebpush_ok']      = PYWEBPUSH_VERSION is not None
     debug['pywebpush_versione'] = PYWEBPUSH_VERSION or 'non importabile'

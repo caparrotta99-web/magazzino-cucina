@@ -7754,6 +7754,10 @@ async function loadChatUnreadBadge() {
 // ── PUSH NOTIFICATIONS ──────────────────────────────────────────────────
 function _pushUrlBase64ToUint8Array(base64String) {
   if (!base64String) throw new Error('VAPID_PUBLIC_KEY mancante o vuota lato server');
+  const invalidi = [...new Set((base64String.match(/[^A-Za-z0-9_-]/g) || []).map(c => JSON.stringify(c)))];
+  if (invalidi.length) {
+    throw new Error(`VAPID_PUBLIC_KEY contiene caratteri non validi: ${invalidi.join(', ')} (lunghezza ${base64String.length}, attesi 87)`);
+  }
   const padding = '='.repeat((4 - base64String.length % 4) % 4);
   const base64  = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
   const raw = atob(base64);

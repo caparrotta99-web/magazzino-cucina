@@ -45,6 +45,7 @@ from database import (
     get_all_users, update_user_role, delete_user,
     approva_utente, rifiuta_utente, update_user_controllo_permesso,
     create_reset_token, get_reset_token, use_reset_token, update_user_password,
+    get_active_reset_tokens, confirm_reset_token,
     update_user_profile, update_user_reparto, update_user_tema, update_user_home_card, is_username_taken,
     update_user_dash_cards, get_ultimo_carico, update_user_tutorial_visto,
     CHAT_CANALI, update_user_chat_permesso,
@@ -446,14 +447,15 @@ def forgot_password():
     code  = None
     error = None
     if request.method == 'POST':
-        identifier = (request.form.get('identifier') or '').strip()
-        user_data  = get_user_by_login(identifier)
+        nome      = (request.form.get('nome') or '').strip()
+        user_data = get_user_by_nome(nome)
         if not user_data:
-            error = 'Nessun account trovato con questi dati'
+            error = 'Nessun account trovato con questo nome e cognome'
         else:
             code       = str(random.randint(100000, 999999))
             expires_at = (now_it() + timedelta(minutes=15)).isoformat()
             create_reset_token(user_data['id'], code, expires_at)
+            print(f"[Reset] codice generato per utente {user_data['id']} ({user_data['nome']}), scade {expires_at}")
     return render_template('forgot.html', code=code, error=error)
 
 
@@ -480,12 +482,15 @@ def reset_password():
             elif datetime.fromisoformat(token_data['expires_at']) < now_it():
                 use_reset_token(token_data['id'])
                 error = 'Codice scaduto — richiedine uno nuovo'
+            elif not token_data['confermato']:
+                error = 'Il codice non è ancora stato confermato da un amministratore. Mostra il codice a un amministratore e riprova.'
             else:
                 update_user_password(
                     token_data['user_id'],
                     generate_password_hash(password, method='pbkdf2:sha256'),
                 )
                 use_reset_token(token_data['id'])
+                print(f"[Reset] password reimpostata per utente {token_data['user_id']} (codice invalidato)")
                 success = True
     return render_template('reset.html', error=error, success=success)
 
@@ -552,7 +557,11 @@ def profile():
 @login_required
 @admin_required
 def admin_page():
-    return render_template('admin.html', users=get_all_users())
+    reset_tokens = get_active_reset_tokens()
+    for t in reset_tokens:
+        t['scade_alle']     = datetime.fromisoformat(t['expires_at']).strftime('%H:%M')
+        t['richiesto_alle'] = datetime.fromisoformat(t['created_at']).strftime('%H:%M') if t['created_at'] else '—'
+    return render_template('admin.html', users=get_all_users(), reset_tokens=reset_tokens)
 
 
 @app.route('/admin/role', methods=['POST'])
@@ -647,6 +656,18 @@ def admin_rifiuta_utente():
     if not user_id:
         abort(400)
     rifiuta_utente(user_id)
+    return redirect(url_for('admin_page'))
+
+
+@app.route('/admin/reset-conferma', methods=['POST'])
+@login_required
+@admin_required
+def admin_conferma_reset():
+    token_id = request.form.get('token_id', type=int)
+    if not token_id:
+        abort(400)
+    confirm_reset_token(token_id)
+    print(f"[Reset] codice id={token_id} confermato dall'admin {current_user.id}")
     return redirect(url_for('admin_page'))
 
 

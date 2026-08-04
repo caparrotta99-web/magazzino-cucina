@@ -89,6 +89,12 @@
 
 .you-label { font-size: 12px; color: var(--muted-2); font-style: italic; align-self: center; }
 .empty { text-align: center; padding: 56px 24px; color: var(--muted-2); }
+
+.reset-code {
+  font-family: 'Inter', sans-serif; font-weight: 700; letter-spacing: 3px;
+  color: var(--text);
+}
+.badge-confermato { background: rgba(34,197,94,.14); color: var(--green); border: 1px solid rgba(34,197,94,.3); }
 </style>
 </head>
 <body>
@@ -106,6 +112,40 @@
 
   {% set pending = users|selectattr('stato', 'equalto', 'in_attesa')|list %}
   {% set attivi  = users|rejectattr('stato', 'equalto', 'in_attesa')|list %}
+
+  {% if reset_tokens %}
+  <div class="section-label">Codici di reset password ({{ reset_tokens|length }})</div>
+  <div class="user-list">
+    {% for t in reset_tokens %}
+    <div class="user-card {% if not t.confermato %}pending-card{% endif %}">
+      <div class="user-info">
+        <div class="user-avatar">{{ t.utente_nome[0]|upper }}</div>
+        <div class="user-details">
+          <div class="user-nome">{{ t.utente_nome }}</div>
+          <div class="user-contact">Codice <span class="reset-code">{{ t.token }}</span> · richiesto alle {{ t.richiesto_alle }} · scade alle {{ t.scade_alle }}</div>
+          <div class="user-badges">
+            {% if t.confermato %}
+              <span class="badge badge-confermato">Confermato</span>
+            {% else %}
+              <span class="badge badge-pending">Da confermare</span>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      <div class="pending-actions">
+        {% if not t.confermato %}
+        <form method="post" action="/admin/reset-conferma">
+          <input type="hidden" name="token_id" value="{{ t.id }}">
+          <button type="submit" class="btn-action approve">✓ Conferma reset</button>
+        </form>
+        {% else %}
+        <span class="you-label">In attesa che l'utente completi il reset</span>
+        {% endif %}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% endif %}
 
   {% if pending %}
   <div class="section-label">In attesa di approvazione ({{ pending|length }})</div>

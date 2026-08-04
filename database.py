@@ -495,6 +495,8 @@ def db_init():
         ('users',        'puo_chat', "INTEGER NOT NULL DEFAULT 0"),
         ('users',        'chat_last_seen', "TEXT NOT NULL DEFAULT ''"),
         ('chat_messaggi', 'autore_badge', "TEXT NOT NULL DEFAULT ''"),
+        ('reset_tokens', 'confermato', "INTEGER NOT NULL DEFAULT 0"),
+        ('reset_tokens', 'created_at', "TEXT NOT NULL DEFAULT ''"),
     ]
     for table, col, defn in migrations:
         if _USE_PG:
@@ -1102,14 +1104,16 @@ def delete_user(user_id):
 # ─── RESET TOKEN ──────────────────────────────────────────────────────────────
 
 def create_reset_token(user_id, token, expires_at):
-    """Invalida eventuali token precedenti e ne crea uno nuovo."""
+    """Invalida eventuali token precedenti e ne crea uno nuovo (da confermare
+    da un amministratore prima che possa essere usato, vedi 'confermato')."""
     with get_conn() as conn:
         conn.execute(
             "UPDATE reset_tokens SET used = 1 WHERE user_id = ?", (user_id,)
         )
         conn.execute(
-            "INSERT INTO reset_tokens (user_id, token, expires_at, used) VALUES (?, ?, ?, 0)",
-            (user_id, token, expires_at)
+            "INSERT INTO reset_tokens (user_id, token, expires_at, used, confermato, created_at) "
+            "VALUES (?, ?, ?, 0, 0, ?)",
+            (user_id, token, expires_at, now_it().isoformat())
         )
 
 
@@ -1125,6 +1129,26 @@ def get_reset_token(token):
 def use_reset_token(token_id):
     with get_conn() as conn:
         conn.execute("UPDATE reset_tokens SET used = 1 WHERE id = ?", (token_id,))
+
+
+def get_active_reset_tokens():
+    """Codici non ancora usati e non scaduti, con il nome dell'utente
+    richiedente, per il pannello Admin (conferma manuale del reset)."""
+    with get_conn() as conn:
+        cur = conn.execute(
+            "SELECT rt.id, rt.user_id, rt.token, rt.expires_at, rt.confermato, rt.created_at, "
+            "u.nome AS utente_nome "
+            "FROM reset_tokens rt JOIN users u ON u.id = rt.user_id "
+            "WHERE rt.used = 0 AND rt.expires_at > ? "
+            "ORDER BY rt.id DESC",
+            (now_it().isoformat(),)
+        )
+        return _rows(cur)
+
+
+def confirm_reset_token(token_id):
+    with get_conn() as conn:
+        conn.execute("UPDATE reset_tokens SET confermato = 1 WHERE id = ?", (token_id,))
 
 
 def update_user_password(user_id, password_hash):

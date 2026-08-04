@@ -143,6 +143,15 @@ async function _getPushSubscription() {
   return reg.pushManager.getSubscription();
 }
 
+// iOS espone Notification/PushManager solo per una PWA aggiunta alla
+// schermata Home e aperta da lì — mai dentro una scheda Safari normale.
+function _isIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+}
+function _isStandalonePwa() {
+  return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+}
+
 async function toggleNotifiche() {
   const btn    = document.getElementById('btn-notifiche');
   const status = document.getElementById('notifiche-status');
@@ -154,6 +163,11 @@ async function toggleNotifiche() {
       await _apiJson('/api/push/unsubscribe', { method: 'POST', body: { endpoint: existing.endpoint } });
       await existing.unsubscribe();
       refreshNotificheStatus();
+      return;
+    }
+    if (_isIOS() && !_isStandalonePwa()) {
+      console.warn('[Push] iOS non in modalità standalone: le notifiche non sono disponibili finché l\'app non è installata sulla Home');
+      status.textContent = 'Installa Brigade sulla schermata Home (Condividi → Aggiungi a Home) e riapri l\'app da lì per attivare le notifiche.';
       return;
     }
     if (Notification.permission === 'denied') {
@@ -201,7 +215,12 @@ async function refreshNotificheStatus() {
   const status = document.getElementById('notifiche-status');
   if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) {
     btn.disabled = true;
-    status.textContent = 'Le notifiche non sono supportate su questo dispositivo/browser.';
+    // Su iOS questa API sparisce del tutto finché l'app non è installata
+    // sulla Home: il messaggio generico "non supportate" farebbe pensare a
+    // un limite permanente del dispositivo, non è così.
+    status.textContent = _isIOS()
+      ? 'Installa Brigade sulla schermata Home (Condividi → Aggiungi a Home) e riapri l\'app da lì per attivare le notifiche.'
+      : 'Le notifiche non sono supportate su questo dispositivo/browser.';
     return;
   }
   const sub = await _getPushSubscription();

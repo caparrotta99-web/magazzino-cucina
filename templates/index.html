@@ -7789,34 +7789,48 @@ async function ensurePushSubscription() {
   }
 }
 
-async function requestPushPermission() {
-  if (!('Notification' in window)) return false;
-  const perm = await Notification.requestPermission();
-  return perm === 'granted' ? ensurePushSubscription() : false;
+// iOS Safari supporta le Web Push SOLO per una PWA aggiunta alla schermata
+// Home e aperta da lì (standalone) — mai dentro una scheda Safari normale.
+// Inoltre iOS richiede che Notification.requestPermission() parta da un
+// gesto utente reale (tap): chiamarla da codice automatico (es. al primo
+// login, senza un click) viene ignorata silenziosamente — il permesso
+// resta 'default' per sempre, ma il nostro flag "pushAsked" veniva comunque
+// segnato come "già richiesto", quindi l'utente non vedeva più alcun modo
+// per riprovare. Per questo ora l'attivazione avviene SOLO tramite un tap
+// esplicito (pulsante "Attiva" o Profilo), mai in automatico al login.
+function _isIOS() {
+  return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+}
+function _isStandalonePwa() {
+  return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
 }
 
 function initPushNotifications() {
-  if (!('Notification' in window) || !('serviceWorker' in navigator)) { renderNotifBanner(); return; }
-  if (Notification.permission === 'granted') {
-    ensurePushSubscription().then(renderNotifBanner);
-  } else if (Notification.permission === 'default' && !localStorage.getItem('pushAsked')) {
-    // Al primo accesso dopo il login chiediamo il permesso una sola volta:
-    // se l'utente nega, il browser stesso non richiederà più il prompt e
-    // pushAsked evita che lo richiediamo noi ad ogni apertura dell'app.
-    localStorage.setItem('pushAsked', '1');
-    requestPushPermission().then(renderNotifBanner);
-  } else {
-    renderNotifBanner();
-  }
+  renderNotifBanner();
 }
 
 // ── BANNER "ATTIVA NOTIFICHE" (home, entrambe le pagine) ─────────────────
 function renderNotifBanner() {
-  const show = ('Notification' in window) &&
+  const supportato = ('Notification' in window) && ('serviceWorker' in navigator);
+  const show = supportato &&
                Notification.permission !== 'granted' &&
                !localStorage.getItem('notifBannerDismissed');
+  const serveInstallazione = show && _isIOS() && !_isStandalonePwa();
+
   document.querySelectorAll('.notif-banner').forEach(el => {
     el.style.display = show ? 'flex' : 'none';
+    const testoEl = el.querySelector('.notif-banner-text');
+    const btnEl   = el.querySelector('.notif-banner-btn');
+    if (!testoEl || !btnEl) return;
+    if (serveInstallazione) {
+      // Su iOS, finché l'app gira dentro Safari (non installata), il tap su
+      // "Attiva" fallirebbe silenziosamente: spieghiamo il passo reale.
+      testoEl.textContent = 'Per attivare le notifiche, installa Brigade sulla schermata Home (Condividi → Aggiungi a Home) e riapri l\'app da lì';
+      btnEl.style.display = 'none';
+    } else {
+      testoEl.textContent = 'Attiva le notifiche per ricevere avvisi sui messaggi e la raccolta rifiuti';
+      btnEl.style.display = '';
+    }
   });
 }
 
@@ -7826,7 +7840,13 @@ async function attivaNotificheBanner() {
     toast('Notifiche bloccate dal browser — abilitale dalle impostazioni del dispositivo.', 'error');
     return;
   }
-  await requestPushPermission();
+  if (_isIOS() && !_isStandalonePwa()) {
+    toast('Installa prima Brigade sulla schermata Home (Condividi → Aggiungi a Home), poi riapri l\'app da lì.', 'error');
+    return;
+  }
+  const perm = await Notification.requestPermission();
+  console.log('[Push] permesso richiesto dal banner:', perm);
+  if (perm === 'granted') await ensurePushSubscription();
   localStorage.setItem('pushAsked', '1');
   renderNotifBanner();
 }

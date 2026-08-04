@@ -1,5 +1,6 @@
 import os
 import re
+import math
 import base64
 import sqlite3
 from datetime import date, datetime, timedelta, timezone
@@ -45,34 +46,42 @@ PRANZO_CENA_CUTOFF = '17:00'
 LOCK_DURATA_MINUTI = 10
 
 # ─── RACCOLTA RIFIUTI ────────────────────────────────────────────────────────
-# Calendario settimanale porta a porta ASM Vigevano 2026 (fonte: asmisa.it).
-# giorno_settimana segue date.weekday(): 0=lunedì ... 6=domenica.
+# Calendario settimanale porta a porta ASM Vigevano 2026 (fonte: asmisa.it,
+# incrociato con vigevano.city per orari di esposizione e la frazione
+# "verde e ramaglie" che mancava). giorno_settimana segue date.weekday():
+# 0=lunedì ... 6=domenica.
 RIFIUTI_ZONE_INFO = {
     'centro_ristoranti': {
         'label': 'Centro città — Ristoranti e Bar',
         # esposizione la sera stessa del giorno di raccolta
         'espone_sera_precedente': False,
+        'orario_esposizione': 'Esponi tra le 18:30 e le 20:30 del giorno di raccolta.',
+        'vetro_scadenza': 'Vetro e lattine: esponi entro le 12:00.',
     },
     'centro_negozi': {
         'label': 'Centro città — Negozi',
         'espone_sera_precedente': False,
+        'orario_esposizione': 'Esponi tra le 18:30 e le 20:30 del giorno di raccolta.',
+        'vetro_scadenza': 'Vetro e lattine: esponi entro le 12:00.',
     },
     'citta': {
         'label': 'Città',
         # esposizione dalle 21.00 del giorno precedente la raccolta
         'espone_sera_precedente': True,
+        'orario_esposizione': 'Esponi dalle 21:00 del giorno precedente alle 4:00 del giorno di raccolta.',
+        'vetro_scadenza': 'Vetro e lattine: esponi entro le 7:30.',
     },
 }
 
 RACCOLTA_RIFIUTI_SEED = [
-    ('centro_ristoranti', 0, 'plastica'), ('centro_ristoranti', 0, 'vetro'),
+    ('centro_ristoranti', 0, 'plastica'), ('centro_ristoranti', 0, 'vetro'), ('centro_ristoranti', 0, 'verde'),
     ('centro_ristoranti', 1, 'secco'),    ('centro_ristoranti', 1, 'organico'),
     ('centro_ristoranti', 2, 'carta'),    ('centro_ristoranti', 2, 'vetro'),
     ('centro_ristoranti', 3, 'organico'),
     ('centro_ristoranti', 4, 'carta'),    ('centro_ristoranti', 4, 'vetro'),
     ('centro_ristoranti', 6, 'organico'),
 
-    ('centro_negozi', 0, 'plastica'),
+    ('centro_negozi', 0, 'plastica'), ('centro_negozi', 0, 'verde'),
     ('centro_negozi', 1, 'secco'),
     ('centro_negozi', 2, 'vetro'),
     ('centro_negozi', 3, 'organico'),
@@ -86,6 +95,29 @@ RACCOLTA_RIFIUTI_SEED = [
     ('citta', 4, 'organico'),
     ('citta', 5, 'vetro'),
 ]
+
+# Punto di riferimento del centro storico (Piazza Ducale) e raggio in metri
+# usati per determinare la zona da coordinate GPS grezze.
+RIFIUTI_CENTRO_LAT, RIFIUTI_CENTRO_LON = 45.3145, 8.8553
+RIFIUTI_CENTRO_RAGGIO_M = 600
+
+
+def _distanza_metri_rifiuti(lat1, lon1, lat2, lon2):
+    R = 6371000
+    to_rad = math.radians
+    d_lat = to_rad(lat2 - lat1)
+    d_lon = to_rad(lon2 - lon1)
+    a = (math.sin(d_lat / 2) ** 2
+         + math.cos(to_rad(lat1)) * math.cos(to_rad(lat2)) * math.sin(d_lon / 2) ** 2)
+    return R * 2 * math.atan2(math.sqrt(a), math.sqrt(1 - a))
+
+
+def zona_rifiuti_da_coordinate(lat, lon):
+    """Zona di raccolta rifiuti dedotta da una coppia di coordinate GPS,
+    in base alla distanza dal centro storico (stessa logica già usata
+    lato client per il rilevamento automatico)."""
+    dist = _distanza_metri_rifiuti(lat, lon, RIFIUTI_CENTRO_LAT, RIFIUTI_CENTRO_LON)
+    return 'centro_ristoranti' if dist <= RIFIUTI_CENTRO_RAGGIO_M else 'citta'
 
 if _USE_PG:
     import psycopg2
@@ -497,6 +529,9 @@ def db_init():
         ('chat_messaggi', 'autore_badge', "TEXT NOT NULL DEFAULT ''"),
         ('reset_tokens', 'confermato', "INTEGER NOT NULL DEFAULT 0"),
         ('reset_tokens', 'created_at', "TEXT NOT NULL DEFAULT ''"),
+        ('users', 'rifiuti_lat', "REAL NOT NULL DEFAULT 0"),
+        ('users', 'rifiuti_lon', "REAL NOT NULL DEFAULT 0"),
+        ('users', 'rifiuti_geo_aggiornato_il', "TEXT NOT NULL DEFAULT ''"),
     ]
     for table, col, defn in migrations:
         if _USE_PG:
@@ -1230,6 +1265,26 @@ def update_user_tema(user_id, tema):
         conn.execute(
             "UPDATE users SET tema = ? WHERE id = ?", (tema, user_id)
         )
+
+
+def update_user_rifiuti_posizione(user_id, lat, lon):
+    """Ultima posizione GPS nota per questo utente: usata come fallback
+    quando la geolocalizzazione del browser è temporaneamente non
+    disponibile (non per un semplice diniego permanente del permesso)."""
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE users SET rifiuti_lat = ?, rifiuti_lon = ?, rifiuti_geo_aggiornato_il = ? WHERE id = ?",
+            (lat, lon, now_it().isoformat(), user_id)
+        )
+
+
+def get_user_rifiuti_posizione(user_id):
+    with get_conn() as conn:
+        cur = conn.execute(
+            "SELECT rifiuti_lat, rifiuti_lon, rifiuti_geo_aggiornato_il FROM users WHERE id = ?",
+            (user_id,)
+        )
+        return _row(cur)
 
 
 def update_user_home_card(user_id, home_card):

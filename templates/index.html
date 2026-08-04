@@ -535,6 +535,27 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
 .home-dash-rifiuti-icon { width: 22px; height: 22px; flex-shrink: 0; color: var(--rifiuto-color); }
 .home-dash-rifiuti-icon svg { width: 100%; height: 100%; }
 .home-dash-rifiuti-label { font-size: 13px; font-weight: 700; color: #ffffff; }
+.home-dash-rifiuti-orario { font-size: 11px; color: rgba(255,255,255,.6); margin-top: 8px; line-height: 1.4; }
+.home-dash-rifiuti-section-title {
+  font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px;
+  color: rgba(255,255,255,.5); margin-top: 18px; margin-bottom: 2px;
+}
+.home-dash-rifiuti-section-title:first-child { margin-top: 0; }
+.home-dash-rifiuti-prossimi { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
+.home-dash-rifiuti-prossimo-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  font-size: 12.5px; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,.08);
+}
+.home-dash-rifiuti-prossimo-row:last-child { border-bottom: none; }
+.home-dash-rifiuti-prossimo-giorno { color: rgba(255,255,255,.7); }
+.home-dash-rifiuti-prossimo-tipi { display: flex; gap: 5px; flex-wrap: wrap; justify-content: flex-end; }
+.home-dash-rifiuti-prossimo-badge {
+  display: inline-flex; align-items: center;
+  font-size: 10.5px; font-weight: 700; padding: 3px 9px; border-radius: 100px;
+  background: var(--rifiuto-bg); color: #ffffff; border: 1px solid var(--rifiuto-color);
+  white-space: nowrap;
+}
+.home-dash-rifiuti-prossimo-none { color: rgba(255,255,255,.4); font-size: 12.5px; }
 
 /* ─── ANTEPRIMA CHAT ──────────────────────────────────────────────────────── */
 .home-dash-chat-row { display: flex; flex-direction: column; gap: 2px; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,.10); }
@@ -3686,6 +3707,7 @@ async function init() {
   _initHomeSwipe();
   _setHomePage(IS_ADMIN ? 0 : 1, false);
   renderNotifBanner();
+  initRifiutiGeoWatch();
   await Promise.all([loadCategorie(), loadProdottiCarico(), loadGiacenze(), loadAlerts(), loadListaSpesa(), loadInUso(), loadApparecchi(), loadStoricoTemperature(), loadLocks()]);
   setInterval(loadLocks, 20000);
   renderInUsoProdotti();
@@ -3882,55 +3904,77 @@ const RIFIUTI_TIPI = {
     label: 'Vetro e lattine', color: '#26a69a', bg: 'rgba(38,166,154,.22)',
     icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 2h8l-1 9a3 3 0 0 1-3 3 3 3 0 0 1-3-3L8 2Z"/><path d="M9 14v6M15 14v6M7 22h10"/></svg>',
   },
+  verde: {
+    label: 'Verde e ramaglie', color: '#8d6e63', bg: 'rgba(141,110,99,.22)',
+    icon: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22V12M12 12c-4-1-6-4-6-8 5 0 8 2 8 6M12 12c3-1 5-3 5-6-4 0-6 1.5-6 4"/></svg>',
+  },
 };
-
-// Centro storico di Vigevano (Piazza Ducale), usato come riferimento per
-// distinguere "Centro città" da "Città" quando si rileva la posizione.
-const RIFIUTI_CENTRO_LAT = 45.3145, RIFIUTI_CENTRO_LON = 8.8553;
-const RIFIUTI_CENTRO_RAGGIO_M = 600;
-
-function _distanzaMetriRifiuti(lat1, lon1, lat2, lon2) {
-  const R = 6371000, toRad = d => d * Math.PI / 180;
-  const dLat = toRad(lat2 - lat1), dLon = toRad(lon2 - lon1);
-  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon / 2) ** 2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-}
 
 async function loadRifiutiRaccolta() {
   const data = await api('/api/rifiuti/oggi');
   _renderRifiutiRaccolta(data);
-  if (!data.zona && !_rifiutiGeoTentata) rilevaZonaRifiutiAutomatica();
 }
 
-let _rifiutiGeoTentata = false;
+// ── GEOLOCALIZZAZIONE SEMPRE ATTIVA ──────────────────────────────────────
+// A differenza del meteo (coordinate fisse di Vigevano), qui la posizione
+// serve a distinguere "Centro" da "Città": watchPosition (non
+// getCurrentPosition) tiene il rilevamento sempre aggiornato per tutta la
+// sessione, e ogni lettura viene anche salvata sull'utente come fallback
+// per quando il GPS è temporaneamente irraggiungibile.
+let _rifiutiWatchId = null;
+let _rifiutiUltimaZonaNota = null;
 
-function rilevaZonaRifiutiAutomatica() {
-  _rifiutiGeoTentata = true;
-  closeRifiutiZonaPicker();
+function initRifiutiGeoWatch() {
+  if (!document.getElementById('home-dash-rifiuti-zona')) return; // utente staff: card non presente
   if (!navigator.geolocation) {
     console.warn('[Rifiuti] navigator.geolocation non disponibile su questo browser');
     openRifiutiZonaPicker();
     return;
   }
-  console.log('[Rifiuti] richiesta posizione via navigator.geolocation.getCurrentPosition...');
-  navigator.geolocation.getCurrentPosition(
+  if (_rifiutiWatchId !== null) return; // già avviato in questa sessione
+  console.log('[Rifiuti] avvio watchPosition per il rilevamento continuo della zona...');
+  _rifiutiWatchId = navigator.geolocation.watchPosition(
     pos => {
-      const dist = _distanzaMetriRifiuti(
-        pos.coords.latitude, pos.coords.longitude, RIFIUTI_CENTRO_LAT, RIFIUTI_CENTRO_LON
-      );
-      const zona = dist <= RIFIUTI_CENTRO_RAGGIO_M ? 'centro_ristoranti' : 'citta';
-      console.log('[Rifiuti] posizione ricevuta', {
-        lat: pos.coords.latitude, lon: pos.coords.longitude,
-        distanza_m: Math.round(dist), zona_scelta: zona,
+      console.log('[Rifiuti] posizione aggiornata', pos.coords.latitude, pos.coords.longitude);
+      api('/api/rifiuti/posizione', {
+        method: 'POST',
+        body: { lat: pos.coords.latitude, lon: pos.coords.longitude },
+      }).then(res => {
+        if (!res || !res.success) { console.warn('[Rifiuti] salvataggio posizione fallito', res); return; }
+        closeRifiutiZonaPicker();
+        if (res.zona !== _rifiutiUltimaZonaNota) {
+          console.log('[Rifiuti] zona aggiornata:', res.zona);
+          _rifiutiUltimaZonaNota = res.zona;
+          loadRifiutiRaccolta();
+        }
       });
-      salvaZonaRifiuti(zona);
     },
     err => {
-      console.warn('[Rifiuti] geolocalizzazione fallita', err.code, err.message);
-      openRifiutiZonaPicker();
+      console.warn('[Rifiuti] geolocalizzazione non disponibile', err.code, err.message);
+      if (err.code === err.PERMISSION_DENIED) {
+        openRifiutiZonaPicker();
+        return;
+      }
+      // Non è un diniego (es. timeout, GPS momentaneamente assente):
+      // riusa l'ultima posizione nota salvata sull'utente, se esiste.
+      api('/api/rifiuti/usa-ultima-posizione', { method: 'POST' }).then(res => {
+        if (res && res.success) {
+          if (res.zona !== _rifiutiUltimaZonaNota) { _rifiutiUltimaZonaNota = res.zona; loadRifiutiRaccolta(); }
+        } else {
+          openRifiutiZonaPicker();
+        }
+      });
     },
-    { timeout: 8000, maximumAge: 10 * 60 * 1000 }
+    { enableHighAccuracy: false, maximumAge: 5 * 60 * 1000, timeout: 10000 }
   );
+}
+
+function rilevaZonaRifiutiAutomatica() {
+  // Richiamata dal pulsante "Rileva automaticamente" del picker manuale:
+  // riparte da zero (utile se il permesso era stato negato e l'utente lo
+  // ha appena riabilitato dalle impostazioni del browser).
+  if (_rifiutiWatchId !== null) { navigator.geolocation.clearWatch(_rifiutiWatchId); _rifiutiWatchId = null; }
+  initRifiutiGeoWatch();
 }
 
 async function salvaZonaRifiuti(zona) {
@@ -3941,6 +3985,7 @@ async function salvaZonaRifiuti(zona) {
     openRifiutiZonaPicker();
     return;
   }
+  _rifiutiUltimaZonaNota = zona;
   closeRifiutiZonaPicker();
   loadRifiutiRaccolta();
 }
@@ -3948,6 +3993,28 @@ async function salvaZonaRifiuti(zona) {
 function openRifiutiZonaPicker() { document.getElementById('modal-rifiuti-zona').classList.add('open'); }
 function closeRifiutiZonaPicker() { document.getElementById('modal-rifiuti-zona').classList.remove('open'); }
 function bgCloseRifiutiZonaPicker(e) { if (e.target === document.getElementById('modal-rifiuti-zona')) closeRifiutiZonaPicker(); }
+
+function _rifiutiChip(t, prefissoLabel) {
+  const info = RIFIUTI_TIPI[t];
+  if (!info) return '';
+  return `<div class="home-dash-rifiuti-chip" style="--rifiuto-color:${info.color};--rifiuto-bg:${info.bg}">
+    <span class="home-dash-rifiuti-icon">${info.icon}</span>
+    <span class="home-dash-rifiuti-label">${prefissoLabel ? prefissoLabel + ': ' : ''}${info.label}</span>
+  </div>`;
+}
+
+function _rifiutiOrarioNota(tipi, data) {
+  const parti = [];
+  if (data.orario_esposizione) parti.push(data.orario_esposizione);
+  if (tipi.includes('vetro') && data.vetro_scadenza) parti.push(data.vetro_scadenza);
+  return parti.length ? `<div class="home-dash-rifiuti-orario">${esc(parti.join(' · '))}</div>` : '';
+}
+
+function _fmtGiornoRifiuti(iso) {
+  const d = new Date(iso + 'T00:00:00');
+  const s = d.toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long' });
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
 
 function _renderRifiutiRaccolta(data) {
   const zonaEl = document.getElementById('home-dash-rifiuti-zona');
@@ -3963,16 +4030,34 @@ function _renderRifiutiRaccolta(data) {
     return;
   }
   zonaEl.textContent = data.zona_label;
-  bodyEl.innerHTML = data.tipi.length
-    ? data.tipi.map(t => {
-        const info = RIFIUTI_TIPI[t];
-        if (!info) return '';
-        return `<div class="home-dash-rifiuti-chip" style="--rifiuto-color:${info.color};--rifiuto-bg:${info.bg}">
-          <span class="home-dash-rifiuti-icon">${info.icon}</span>
-          <span class="home-dash-rifiuti-label">Stasera esponi: ${info.label}</span>
-        </div>`;
-      }).join('')
-    : '<ul class="home-dash-simple-list"><li class="home-dash-simple-empty">Nessuna raccolta stasera</li></ul>';
+
+  let html = '<div class="home-dash-rifiuti-section-title">Stasera esponi</div>';
+  html += data.tipi.length
+    ? data.tipi.map(t => _rifiutiChip(t)).join('') + _rifiutiOrarioNota(data.tipi, data)
+    : '<div class="home-dash-rifiuti-prossimo-none">Nessuna raccolta stasera</div>';
+
+  if (data.domani) {
+    html += '<div class="home-dash-rifiuti-section-title">Domani sera</div>';
+    html += data.domani.tipi.length
+      ? data.domani.tipi.map(t => _rifiutiChip(t)).join('') + _rifiutiOrarioNota(data.domani.tipi, data)
+      : '<div class="home-dash-rifiuti-prossimo-none">Nessuna raccolta domani</div>';
+  }
+
+  if (data.prossimi && data.prossimi.length) {
+    html += '<div class="home-dash-rifiuti-section-title">Prossime sere</div><div class="home-dash-rifiuti-prossimi">';
+    html += data.prossimi.map(p => `
+      <div class="home-dash-rifiuti-prossimo-row">
+        <span class="home-dash-rifiuti-prossimo-giorno">${esc(_fmtGiornoRifiuti(p.data))}</span>
+        <span class="home-dash-rifiuti-prossimo-tipi">${
+          p.tipi.length
+            ? p.tipi.map(t => `<span class="home-dash-rifiuti-prossimo-badge" style="--rifiuto-color:${RIFIUTI_TIPI[t] ? RIFIUTI_TIPI[t].color : '#999'};--rifiuto-bg:${RIFIUTI_TIPI[t] ? RIFIUTI_TIPI[t].bg : 'transparent'}">${RIFIUTI_TIPI[t] ? esc(RIFIUTI_TIPI[t].label) : esc(t)}</span>`).join('')
+            : '<span class="home-dash-rifiuti-prossimo-none">—</span>'
+        }</span>
+      </div>`).join('');
+    html += '</div>';
+  }
+
+  bodyEl.innerHTML = html;
 }
 
 // ── ANTEPRIMA CHAT (dashboard) ────────────────────────────────────────────

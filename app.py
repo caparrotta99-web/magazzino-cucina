@@ -54,6 +54,7 @@ from database import (
     set_chat_canale_letto, get_chat_unread_counts,
     log_chat_azione, get_log_chat_messaggi,
     RIFIUTI_ZONE_INFO, get_impostazione, set_impostazione, get_raccolta_calendario,
+    zona_rifiuti_da_coordinate, update_user_rifiuti_posizione, get_user_rifiuti_posizione,
     get_or_create_vapid_keys, save_push_subscription, delete_push_subscription,
     get_push_subscriptions_by_users, get_all_push_subscriptions,
     log_meteo_lettura,
@@ -2393,32 +2394,108 @@ def api_controllo_log_chat():
 
 RIFIUTI_TIPI_LABEL = {
     'organico': 'Organico', 'carta': 'Carta', 'plastica': 'Plastica',
-    'secco': 'Indifferenziato', 'vetro': 'Vetro e lattine',
+    'secco': 'Indifferenziato', 'vetro': 'Vetro e lattine', 'verde': 'Verde e ramaglie',
 }
+
+RIFIUTI_GIORNI_PROSSIMI = 7  # quante sere mostrare oltre a "stasera" e "domani"
+
+
+def _tipi_per_sera(sera, zona, info, calendario):
+    """Tipi di rifiuto da esporre la sera di 'sera' (un date), secondo la
+    regola della zona: il centro raccoglie la mattina dopo la stessa sera
+    dell'esposizione, la Città raccoglie la mattina della sera precedente
+    (quindi si espone la sera prima del giorno di raccolta)."""
+    giorno_raccolta = sera + timedelta(days=1) if info['espone_sera_precedente'] else sera
+    return [r['tipo_rifiuto'] for r in calendario if r['giorno_settimana'] == giorno_raccolta.weekday()]
 
 
 def _calcola_rifiuti_oggi():
-    """Zona configurata, sue info (label/orario di esposizione) e lista dei
-    tipi di rifiuto da esporre stasera, secondo la regola della zona
-    (stesso giorno per i centri, sera precedente per la Città)."""
+    """Zona configurata, sue info e lista dei tipi di rifiuto da esporre
+    stasera. Usata dal job dello scheduler (promemoria delle 18:00)."""
     zona = get_impostazione('zona_rifiuti', '')
     info = RIFIUTI_ZONE_INFO.get(zona)
     if not info:
         return zona, info, []
-    oggi = today_it()
-    giorno_esposto = oggi + timedelta(days=1) if info['espone_sera_precedente'] else oggi
     calendario = get_raccolta_calendario(zona)
-    tipi = [r['tipo_rifiuto'] for r in calendario if r['giorno_settimana'] == giorno_esposto.weekday()]
+    tipi = _tipi_per_sera(today_it(), zona, info, calendario)
     return zona, info, tipi
+
+
+def _calcola_rifiuti_esteso():
+    """Come _calcola_rifiuti_oggi ma con l'anteprima di domani e dei
+    prossimi RIFIUTI_GIORNI_PROSSIMI giorni, per la card della dashboard."""
+    zona = get_impostazione('zona_rifiuti', '')
+    info = RIFIUTI_ZONE_INFO.get(zona)
+    if not info:
+        return zona, info, [], None, []
+    calendario = get_raccolta_calendario(zona)
+    oggi = today_it()
+    stasera = _tipi_per_sera(oggi, zona, info, calendario)
+    domani = {
+        'data': (oggi + timedelta(days=1)).isoformat(),
+        'tipi': _tipi_per_sera(oggi + timedelta(days=1), zona, info, calendario),
+    }
+    prossimi = []
+    for i in range(2, 2 + RIFIUTI_GIORNI_PROSSIMI):
+        giorno = oggi + timedelta(days=i)
+        prossimi.append({'data': giorno.isoformat(), 'tipi': _tipi_per_sera(giorno, zona, info, calendario)})
+    return zona, info, stasera, domani, prossimi
 
 
 @app.route('/api/rifiuti/oggi')
 @login_required
 def api_rifiuti_oggi():
-    zona, info, tipi = _calcola_rifiuti_oggi()
+    zona, info, stasera, domani, prossimi = _calcola_rifiuti_esteso()
     if not info:
-        return jsonify({'success': True, 'zona': '', 'zona_label': '', 'tipi': []})
-    return jsonify({'success': True, 'zona': zona, 'zona_label': info['label'], 'tipi': tipi})
+        return jsonify({'success': True, 'zona': '', 'zona_label': '', 'tipi': [], 'domani': None, 'prossimi': []})
+    return jsonify({
+        'success': True,
+        'zona': zona,
+        'zona_label': info['label'],
+        'tipi': stasera,
+        'orario_esposizione': info.get('orario_esposizione', ''),
+        'vetro_scadenza': info.get('vetro_scadenza', ''),
+        'domani': domani,
+        'prossimi': prossimi,
+    })
+
+
+@app.route('/api/rifiuti/posizione', methods=['POST'])
+@login_required
+def api_rifiuti_set_posizione():
+    """Riceve una lettura GPS (da watchPosition, quindi potenzialmente
+    frequente): salva l'ultima posizione nota per QUESTO utente — da usare
+    come fallback quando la geolocalizzazione del browser è momentaneamente
+    irraggiungibile — e ricalcola/aggiorna la zona condivisa del locale."""
+    data = request.get_json(silent=True) or {}
+    try:
+        lat = float(data.get('lat'))
+        lon = float(data.get('lon'))
+    except (TypeError, ValueError):
+        print(f"[Rifiuti] posizione non valida ricevuta da utente {current_user.id}: {data}")
+        return jsonify({'success': False, 'error': 'Coordinate non valide'}), 400
+    update_user_rifiuti_posizione(int(current_user.id), lat, lon)
+    zona = zona_rifiuti_da_coordinate(lat, lon)
+    set_impostazione('zona_rifiuti', zona)
+    print(f"[Rifiuti] posizione utente {current_user.id}: lat={lat:.5f} lon={lon:.5f} -> zona={zona}")
+    return jsonify({'success': True, 'zona': zona})
+
+
+@app.route('/api/rifiuti/usa-ultima-posizione', methods=['POST'])
+@login_required
+def api_rifiuti_usa_ultima_posizione():
+    """Fallback quando il browser non riesce a fornire una posizione fresca
+    (non un diniego permanente, es. timeout/GPS momentaneamente assente):
+    riusa l'ultima posizione nota salvata per questo utente, se esiste."""
+    pos = get_user_rifiuti_posizione(int(current_user.id))
+    if not pos or (not pos['rifiuti_lat'] and not pos['rifiuti_lon']):
+        print(f"[Rifiuti] nessuna posizione precedente salvata per utente {current_user.id}")
+        return jsonify({'success': False, 'error': 'Nessuna posizione precedente salvata'}), 404
+    zona = zona_rifiuti_da_coordinate(pos['rifiuti_lat'], pos['rifiuti_lon'])
+    set_impostazione('zona_rifiuti', zona)
+    print(f"[Rifiuti] fallback su ultima posizione nota (utente {current_user.id}, "
+          f"aggiornata il {pos['rifiuti_geo_aggiornato_il']}): zona={zona}")
+    return jsonify({'success': True, 'zona': zona})
 
 
 @app.route('/api/rifiuti/zona', methods=['POST'])

@@ -639,6 +639,12 @@ def landing_page():
     return send_from_directory(app.root_path, 'landing.html')
 
 
+@app.route('/privacy')
+def privacy_page():
+    """Informativa privacy pubblica (file standalone, stesso pattern di /landing)."""
+    return send_from_directory(app.root_path, 'privacy.html')
+
+
 # ─── API LISTINO ─────────────────────────────────────────────────────────────
 
 @app.route('/api/fornitori')

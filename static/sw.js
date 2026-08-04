@@ -1,4 +1,4 @@
-const CACHE_NAME = 'magazzino-v1';
+const CACHE_NAME = 'magazzino-v2';
 
 // Asset statici da mettere in cache al momento dell'installazione
 const STATIC_ASSETS = [

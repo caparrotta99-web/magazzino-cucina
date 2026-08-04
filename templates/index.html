@@ -8,6 +8,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Brigade — HACCP</title>
 <link rel="manifest" href="/static/manifest.json">
+<link rel="icon" href="/static/icon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="/static/icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
@@ -3772,7 +3774,6 @@ function renderHomeDashboard() {
 
 // ── METEO VIGEVANO (Open-Meteo, nessuna chiave richiesta) ────────────────
 const METEO_LAT = 45.3167, METEO_LON = 8.8500;
-let _meteoLoaded = false;
 
 // Icone SVG minimal, mappate dai weather_code WMO restituiti da Open-Meteo
 const METEO_ICONS = {
@@ -3793,17 +3794,25 @@ function _meteoInfo(code) {
   return { label: 'Variabile', icon: 'nuvoloso' };
 }
 async function loadMeteoVigevano() {
-  if (_meteoLoaded) return;
-  _meteoLoaded = true;
+  // NB: niente flag "già caricato una volta" qui — questa funzione viene
+  // richiamata ogni volta che si torna sulla Dashboard (renderHomeDashboard),
+  // ed è la cache sessionStorage con TTL 10 minuti qui sotto a decidere se
+  // serve un fetch nuovo. Un flag one-shot bloccava ogni fetch successivo
+  // al primo, quindi la temperatura restava congelata per l'intera sessione
+  // anche ore dopo, pur cambiando l'orario mostrato altrove in pagina.
   try {
     const cached = sessionStorage.getItem('meteoVigevanoV3');
     if (cached) {
       const { t, data } = JSON.parse(cached);
       if (Date.now() - t < 10 * 60 * 1000) { _renderMeteo(data, t); return; }
     }
-    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${METEO_LAT}&longitude=${METEO_LON}&current=temperature_2m,weather_code,apparent_temperature&daily=temperature_2m_max,temperature_2m_min&timezone=Europe%2FRome&forecast_days=1`);
+    // cache: 'no-store' + timestamp in query string: evita che una cache
+    // intermedia (browser, proxy, service worker) restituisca una risposta
+    // vecchia invece di interrogare davvero Open-Meteo.
+    const res = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${METEO_LAT}&longitude=${METEO_LON}&current=temperature_2m,weather_code,apparent_temperature&daily=temperature_2m_max,temperature_2m_min&timezone=Europe%2FRome&forecast_days=1&_=${Date.now()}`, { cache: 'no-store' });
     const data = await res.json();
-    console.log('[Meteo Vigevano] risposta API Open-Meteo:', {
+    console.log('[Meteo Vigevano] risposta grezza API Open-Meteo:', JSON.stringify(data));
+    console.log('[Meteo Vigevano] campi estratti:', {
       rilevato_alle:      data.current && data.current.time,
       temperatura_attuale: data.current && data.current.temperature_2m,
       percepita:           data.current && data.current.apparent_temperature,
@@ -3898,22 +3907,40 @@ let _rifiutiGeoTentata = false;
 function rilevaZonaRifiutiAutomatica() {
   _rifiutiGeoTentata = true;
   closeRifiutiZonaPicker();
-  if (!navigator.geolocation) { openRifiutiZonaPicker(); return; }
+  if (!navigator.geolocation) {
+    console.warn('[Rifiuti] navigator.geolocation non disponibile su questo browser');
+    openRifiutiZonaPicker();
+    return;
+  }
+  console.log('[Rifiuti] richiesta posizione via navigator.geolocation.getCurrentPosition...');
   navigator.geolocation.getCurrentPosition(
     pos => {
       const dist = _distanzaMetriRifiuti(
         pos.coords.latitude, pos.coords.longitude, RIFIUTI_CENTRO_LAT, RIFIUTI_CENTRO_LON
       );
-      salvaZonaRifiuti(dist <= RIFIUTI_CENTRO_RAGGIO_M ? 'centro_ristoranti' : 'citta');
+      const zona = dist <= RIFIUTI_CENTRO_RAGGIO_M ? 'centro_ristoranti' : 'citta';
+      console.log('[Rifiuti] posizione ricevuta', {
+        lat: pos.coords.latitude, lon: pos.coords.longitude,
+        distanza_m: Math.round(dist), zona_scelta: zona,
+      });
+      salvaZonaRifiuti(zona);
     },
-    () => openRifiutiZonaPicker(),
+    err => {
+      console.warn('[Rifiuti] geolocalizzazione fallita', err.code, err.message);
+      openRifiutiZonaPicker();
+    },
     { timeout: 8000, maximumAge: 10 * 60 * 1000 }
   );
 }
 
 async function salvaZonaRifiuti(zona) {
   const res = await api('/api/rifiuti/zona', { method: 'POST', body: { zona } });
-  if (!res.success) { toast(res.error || 'Errore', 'error'); return; }
+  if (!res.success) {
+    console.warn('[Rifiuti] salvataggio zona fallito', res);
+    toast(res.error || 'Errore', 'error');
+    openRifiutiZonaPicker();
+    return;
+  }
   closeRifiutiZonaPicker();
   loadRifiutiRaccolta();
 }

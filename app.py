@@ -1,5 +1,6 @@
 import os
 import re
+import sys
 import json
 import random
 import string
@@ -8,6 +9,14 @@ import uuid
 import threading
 from datetime import datetime, timedelta
 from functools import wraps
+
+# stdout non è un TTY quando il processo gira dietro gunicorn/gestori di
+# processo (Render compreso): per default Python lo bufferizza a blocchi
+# interi, quindi i print() di diagnostica (push, scheduler, meteo...)
+# possono restare invisibili nei log per minuti o non comparire affatto
+# prima che il buffer si riempia. line_buffering li rende visibili subito.
+if hasattr(sys.stdout, 'reconfigure'):
+    sys.stdout.reconfigure(line_buffering=True)
 
 from timezone_utils import now_it, today_it, TZ_ITALIA
 
@@ -246,7 +255,18 @@ if not get_user_by_login('admin'):
         role='admin',
     )
 
-VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY = get_or_create_vapid_keys()
+# Le chiavi VAPID possono essere fissate da variabili d'ambiente (utile su
+# Render per garantire che restino identiche tra un deploy e l'altro anche
+# se il disco persistente venisse mai ricreato); in assenza delle env var
+# si usano quelle generate una tantum e salvate in impostazioni_app.
+_VAPID_PUB_ENV  = os.environ.get('VAPID_PUBLIC_KEY', '')
+_VAPID_PRIV_ENV = os.environ.get('VAPID_PRIVATE_KEY', '')
+if _VAPID_PUB_ENV and _VAPID_PRIV_ENV:
+    VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY = _VAPID_PUB_ENV, _VAPID_PRIV_ENV
+    print('[Push] chiavi VAPID caricate dalle variabili d\'ambiente')
+else:
+    VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY = get_or_create_vapid_keys()
+    print('[Push] chiavi VAPID caricate dal database (impostazioni_app)')
 VAPID_CLAIMS_SUB = os.environ.get('VAPID_SUBJECT', 'mailto:info@brigade-app.local')
 
 
@@ -255,7 +275,10 @@ def _invia_push(subscriptions, title, body, url='/', tag=''):
     push_subscriptions). Rimuove automaticamente le subscription scadute
     (endpoint non più valido, es. utente disinstallato/notifiche revocate)."""
     payload = json.dumps({'title': title, 'body': body, 'url': url, 'tag': tag})
+    print(f"[Push] invio '{title}' a {len(subscriptions)} subscription...")
+    inviate, fallite = 0, 0
     for sub in subscriptions:
+        endpoint_short = sub['endpoint'][-24:]
         try:
             webpush(
                 subscription_info=json.loads(sub['subscription_json']),
@@ -263,24 +286,35 @@ def _invia_push(subscriptions, title, body, url='/', tag=''):
                 vapid_private_key=VAPID_PRIVATE_KEY,
                 vapid_claims={'sub': VAPID_CLAIMS_SUB},
             )
+            inviate += 1
+            print(f"[Push]  ok -> ...{endpoint_short} (utente {sub['utente_id']})")
         except WebPushException as e:
             status = getattr(e.response, 'status_code', None)
+            print(f"[Push]  FALLITA -> ...{endpoint_short} (utente {sub['utente_id']}): status={status} {e}")
+            fallite += 1
             if status in (404, 410):
                 delete_push_subscription(sub['endpoint'])
-        except Exception:
-            pass  # invio best-effort: un errore di rete non deve interrompere gli altri invii
+                print(f"[Push]  subscription rimossa (endpoint non più valido, status {status})")
+        except Exception as e:
+            print(f"[Push]  ERRORE invio -> ...{endpoint_short} (utente {sub['utente_id']}): {e}")
+            fallite += 1
+    print(f"[Push] completato: {inviate} inviate, {fallite} fallite")
 
 
 def push_to_users(user_ids, title, body, url='/', tag=''):
     subs = get_push_subscriptions_by_users(user_ids)
-    if subs:
-        _invia_push(subs, title, body, url, tag)
+    if not subs:
+        print(f"[Push] nessuna subscription trovata per utenti {list(user_ids)}, notifica '{title}' non inviata")
+        return
+    _invia_push(subs, title, body, url, tag)
 
 
 def push_to_all(title, body, url='/', tag=''):
     subs = get_all_push_subscriptions()
-    if subs:
-        _invia_push(subs, title, body, url, tag)
+    if not subs:
+        print(f"[Push] nessuna subscription salvata nel database, notifica '{title}' non inviata")
+        return
+    _invia_push(subs, title, body, url, tag)
 
 
 def _push_pending_to_sheets():
@@ -2247,13 +2281,19 @@ def api_rifiuti_oggi():
 
 @app.route('/api/rifiuti/zona', methods=['POST'])
 @login_required
-@admin_required
 def api_rifiuti_set_zona():
+    # Nessun @admin_required: la zona è un dato di posizione del locale (non
+    # un'impostazione sensibile) e il rilevamento automatico via
+    # geolocalizzazione parte per qualunque utente che apre la dashboard —
+    # con l'admin_required qui, il salvataggio falliva (403) per tutto lo
+    # staff non-admin e la zona non veniva mai impostata.
     data = request.get_json(silent=True) or {}
     zona = data.get('zona', '')
     if zona not in RIFIUTI_ZONE_INFO:
+        print(f"[Rifiuti] zona non valida ricevuta: {zona!r}")
         return jsonify({'success': False, 'error': 'Zona non valida'}), 400
     set_impostazione('zona_rifiuti', zona)
+    print(f"[Rifiuti] zona impostata: {zona} (utente {current_user.id})")
     return jsonify({'success': True})
 
 
@@ -2271,8 +2311,10 @@ def api_push_subscribe():
     data = request.get_json(force=True)
     endpoint = (data or {}).get('endpoint', '')
     if not data or not endpoint:
+        print(f"[Push] subscribe fallito: dati non validi (utente {current_user.id})")
         return jsonify({'success': False, 'error': 'Subscription non valida'}), 400
     save_push_subscription(int(current_user.id), json.dumps(data), endpoint)
+    print(f"[Push] subscription salvata per utente {current_user.id}: ...{endpoint[-24:]}")
     return jsonify({'success': True})
 
 
@@ -2282,6 +2324,7 @@ def api_push_unsubscribe():
     endpoint = (request.get_json(silent=True) or {}).get('endpoint', '')
     if endpoint:
         delete_push_subscription(endpoint)
+        print(f"[Push] subscription rimossa per utente {current_user.id}: ...{endpoint[-24:]}")
     return jsonify({'success': True})
 
 
@@ -2291,6 +2334,7 @@ def api_push_unsubscribe():
 @login_required
 def api_meteo_log():
     d = request.get_json(force=True)
+    print(f"[Meteo] valore grezzo ricevuto dal client: {d}")
     try:
         temperatura  = float(d.get('temperatura'))
         weather_code = int(d.get('weather_code'))
@@ -2303,10 +2347,13 @@ def api_meteo_log():
 # ─── NOTIFICHE AUTOMATICHE GIORNALIERE ──────────────────────────────────────
 
 def _job_promemoria_rifiuti():
+    print('[Scheduler] job promemoria_rifiuti in esecuzione...')
     zona, info, tipi = _calcola_rifiuti_oggi()
     if not info or not tipi:
+        print(f"[Scheduler] promemoria_rifiuti: nessuna raccolta stasera (zona={zona!r}, tipi={tipi})")
         return
     nomi = ', '.join(RIFIUTI_TIPI_LABEL.get(t, t) for t in tipi)
+    print(f"[Scheduler] promemoria_rifiuti: invio notifica per {nomi} (zona={zona})")
     push_to_all('Raccolta rifiuti', f'Stasera esponi: {nomi}', url='/?goto=home', tag='promemoria-rifiuti')
 
 
@@ -2314,6 +2361,9 @@ _scheduler = BackgroundScheduler(timezone=TZ_ITALIA)
 _scheduler.add_job(_job_promemoria_rifiuti,
                     CronTrigger(hour=18, minute=0, timezone=TZ_ITALIA), id='promemoria_rifiuti')
 _scheduler.start()
+_job_rifiuti_ref = _scheduler.get_job('promemoria_rifiuti')
+print(f"[Scheduler] avviato, prossima esecuzione promemoria_rifiuti: "
+      f"{_job_rifiuti_ref.next_run_time if _job_rifiuti_ref else 'N/D'}")
 
 
 if __name__ == '__main__':

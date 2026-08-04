@@ -264,11 +264,21 @@ _VAPID_PUB_ENV  = os.environ.get('VAPID_PUBLIC_KEY', '')
 _VAPID_PRIV_ENV = os.environ.get('VAPID_PRIVATE_KEY', '')
 if _VAPID_PUB_ENV and _VAPID_PRIV_ENV:
     VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY = _VAPID_PUB_ENV, _VAPID_PRIV_ENV
+    VAPID_SOURCE = 'variabili d\'ambiente'
     print('[Push] chiavi VAPID caricate dalle variabili d\'ambiente')
 else:
     VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY = get_or_create_vapid_keys()
+    VAPID_SOURCE = 'database (impostazioni_app)'
     print('[Push] chiavi VAPID caricate dal database (impostazioni_app)')
 VAPID_CLAIMS_SUB = os.environ.get('VAPID_SUBJECT', 'mailto:info@brigade-app.local')
+
+try:
+    import importlib.metadata as _importlib_metadata
+    PYWEBPUSH_VERSION = _importlib_metadata.version('pywebpush')
+    print(f"[Push] pywebpush importato correttamente (versione {PYWEBPUSH_VERSION})")
+except Exception as _e:
+    PYWEBPUSH_VERSION = None
+    print(f"[Push] ERRORE: pywebpush non importabile: {_e}")
 
 
 def _invia_push(subscriptions, title, body, url='/', tag=''):
@@ -554,18 +564,21 @@ def profile():
 
 # ─── ADMIN ────────────────────────────────────────────────────────────────────
 
-@app.route('/admin')
-@login_required
-@admin_required
-def admin_page():
+def _render_admin_page(**extra):
     reset_tokens = get_active_reset_tokens()
     for t in reset_tokens:
         t['scade_alle']     = datetime.fromisoformat(t['expires_at']).strftime('%H:%M')
         t['richiesto_alle'] = datetime.fromisoformat(t['created_at']).strftime('%H:%M') if t['created_at'] else '—'
     return render_template(
-        'admin.html', users=get_all_users(), reset_tokens=reset_tokens,
-        test_notifica=request.args.get('test_notifica'),
+        'admin.html', users=get_all_users(), reset_tokens=reset_tokens, **extra
     )
+
+
+@app.route('/admin')
+@login_required
+@admin_required
+def admin_page():
+    return _render_admin_page(test_notifica=request.args.get('test_notifica'))
 
 
 @app.route('/admin/role', methods=['POST'])
@@ -691,6 +704,92 @@ def admin_test_notifica():
               f"(nessuna subscription attiva o invio fallito, fallite={fallite})")
         esito = 'fail'
     return redirect(url_for('admin_page', test_notifica=esito))
+
+
+@app.route('/admin/debug-notifiche', methods=['POST'])
+@login_required
+@admin_required
+def admin_debug_notifiche():
+    """Diagnostica completa delle push notifications: quante subscription
+    esistono, cosa contiene quella dell'admin, se le VAPID key sono
+    configurate, se pywebpush è importabile, e un invio di prova con
+    l'errore esatto restituito da webpush() (non solo un booleano)."""
+    admin_id = int(current_user.id)
+    print(f"[Push][Debug] avviato da admin {admin_id}")
+
+    debug = {}
+
+    tutte_le_subs = get_all_push_subscriptions()
+    debug['totale_subscription'] = len(tutte_le_subs)
+    print(f"[Push][Debug] subscription totali nel database: {len(tutte_le_subs)}")
+
+    admin_subs = get_push_subscriptions_by_users([admin_id])
+    debug['subscription_admin'] = []
+    for s in admin_subs:
+        try:
+            parsed = json.loads(s['subscription_json'])
+        except Exception as e:
+            parsed = {}
+            print(f"[Push][Debug] subscription id={s['id']} non è JSON valido: {e}")
+        keys = parsed.get('keys') or {}
+        debug['subscription_admin'].append({
+            'id': s['id'],
+            'endpoint': s['endpoint'],
+            'p256dh_len': len(keys.get('p256dh', '')),
+            'auth_len': len(keys.get('auth', '')),
+        })
+    print(f"[Push][Debug] subscription dell'admin {admin_id}: {len(admin_subs)}")
+
+    debug['vapid_public_presente']  = bool(VAPID_PUBLIC_KEY)
+    debug['vapid_private_presente'] = bool(VAPID_PRIVATE_KEY)
+    debug['vapid_source']           = VAPID_SOURCE
+    debug['vapid_public_preview']   = (VAPID_PUBLIC_KEY[:20] + '…') if VAPID_PUBLIC_KEY else '(mancante)'
+    print(f"[Push][Debug] VAPID pubblica presente={debug['vapid_public_presente']} "
+          f"privata presente={debug['vapid_private_presente']} fonte={VAPID_SOURCE}")
+
+    debug['pywebpush_ok']      = PYWEBPUSH_VERSION is not None
+    debug['pywebpush_versione'] = PYWEBPUSH_VERSION or 'non importabile'
+    print(f"[Push][Debug] pywebpush importabile={debug['pywebpush_ok']} versione={debug['pywebpush_versione']}")
+
+    debug['invio_risultati'] = []
+    if not admin_subs:
+        print(f"[Push][Debug] nessuna subscription per l'admin {admin_id}: invio di prova saltato")
+    else:
+        payload = json.dumps({
+            'title': 'Brigade', 'body': 'Test notifica Brigade - funziona!',
+            'url': '/', 'tag': 'debug-notifiche',
+        })
+        for s in admin_subs:
+            endpoint_short = s['endpoint'][-24:]
+            entry = {'endpoint': s['endpoint']}
+            print(f"[Push][Debug] tentativo invio -> ...{endpoint_short}")
+            try:
+                webpush(
+                    subscription_info=json.loads(s['subscription_json']),
+                    data=payload,
+                    vapid_private_key=VAPID_PRIVATE_KEY,
+                    vapid_claims={'sub': VAPID_CLAIMS_SUB},
+                )
+                entry['esito'] = 'ok'
+                print(f"[Push][Debug] invio riuscito -> ...{endpoint_short}")
+            except WebPushException as e:
+                status = getattr(e.response, 'status_code', None)
+                body_text = None
+                try:
+                    body_text = e.response.text
+                except Exception:
+                    pass
+                entry['esito']  = 'errore'
+                entry['errore'] = f"WebPushException status={status}: {e}" + (f" | risposta server push: {body_text}" if body_text else '')
+                print(f"[Push][Debug] invio FALLITO -> ...{endpoint_short}: {entry['errore']}")
+            except Exception as e:
+                entry['esito']  = 'errore'
+                entry['errore'] = f"{type(e).__name__}: {e}"
+                print(f"[Push][Debug] invio FALLITO (errore inatteso) -> ...{endpoint_short}: {entry['errore']}")
+            debug['invio_risultati'].append(entry)
+
+    print(f"[Push][Debug] completato per admin {admin_id}")
+    return _render_admin_page(debug_notifiche=debug)
 
 
 # ─── PAGINE ──────────────────────────────────────────────────────────────────

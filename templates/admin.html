@@ -95,6 +95,23 @@
   color: var(--text);
 }
 .badge-confermato { background: rgba(34,197,94,.14); color: var(--green); border: 1px solid rgba(34,197,94,.3); }
+
+.debug-panel {
+  background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+  padding: 16px 18px; margin-top: 14px; display: flex; flex-direction: column; gap: 10px;
+  box-shadow: var(--shadow);
+}
+:root[data-theme="dark"] .debug-panel { backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur); }
+.debug-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 13.5px; }
+.debug-label { color: var(--muted); font-weight: 600; }
+.debug-value { color: var(--text); font-weight: 600; text-align: right; }
+.debug-sub {
+  font-size: 12.5px; color: var(--muted); line-height: 1.6;
+  background: var(--surface-2); border-radius: 10px; padding: 10px 12px;
+  word-break: break-all;
+}
+.debug-sub.debug-warn { color: var(--red); background: rgba(239,68,68,.08); }
+.debug-mono { font-family: 'Menlo', 'Consolas', monospace; font-size: 11.5px; }
 </style>
 </head>
 <body>
@@ -120,9 +137,64 @@
   {% endif %}
 
   <div class="section-label">Notifiche</div>
-  <form method="post" action="/admin/test-notifica">
-    <button type="submit" class="btn-secondary">🔔 Invia notifica di test</button>
-  </form>
+  <div style="display:flex;gap:10px;flex-wrap:wrap">
+    <form method="post" action="/admin/test-notifica" style="flex:1;min-width:160px">
+      <button type="submit" class="btn-secondary" style="width:100%">🔔 Invia notifica di test</button>
+    </form>
+    <form method="post" action="/admin/debug-notifiche" style="flex:1;min-width:160px">
+      <button type="submit" class="btn-secondary" style="width:100%">🛠 Debug notifiche</button>
+    </form>
+  </div>
+
+  {% if debug_notifiche %}
+  {% set d = debug_notifiche %}
+  <div class="debug-panel">
+    <div class="debug-row">
+      <span class="debug-label">Subscription nel database</span>
+      <span class="debug-value">{{ d.totale_subscription }} totali</span>
+    </div>
+
+    <div class="debug-row">
+      <span class="debug-label">Subscription dell'admin</span>
+      <span class="debug-value">{{ d.subscription_admin|length }}</span>
+    </div>
+    {% if d.subscription_admin %}
+      {% for s in d.subscription_admin %}
+      <div class="debug-sub">
+        endpoint: <span class="debug-mono">{{ s.endpoint }}</span><br>
+        chiavi: p256dh {{ s.p256dh_len }} caratteri · auth {{ s.auth_len }} caratteri
+      </div>
+      {% endfor %}
+    {% else %}
+      <div class="debug-sub debug-warn">Nessuna subscription salvata per questo account admin — attivale dal profilo prima di testare l'invio.</div>
+    {% endif %}
+
+    <div class="debug-row">
+      <span class="debug-label">VAPID key pubblica</span>
+      <span class="debug-value">{{ 'presente' if d.vapid_public_presente else 'MANCANTE' }} ({{ d.vapid_source }})</span>
+    </div>
+    <div class="debug-row">
+      <span class="debug-label">VAPID key privata</span>
+      <span class="debug-value">{{ 'presente' if d.vapid_private_presente else 'MANCANTE' }}</span>
+    </div>
+    <div class="debug-sub">chiave pubblica: <span class="debug-mono">{{ d.vapid_public_preview }}</span></div>
+
+    <div class="debug-row">
+      <span class="debug-label">Libreria pywebpush</span>
+      <span class="debug-value">{{ 'installata (v' + d.pywebpush_versione + ')' if d.pywebpush_ok else 'NON INSTALLATA' }}</span>
+    </div>
+
+    {% if d.invio_risultati %}
+    <div class="section-label" style="margin-top:20px">Tentativo di invio</div>
+    {% for r in d.invio_risultati %}
+    <div class="debug-sub {% if r.esito != 'ok' %}debug-warn{% endif %}">
+      <span class="debug-mono">...{{ r.endpoint[-24:] }}</span><br>
+      {% if r.esito == 'ok' %}✓ inviata con successo{% else %}✕ {{ r.errore }}{% endif %}
+    </div>
+    {% endfor %}
+    {% endif %}
+  </div>
+  {% endif %}
 
   {% if reset_tokens %}
   <div class="section-label">Codici di reset password ({{ reset_tokens|length }})</div>

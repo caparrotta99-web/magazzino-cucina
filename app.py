@@ -300,22 +300,23 @@ def _invia_push(subscriptions, title, body, url='/', tag=''):
             print(f"[Push]  ERRORE invio -> ...{endpoint_short} (utente {sub['utente_id']}): {e}")
             fallite += 1
     print(f"[Push] completato: {inviate} inviate, {fallite} fallite")
+    return inviate, fallite
 
 
 def push_to_users(user_ids, title, body, url='/', tag=''):
     subs = get_push_subscriptions_by_users(user_ids)
     if not subs:
         print(f"[Push] nessuna subscription trovata per utenti {list(user_ids)}, notifica '{title}' non inviata")
-        return
-    _invia_push(subs, title, body, url, tag)
+        return 0, 0
+    return _invia_push(subs, title, body, url, tag)
 
 
 def push_to_all(title, body, url='/', tag=''):
     subs = get_all_push_subscriptions()
     if not subs:
         print(f"[Push] nessuna subscription salvata nel database, notifica '{title}' non inviata")
-        return
-    _invia_push(subs, title, body, url, tag)
+        return 0, 0
+    return _invia_push(subs, title, body, url, tag)
 
 
 def _push_pending_to_sheets():
@@ -561,7 +562,10 @@ def admin_page():
     for t in reset_tokens:
         t['scade_alle']     = datetime.fromisoformat(t['expires_at']).strftime('%H:%M')
         t['richiesto_alle'] = datetime.fromisoformat(t['created_at']).strftime('%H:%M') if t['created_at'] else '—'
-    return render_template('admin.html', users=get_all_users(), reset_tokens=reset_tokens)
+    return render_template(
+        'admin.html', users=get_all_users(), reset_tokens=reset_tokens,
+        test_notifica=request.args.get('test_notifica'),
+    )
 
 
 @app.route('/admin/role', methods=['POST'])
@@ -669,6 +673,24 @@ def admin_conferma_reset():
     confirm_reset_token(token_id)
     print(f"[Reset] codice id={token_id} confermato dall'admin {current_user.id}")
     return redirect(url_for('admin_page'))
+
+
+@app.route('/admin/test-notifica', methods=['POST'])
+@login_required
+@admin_required
+def admin_test_notifica():
+    inviate, fallite = push_to_users(
+        [int(current_user.id)], 'Brigade', 'Test notifica Brigade - funziona!',
+        url='/', tag='test-notifica',
+    )
+    if inviate:
+        print(f"[Push] Test notifica inviata con successo all'admin {current_user.id}")
+        esito = 'ok'
+    else:
+        print(f"[Push] Test notifica NON inviata all'admin {current_user.id} "
+              f"(nessuna subscription attiva o invio fallito, fallite={fallite})")
+        esito = 'fail'
+    return redirect(url_for('admin_page', test_notifica=esito))
 
 
 # ─── PAGINE ──────────────────────────────────────────────────────────────────

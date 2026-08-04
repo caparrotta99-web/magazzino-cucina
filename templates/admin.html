@@ -113,6 +113,17 @@
   {% set pending = users|selectattr('stato', 'equalto', 'in_attesa')|list %}
   {% set attivi  = users|rejectattr('stato', 'equalto', 'in_attesa')|list %}
 
+  {% if test_notifica == 'ok' %}
+  <div class="msg-success">✓ Notifica di test inviata — controlla il tuo dispositivo.</div>
+  {% elif test_notifica == 'fail' %}
+  <div class="msg-error">Notifica non inviata: nessuna subscription push attiva su questo account (attiva le notifiche dal profilo) oppure invio fallito.</div>
+  {% endif %}
+
+  <div class="section-label">Notifiche</div>
+  <form method="post" action="/admin/test-notifica">
+    <button type="submit" class="btn-secondary">🔔 Invia notifica di test</button>
+  </form>
+
   {% if reset_tokens %}
   <div class="section-label">Codici di reset password ({{ reset_tokens|length }})</div>
   <div class="user-list">

@@ -47,7 +47,7 @@
   {% endif %}
 
   <div class="card">
-    <form method="post" action="/profile">
+    <form method="post" action="/profile" id="profile-form">
 
       <!-- ── DATI PERSONALI ── -->
       <div class="section-title">Dati personali</div>
@@ -115,6 +115,8 @@
       <span class="hint" id="notifiche-status"></span>
     </div>
   </div>
+
+  <button type="submit" form="profile-form" class="btn-primary">Salva</button>
 
 </main>
 

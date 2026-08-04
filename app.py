@@ -10,6 +10,9 @@ import threading
 from datetime import datetime, timedelta
 from functools import wraps
 
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.hazmat.primitives.serialization import Encoding, PublicFormat
+
 # stdout non è un TTY quando il processo gira dietro gunicorn/gestori di
 # processo (Render compreso): per default Python lo bufferizza a blocchi
 # interi, quindi i print() di diagnostica (push, scheduler, meteo...)
@@ -777,6 +780,30 @@ def admin_debug_notifiche():
           f"len={debug['vapid_public_len']} (atteso 87) caratteri_non_validi={debug['vapid_public_non_validi']} "
           f"| privata presente={debug['vapid_private_presente']} len={debug['vapid_private_len']} "
           f"(atteso 43) caratteri_non_validi={debug['vapid_private_non_validi']} fonte={VAPID_SOURCE}")
+
+    # Verifica decisiva: pywebpush/py_vapid non usa MAI VAPID_PUBLIC_KEY per
+    # firmare — la chiave pubblica di firma viene ricalcolata matematicamente
+    # dalla sola VAPID_PRIVATE_KEY. Se le due variabili d'ambiente non sono
+    # una coppia coerente (es. incollate da generazioni diverse in momenti
+    # diversi), il browser si iscrive con una chiave pubblica e il server
+    # firma con una chiave privata che corrisponde a un'ALTRA chiave pubblica
+    # — firma sempre non valida per il push service, qualsiasi subscription,
+    # sempre "BadJwtToken". Lo controlliamo direttamente qui.
+    debug['vapid_coppia_combacia'] = None
+    debug['vapid_public_da_privata'] = None
+    if VAPID_PRIVATE_KEY and not debug['vapid_private_non_validi']:
+        try:
+            priv_padded = VAPID_PRIVATE_KEY + '=' * (-len(VAPID_PRIVATE_KEY) % 4)
+            priv_raw = base64.urlsafe_b64decode(priv_padded)
+            priv_key = ec.derive_private_key(int.from_bytes(priv_raw, 'big'), ec.SECP256R1())
+            pub_raw = priv_key.public_key().public_bytes(Encoding.X962, PublicFormat.UncompressedPoint)
+            pub_derivata = base64.urlsafe_b64encode(pub_raw).rstrip(b'=').decode()
+            debug['vapid_public_da_privata'] = pub_derivata
+            debug['vapid_coppia_combacia'] = (pub_derivata == VAPID_PUBLIC_KEY)
+            print(f"[Push][Debug] chiave pubblica derivata dalla privata: {pub_derivata}")
+            print(f"[Push][Debug] combacia con VAPID_PUBLIC_KEY? {debug['vapid_coppia_combacia']}")
+        except Exception as e:
+            print(f"[Push][Debug] impossibile derivare la chiave pubblica dalla privata: {e}")
 
     debug['pywebpush_ok']      = PYWEBPUSH_VERSION is not None
     debug['pywebpush_versione'] = PYWEBPUSH_VERSION or 'non importabile'

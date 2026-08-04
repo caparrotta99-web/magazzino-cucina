@@ -196,6 +196,21 @@
     {% endif %}
     <div class="debug-sub">chiave pubblica per intero (non è segreta, il browser la riceve comunque):<br><span class="debug-mono">{{ d.vapid_public_full }}</span></div>
 
+    {% if d.vapid_coppia_combacia is not none %}
+    <div class="debug-row">
+      <span class="debug-label">Le due chiavi sono una coppia coerente</span>
+      <span class="debug-value {% if not d.vapid_coppia_combacia %}debug-warn-text{% endif %}">{{ 'sì' if d.vapid_coppia_combacia else 'NO — MISMATCH' }}</span>
+    </div>
+    {% if not d.vapid_coppia_combacia %}
+    <div class="debug-sub debug-warn">
+      VAPID_PUBLIC_KEY e VAPID_PRIVATE_KEY su Render NON sono la stessa coppia generata insieme — sono due chiavi valide ma scollegate (es. incollate da due generazioni diverse). Il browser si iscrive con la chiave pubblica configurata, ma il server firma con una privata che corrisponde a un'ALTRA pubblica: firma sempre invalida, "BadJwtToken" garantito, indipendentemente da quanto sia recente la subscription.<br><br>
+      Chiave pubblica che corrisponde davvero alla privata attuale:<br>
+      <span class="debug-mono">{{ d.vapid_public_da_privata }}</span><br><br>
+      <strong>Fix:</strong> su Render imposta VAPID_PUBLIC_KEY esattamente uguale al valore sopra (o rigenera entrambe le chiavi insieme, nella stessa volta).
+    </div>
+    {% endif %}
+    {% endif %}
+
     <div class="debug-row">
       <span class="debug-label">Libreria pywebpush</span>
       <span class="debug-value">{{ 'installata (v' + d.pywebpush_versione + ')' if d.pywebpush_ok else 'NON INSTALLATA' }}</span>

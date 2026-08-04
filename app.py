@@ -302,11 +302,28 @@ def _invia_push(subscriptions, title, body, url='/', tag=''):
             print(f"[Push]  ok -> ...{endpoint_short} (utente {sub['utente_id']})")
         except WebPushException as e:
             status = getattr(e.response, 'status_code', None)
-            print(f"[Push]  FALLITA -> ...{endpoint_short} (utente {sub['utente_id']}): status={status} {e}")
+            body_text = None
+            try:
+                body_text = e.response.text
+            except Exception:
+                pass
+            print(f"[Push]  FALLITA -> ...{endpoint_short} (utente {sub['utente_id']}): status={status} {e}"
+                  + (f" | risposta push service: {body_text}" if body_text else ""))
             fallite += 1
             if status in (404, 410):
                 delete_push_subscription(sub['endpoint'])
                 print(f"[Push]  subscription rimossa (endpoint non più valido, status {status})")
+            elif status in (401, 403):
+                # Il push service rifiuta il token VAPID (es. "BadJwtToken"):
+                # quasi sempre perché la chiave pubblica con cui il browser si
+                # è iscritto non corrisponde più alla chiave privata con cui
+                # firmiamo ora — tipicamente dopo una rotazione delle VAPID
+                # key. La subscription resterà rotta per sempre finché non
+                # viene ricreata, quindi la rimuoviamo per forzare un nuovo
+                # abbonamento dal client con la chiave pubblica corrente.
+                delete_push_subscription(sub['endpoint'])
+                print(f"[Push]  subscription rimossa (VAPID non valida per status {status} — "
+                      f"probabile mismatch chiave pubblica/privata dopo rotazione VAPID)")
         except Exception as e:
             print(f"[Push]  ERRORE invio -> ...{endpoint_short} (utente {sub['utente_id']}): {e}")
             fallite += 1

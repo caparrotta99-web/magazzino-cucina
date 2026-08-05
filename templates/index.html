@@ -472,17 +472,14 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
     linear-gradient(165deg, #71a0b0 0%, #3f7688 42%, #1c4b58 100%);
   padding: calc(28px + env(safe-area-inset-top)) 20px calc(110px + env(safe-area-inset-bottom, 0px));
 }
-/* In tema scuro la Dashboard usa una variante più scura e profonda dello
-   stesso gradiente, identica a quella del resto dell'app (.aurora-bg);
-   il tema chiaro mantiene invece il gradiente originale, invariato. */
+/* In tema scuro la Dashboard non dipinge più un proprio sfondo: diventa
+   trasparente e lascia vedere i livelli fissi globali .aurora-bg (gradiente)
+   + .utensils-bg (posate stilizzate) dietro a <main>, esattamente come già
+   avviene nella pagina Menu — stesso sfondo, un'unica fonte di verità
+   invece di ripetere il gradiente qui. Il tema chiaro non è toccato: resta
+   il gradiente originale definito sopra, invariato. */
 :root[data-theme="dark"] .home-dash {
-  background:
-    linear-gradient(rgba(255,255,255,.08), rgba(255,255,255,.08)),
-    radial-gradient(circle at 78% 12%, rgba(255,201,140,.20), transparent 40%),
-    radial-gradient(ellipse 130% 55% at 10% -8%, rgba(255,255,255,.20), transparent 50%),
-    radial-gradient(ellipse 120% 70% at 100% 15%, rgba(120,195,210,.34), transparent 55%),
-    radial-gradient(ellipse 150% 80% at 50% 118%, rgba(8,35,42,.78), transparent 62%),
-    linear-gradient(165deg, #3d5f6c 0%, #28505c 42%, #0f2c35 100%);
+  background: transparent;
 }
 .home-dash-greeting { margin-bottom: 24px; }
 .home-dash-hello { font-size: 32px; font-weight: 800; color: #ffffff; line-height: 1.15; letter-spacing: -.3px; }
@@ -556,6 +553,27 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
   white-space: nowrap;
 }
 .home-dash-rifiuti-prossimo-none { color: rgba(255,255,255,.4); font-size: 12.5px; }
+
+/* Riga sempre visibile con lo stato di stasera: fa anche da leva per
+   espandere/chiudere il calendario completo della settimana. */
+.home-dash-rifiuti-oggi-row {
+  width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: none; border: none; cursor: pointer; text-align: left;
+  padding: 12px 0 0; margin-top: 4px;
+  font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 700; color: #ffffff;
+}
+.home-dash-rifiuti-chevron { flex-shrink: 0; color: rgba(255,255,255,.55); transition: transform .25s ease; }
+#home-dash-rifiuti-card.expanded .home-dash-rifiuti-chevron { transform: rotate(180deg); }
+
+/* Pannello espandibile: transizione su max-height (tecnica più compatibile
+   del trucco grid-template-rows 0fr/1fr, che in alcuni motori non anima
+   in modo affidabile). Il tetto di 800px è ampiamente sufficiente per
+   stasera + domani + le 7 prossime sere. */
+.home-dash-rifiuti-expand {
+  max-height: 0; overflow: hidden;
+  transition: max-height .35s ease;
+}
+#home-dash-rifiuti-card.expanded .home-dash-rifiuti-expand { max-height: 800px; }
 
 /* ─── ANTEPRIMA CHAT ──────────────────────────────────────────────────────── */
 .home-dash-chat-row { display: flex; flex-direction: column; gap: 2px; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,.10); }
@@ -2148,9 +2166,17 @@ html.chat-no-scroll { overflow: hidden; }
                   <div class="home-dash-card-title">Raccolta rifiuti</div>
                   <div class="home-dash-rifiuti-zona" id="home-dash-rifiuti-zona">Zona non impostata</div>
                 </div>
-                <button type="button" class="home-dash-rifiuti-change" onclick="openRifiutiZonaPicker()">Cambia zona</button>
+                <button type="button" class="home-dash-rifiuti-change" onclick="event.stopPropagation(); openRifiutiZonaPicker()">Cambia zona</button>
               </div>
-              <div id="home-dash-rifiuti-body"></div>
+
+              <button type="button" class="home-dash-rifiuti-oggi-row" onclick="toggleRifiutiExpand()">
+                <span id="home-dash-rifiuti-oggi">Caricamento…</span>
+                <svg class="home-dash-rifiuti-chevron" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+              </button>
+
+              <div class="home-dash-rifiuti-expand">
+                <div id="home-dash-rifiuti-body"></div>
+              </div>
             </div>
 
             <div class="home-dash-card" onclick="S.spesaFornFilter='DOCKS'; navTo('lista-spesa')">
@@ -4016,21 +4042,34 @@ function _fmtGiornoRifiuti(iso) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
+function toggleRifiutiExpand() {
+  document.getElementById('home-dash-rifiuti-card').classList.toggle('expanded');
+}
+
 function _renderRifiutiRaccolta(data) {
   const zonaEl = document.getElementById('home-dash-rifiuti-zona');
+  const oggiEl = document.getElementById('home-dash-rifiuti-oggi');
   const bodyEl = document.getElementById('home-dash-rifiuti-body');
-  if (!zonaEl || !bodyEl) return;
+  if (!zonaEl || !oggiEl || !bodyEl) return;
 
   document.querySelectorAll('#modal-rifiuti-zona .chat-action-opt[data-zona]').forEach(b =>
     b.classList.toggle('selected', b.dataset.zona === data.zona));
 
   if (!data.zona) {
     zonaEl.textContent = 'Zona non impostata';
-    bodyEl.innerHTML = '<div class="home-dash-simple-list"><li class="home-dash-simple-empty">Imposta la zona per vedere il calendario</li></div>';
+    oggiEl.textContent = 'Imposta la zona per vedere il calendario';
+    bodyEl.innerHTML = '';
     return;
   }
   zonaEl.textContent = data.zona_label;
 
+  // Riga sempre visibile: solo lo stato di stasera, in una riga.
+  oggiEl.textContent = data.tipi.length
+    ? 'Stasera esponi: ' + data.tipi.map(t => RIFIUTI_TIPI[t] ? RIFIUTI_TIPI[t].label : t).join(', ')
+    : 'Nessuna raccolta stasera';
+
+  // Pannello espandibile (aperto al tap): dettaglio di stasera + calendario
+  // completo della settimana.
   let html = '<div class="home-dash-rifiuti-section-title">Stasera esponi</div>';
   html += data.tipi.length
     ? data.tipi.map(t => _rifiutiChip(t)).join('') + _rifiutiOrarioNota(data.tipi, data)

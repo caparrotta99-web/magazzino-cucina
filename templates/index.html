@@ -1926,9 +1926,63 @@ html.chat-no-scroll { overflow: hidden; }
   background: rgba(255,255,255,.15); color: #fff;
   display: flex; align-items: center; justify-content: center;
 }
+/* ─── SPLASH SCREEN ─────────────────────────────────────────────────────
+   Overlay fullscreen mostrato solo all'apertura dell'app (un caricamento
+   di pagina reale), mai durante la navigazione interna fra le pagine
+   (navTo() non ricarica mai la pagina, quindi questo blocco non viene
+   rieseguito). Sempre sfondo bianco puro, indipendente dal tema chiaro/
+   scuro dell'app, per un avvio pulito e coerente col brand su entrambi. */
+#splash-screen {
+  position: fixed; inset: 0; z-index: 9999;
+  background: #ffffff;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 22px;
+  opacity: 0;
+  animation: splashFadeIn .5s ease forwards;
+}
+#splash-screen.splash-hide { animation: splashFadeOut .45s ease forwards; pointer-events: none; }
+.splash-logo { width: 96px; height: 96px; border-radius: 24px; box-shadow: 0 14px 34px rgba(0,0,0,.14); }
+.splash-text { display: flex; flex-direction: column; align-items: center; gap: 5px; }
+.splash-name { font-family: 'Inter', sans-serif; font-size: 28px; font-weight: 800; color: #111827; letter-spacing: -.5px; }
+.splash-sub {
+  font-family: 'Inter', sans-serif; font-size: 12.5px; font-weight: 600; color: #9ca3af;
+  letter-spacing: .6px; text-transform: uppercase;
+}
+@keyframes splashFadeIn  { from { opacity: 0; } to { opacity: 1; } }
+@keyframes splashFadeOut { from { opacity: 1; } to { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) {
+  #splash-screen, #splash-screen.splash-hide { animation: none; opacity: 1; }
+}
 </style>
 </head>
 <body class="home-active">
+
+<div id="splash-screen" aria-hidden="true">
+  <img src="/static/icon.svg" alt="" class="splash-logo">
+  <div class="splash-text">
+    <div class="splash-name">Brigade</div>
+    <div class="splash-sub">HACCP Management</div>
+  </div>
+</div>
+<script>
+  (function () {
+    var splash = document.getElementById('splash-screen');
+    if (!splash) return;
+    // Timer avviato il prima possibile (script inline subito dopo il
+    // markup della splash), indipendente da quanto impiega il resto della
+    // pagina a caricarsi: i 2 secondi sono sempre dal primo paint.
+    setTimeout(function () {
+      splash.classList.add('splash-hide');
+      // Fallback oltre a 'animationend': con prefers-reduced-motion la
+      // CSS animation è disattivata (niente dissolvenza) e l'evento non
+      // scatterebbe mai, lasciando la splash bloccata sullo schermo.
+      var removed = false;
+      var remove = function () { if (!removed) { removed = true; splash.remove(); } };
+      splash.addEventListener('animationend', remove, { once: true });
+      setTimeout(remove, 500);
+    }, 2000);
+  })();
+</script>
 
 <div class="aurora-bg" aria-hidden="true"></div>
 

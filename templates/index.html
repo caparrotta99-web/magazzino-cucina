@@ -65,6 +65,9 @@ body {
   --violet:  #8b5cf6;
   --teal:    #0d9488;
   --amber:   #b45309;
+  --yellow:  #eab308;
+  --pink:    #ec4899;
+  --indigo:  #6366f1;
   --success: #16a34a;
   --warning: #f97316;
   --error:   #ef4444;
@@ -194,15 +197,6 @@ header {
 .btn-icon:active { background: rgba(0,0,0,.06); }
 .btn-icon.spinning svg { animation: spin .7s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.hdr-alert-dot {
-  width: 8px; height: 8px; background: var(--error);
-  border-radius: 50%; display: none; flex-shrink: 0;
-  animation: dotPulse 2s ease-in-out infinite;
-}
-@keyframes dotPulse {
-  0%, 100% { box-shadow: 0 0 0 0 rgba(248,113,113,.8); transform: scale(1); }
-  50%       { box-shadow: 0 0 0 6px rgba(248,113,113,0); transform: scale(1.15); }
-}
 
 /* ─── MAIN CONTENT ──────────────────────────────────────────────────────── */
 main {
@@ -347,14 +341,25 @@ main {
   color: #ffffff;
 }
 .hcard-icon svg { width: 18px; height: 18px; }
+/* Ogni card ha un accent dedicato su icona + titolo, per riconoscerle
+   a colpo d'occhio invece di doverne leggere il testo. */
 .hcard-carico   .hcard-icon { background: var(--green); }
 .hcard-in-uso   .hcard-icon { background: var(--orange); }
 .hcard-giacenze .hcard-icon { background: var(--blue); }
-.hcard-alert    .hcard-icon { background: var(--orange); }
+.hcard-alert    .hcard-icon { background: var(--red); }
 .hcard-temperature .hcard-icon { background: var(--teal); }
-.hcard-preparazioni .hcard-icon { background: var(--amber); }
-.hcard-prenotazioni .hcard-icon { background: var(--violet); }
-.hcard-gestione-sala .hcard-icon { background: var(--teal); }
+.hcard-preparazioni .hcard-icon { background: var(--violet); }
+.hcard-prenotazioni .hcard-icon { background: var(--pink); }
+.hcard-gestione-sala .hcard-icon { background: var(--indigo); }
+
+.hcard-carico   .hcard-label { color: var(--green); }
+.hcard-in-uso   .hcard-label { color: var(--orange); }
+.hcard-giacenze .hcard-label { color: var(--blue); }
+.hcard-alert    .hcard-label { color: var(--red); }
+.hcard-temperature .hcard-label { color: var(--teal); }
+.hcard-preparazioni .hcard-label { color: var(--violet); }
+.hcard-prenotazioni .hcard-label { color: var(--pink); }
+.hcard-gestione-sala .hcard-label { color: var(--indigo); }
 /* Lista Spesa resta la card "hero", più grande delle altre 3 per riga */
 .hcard-spesa {
   background: var(--card);
@@ -364,9 +369,9 @@ main {
   grid-column: 1 / -1;
   padding: 20px 16px 18px; min-height: 140px; gap: 14px;
 }
-.hcard-spesa .hcard-icon { background: var(--violet); width: 44px; height: 44px; border-radius: 12px; }
+.hcard-spesa .hcard-icon { background: var(--yellow); width: 44px; height: 44px; border-radius: 12px; }
 .hcard-spesa .hcard-icon svg { width: 22px; height: 22px; }
-.hcard-spesa .hcard-label { font-size: 16px; }
+.hcard-spesa .hcard-label { font-size: 16px; color: var(--yellow); }
 .hcard-spesa .hcard-sub   { font-size: 12px; }
 .hcard-spesa-num {
   font-size: 38px; font-weight: 700; color: var(--text);
@@ -576,10 +581,19 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
 #home-dash-rifiuti-card.expanded .home-dash-rifiuti-expand { max-height: 800px; }
 
 /* ─── ANTEPRIMA CHAT ──────────────────────────────────────────────────────── */
-.home-dash-chat-row { display: flex; flex-direction: column; gap: 2px; padding: 7px 0; border-bottom: 1px solid rgba(255,255,255,.10); }
-.home-dash-chat-row:last-child { border-bottom: none; }
-.home-dash-chat-top { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
-.home-dash-chat-nome { font-size: 12.5px; font-weight: 700; color: #fff; }
+/* Nessun messaggio: link piccolo invece della card grande. */
+.home-dash-chat-link {
+  display: flex; align-items: center; gap: 5px;
+  font-family: 'Inter', sans-serif; font-size: 13px; font-weight: 700; color: #ffffff;
+  padding: 2px 4px 14px; cursor: pointer; width: fit-content;
+}
+.home-dash-chat-link-arrow { color: rgba(255,255,255,.55); }
+/* Con messaggi: card compatta, una sola riga (ultimo messaggio). */
+.home-dash-card-chat { padding: 14px 16px; }
+.home-dash-chat-compact { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.home-dash-chat-compact-info { display: flex; align-items: baseline; gap: 7px; min-width: 0; overflow: hidden; }
+.home-dash-chat-compact-meta { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+.home-dash-chat-nome { font-size: 12.5px; font-weight: 700; color: #fff; flex-shrink: 0; }
 .home-dash-chat-ora  { font-size: 10.5px; color: rgba(255,255,255,.55); flex-shrink: 0; }
 .home-dash-chat-testo { font-size: 12.5px; color: rgba(255,255,255,.8); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .home-dash-chat-testo em { color: rgba(255,255,255,.5); font-style: italic; }
@@ -611,7 +625,7 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
 .hcard-label { font-size: 13px; font-weight: 700; line-height: 1.25; color: var(--text); }
 .hcard-sub   { font-size: 10.5px; color: var(--muted); margin-top: 1px; line-height: 1.3; }
 .hcard-alert-num {
-  font-size: 26px; font-weight: 700; color: var(--orange);
+  font-size: 26px; font-weight: 700; color: var(--red);
   line-height: 1; margin-bottom: 2px;
 }
 .hcard-alert-lbl { font-size: 10.5px; color: var(--muted); }
@@ -766,6 +780,10 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
 }
 .btn-primary:hover   { background: #0ea271; }
 .btn-primary:active   { transform: scale(.98); box-shadow: none; }
+/* Pulsante dentro un .form-card (es. "Metti in uso"): niente margine
+   esterno separato, solo lo spazio interno dal campo precedente — resta
+   dentro lo stesso bordo/ombra della card invece di sembrare isolato. */
+.form-card-submit { margin-top: 18px; }
 .btn-primary:disabled { opacity: .5; cursor: not-allowed; transform: none; }
 .spinner {
   width: 18px; height: 18px;
@@ -1767,7 +1785,16 @@ html.chat-no-scroll { overflow: hidden; }
   padding: 12px 6px calc(12px + env(safe-area-inset-bottom, 0px));
 }
 :root { --chat-sidebar-bg: #e6e8eb; }
-:root[data-theme="dark"] { --chat-sidebar-bg: #081418; }
+/* In tema scuro la sidebar non dipinge più un nero pieno: diventa un
+   pannello in vetro (stesso linguaggio delle altre card) che lascia
+   vedere lo stesso gradiente .aurora-bg del resto dell'app in
+   trasparenza, con un bordo destro più marcato per restare comunque
+   ben distinta dall'area messaggi. */
+:root[data-theme="dark"] { --chat-sidebar-bg: rgba(255,255,255,.07); }
+:root[data-theme="dark"] .chat-sidebar {
+  backdrop-filter: var(--glass-blur); -webkit-backdrop-filter: var(--glass-blur);
+  border-right-color: rgba(255,255,255,.22);
+}
 .chat-sidebar-title {
   font-size: 10px; font-weight: 800; letter-spacing: .6px; text-transform: uppercase;
   color: var(--muted-2); padding: 2px 8px 10px;
@@ -2044,7 +2071,6 @@ html.chat-no-scroll { overflow: hidden; }
     </div>
   </div>
   <div class="hdr-actions">
-    <div class="hdr-alert-dot js-hdr-alert-dot" id="hdr-alert-dot"></div>
     <button class="btn-icon js-btn-sync" id="btn-sync" title="Sincronizza" onclick="syncAll()">
       <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/>
@@ -2242,14 +2268,7 @@ html.chat-no-scroll { overflow: hidden; }
             </div>
 
             {% if current_user.puo_accedere_chat %}
-            <div class="home-dash-card" onclick="navTo('chat')">
-              <div class="home-dash-card-top">
-                <div class="home-dash-card-title">Messaggi recenti</div>
-                <span class="home-dash-badge" id="home-dash-chat-badge" style="display:none">0</span>
-              </div>
-              <div id="home-dash-chat-preview"></div>
-              <button type="button" class="home-dash-pdf-btn" style="margin-top:12px;margin-bottom:0" onclick="event.stopPropagation(); navTo('chat')">Apri chat</button>
-            </div>
+            <div id="home-dash-chat-wrap"></div>
             {% endif %}
 
             <button type="button" class="home-dash-pdf-btn" onclick="navTo('export')">
@@ -2280,7 +2299,6 @@ html.chat-no-scroll { overflow: hidden; }
                 <div class="home-menu-datetime"><span id="home-menu-date"></span>&nbsp;·&nbsp;<span id="home-menu-time"></span></div>
               </div>
               <div class="home-menu-icons">
-                <div class="hdr-alert-dot js-hdr-alert-dot" id="hdr-alert-dot-2"></div>
                 <button type="button" class="btn-icon" onclick="toggleTema()" aria-label="Cambia tema" title="Cambia tema">
                   <svg class="js-theme-icon-on" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"
                        style="display:{{ 'none' if (current_user.is_authenticated and current_user.tema == 'scuro') else 'block' }}">
@@ -2861,19 +2879,19 @@ html.chat-no-scroll { overflow: hidden; }
         </div>
       </div>
       <div class="lot-info-box" id="u-lot-info"></div>
-      <div class="fgroup">
+      <div class="fgroup" style="margin-bottom:0">
         <label class="flabel">Quantità da prelevare *</label>
         <input class="finput" type="number" id="u-qty"
                placeholder="0" min="0.01" step="0.01" inputmode="decimal"
                oninput="validateQtyInUso()">
         <div class="ferror" id="u-qty-error"></div>
       </div>
-    </div>
 
-    <button class="btn-primary" id="btn-in-uso" onclick="submitInUso()">
-      <span class="spinner"></span>
-      <span class="btn-lbl">Metti in uso</span>
-    </button>
+      <button class="btn-primary form-card-submit" id="btn-in-uso" onclick="submitInUso()">
+        <span class="spinner"></span>
+        <span class="btn-lbl">Metti in uso</span>
+      </button>
+    </div>
   </section>
 
   <!-- GIACENZE -->
@@ -4164,26 +4182,41 @@ function _fmtChatOra(iso) {
     : d.toLocaleDateString('it-IT', { day: '2-digit', month: '2-digit' });
 }
 async function loadChatPreview() {
+  const wrap = document.getElementById('home-dash-chat-wrap');
+  if (!wrap) return;
   const [dataMsg, dataUnread] = await Promise.all([
     api('/api/chat/preview'),
     api('/api/chat/unread-count'),
   ]);
-  const el = document.getElementById('home-dash-chat-preview');
-  const msgs = dataMsg.messaggi || [];
-  el.innerHTML = msgs.length
-    ? msgs.map(m => `
-        <div class="home-dash-chat-row">
-          <div class="home-dash-chat-top">
-            <span class="home-dash-chat-nome">${esc(m.utente_nome)}</span>
-            <span class="home-dash-chat-ora">${_fmtChatOra(m.creato_il)}</span>
-          </div>
-          <div class="home-dash-chat-testo">${m.eliminato ? '<em>Messaggio eliminato</em>' : esc(m.testo || (m.foto ? 'Foto' : ''))}</div>
-        </div>`).join('')
-    : '<div class="home-dash-card-list">Nessun messaggio</div>';
-
-  const badge = document.getElementById('home-dash-chat-badge');
+  const msgs  = dataMsg.messaggi || [];
   const count = dataUnread.count || 0;
-  if (badge) { badge.textContent = count; badge.style.display = count > 0 ? 'inline-block' : 'none'; }
+
+  // Nessun messaggio: un link piccolo invece della card grande — non ha
+  // senso occupare tutto quello spazio per dire "non c'è niente".
+  if (!msgs.length) {
+    wrap.innerHTML = `
+      <a class="home-dash-chat-link" onclick="navTo('chat')">
+        Chat <span class="home-dash-chat-link-arrow">→</span>
+      </a>`;
+    return;
+  }
+
+  // Con messaggi: solo l'ultimo, su una riga compatta (niente più elenco
+  // di 4 righe né pulsante "Apri chat" separato — la card è già tappabile).
+  const m = msgs[0];
+  wrap.innerHTML = `
+    <div class="home-dash-card home-dash-card-chat" onclick="navTo('chat')">
+      <div class="home-dash-chat-compact">
+        <div class="home-dash-chat-compact-info">
+          <span class="home-dash-chat-nome">${esc(m.utente_nome)}</span>
+          <span class="home-dash-chat-testo">${m.eliminato ? '<em>Messaggio eliminato</em>' : esc(m.testo || (m.foto ? 'Foto' : ''))}</span>
+        </div>
+        <div class="home-dash-chat-compact-meta">
+          ${count > 0 ? `<span class="home-dash-badge" style="display:inline-block">${count}</span>` : ''}
+          <span class="home-dash-chat-ora">${_fmtChatOra(m.creato_il)}</span>
+        </div>
+      </div>
+    </div>`;
 }
 
 // ── TEMA ─────────────────────────────────────────────────────────────────
@@ -5263,8 +5296,6 @@ async function loadAlerts() {
   const badge = document.getElementById('drw-alert-badge');
   badge.textContent = count > 0 ? count : '';
   badge.classList.toggle('show', count > 0);
-
-  document.querySelectorAll('.js-hdr-alert-dot').forEach(el => el.style.display = count > 0 ? 'block' : 'none');
 
   const num = document.getElementById('home-alert-num');
   if (num) num.textContent = count;

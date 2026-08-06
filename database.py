@@ -381,7 +381,7 @@ def db_init():
                 ora          TEXT NOT NULL,
                 telefono     TEXT NOT NULL DEFAULT '',
                 note         TEXT NOT NULL DEFAULT '',
-                stato        TEXT NOT NULL DEFAULT 'confermata',
+                stato        TEXT NOT NULL DEFAULT 'prenotato',
                 operatore_id INTEGER
             )""",
             f"""CREATE TABLE IF NOT EXISTS combinazioni_tavoli (
@@ -393,6 +393,15 @@ def db_init():
                 id           {pk},
                 percorso_svg TEXT NOT NULL DEFAULT '',
                 created_at   TEXT NOT NULL DEFAULT ''
+            )""",
+            f"""CREATE TABLE IF NOT EXISTS sala_disposizione_giornaliera (
+                id          {pk},
+                tavolo_id   INTEGER NOT NULL,
+                data        TEXT NOT NULL,
+                servizio    TEXT NOT NULL,
+                posizione_x REAL NOT NULL,
+                posizione_y REAL NOT NULL,
+                UNIQUE(tavolo_id, data, servizio)
             )""",
             f"""CREATE TABLE IF NOT EXISTS log_eliminazioni_prenotazioni (
                 id             {pk},
@@ -568,6 +577,24 @@ def db_init():
         conn.execute(
             "UPDATE listino SET reparto = 'Sala' "
             "WHERE reparto = 'Cucina' AND LOWER(categoria) IN ('bevande', 'dolci')"
+        )
+
+    # Migrazione: prenotazioni.stato passa da confermata/in_attesa/cancellata
+    # a prenotato/arrivato/conto/libero (stato del servizio in tempo reale,
+    # non più conferma della prenotazione). Le cancellate sono equivalenti a
+    # "mai esistite" nel nuovo modello e vengono eliminate; le altre righe
+    # legacy diventano 'prenotato'. Idempotente: dopo il primo run non trova
+    # più righe da correggere.
+    with get_conn() as conn:
+        cancellate = _rows(conn.execute("SELECT id FROM prenotazioni WHERE stato = 'cancellata'"))
+        if cancellate:
+            ids = tuple(r['id'] for r in cancellate)
+            ph = ','.join('?' * len(ids))
+            conn.execute(f"DELETE FROM combinazioni_tavoli WHERE prenotazione_id IN ({ph})", ids)
+            conn.execute(f"DELETE FROM prenotazioni WHERE id IN ({ph})", ids)
+        conn.execute(
+            "UPDATE prenotazioni SET stato = 'prenotato' "
+            "WHERE stato NOT IN ('prenotato', 'arrivato', 'conto', 'libero')"
         )
 
     # ── Step 3: post-migration indexes ────────────────────────────────────────
@@ -2050,10 +2077,16 @@ def get_or_create_sala_default():
 
 # ─── TAVOLI ────────────────────────────────────────────────────────────────
 
-def get_tavoli(sala_id=None):
-    """Elenco tavoli attivi con stato calcolato in tempo reale:
-    'occupato' (toggle manuale del cameriere) > 'prenotato' (c'è una
-    prenotazione oggi non cancellata collegata) > 'libero'."""
+def get_tavoli(sala_id=None, data=None, servizio=None):
+    """Elenco tavoli attivi.
+    - data=None (Setup Sala): posizione base, nessuna prenotazione
+      considerata — stato solo dal flag manuale 'occupato'.
+    - data valorizzato (mappa servizio/calendario): stato calcolato dalle
+      prenotazioni di quella data (filtrate per turno se servizio è dato:
+      'occupato' se manuale o prenotazione arrivata/con conto richiesto,
+      'prenotato' se prenotazione non ancora arrivata, 'libero' altrimenti)
+      e posizione sovrascritta da un eventuale spostamento temporaneo
+      (sala_disposizione_giornaliera) salvato per quella data+servizio."""
     with get_conn() as conn:
         sql = ("SELECT t.id, t.numero, t.forma, t.posti, t.sala_id, "
                "t.posizione_x, t.posizione_y, t.rotazione, t.occupato, s.nome AS sala_nome "
@@ -2065,22 +2098,51 @@ def get_tavoli(sala_id=None):
         sql += " ORDER BY t.numero"
         tavoli = _rows(conn.execute(sql, tuple(params)))
 
-        oggi = today_it().isoformat()
-        prenotati_rows = _rows(conn.execute(
-            "SELECT DISTINCT ct.tavolo_id FROM combinazioni_tavoli ct "
-            "JOIN prenotazioni p ON p.id = ct.prenotazione_id "
-            "WHERE p.data = ? AND p.stato != 'cancellata'",
-            (oggi,)
-        ))
-    prenotati_ids = {r['tavolo_id'] for r in prenotati_rows}
+        prenotazioni_rows = []
+        if data:
+            psql = ("SELECT ct.tavolo_id, p.id AS prenotazione_id, p.stato, p.nome, p.ora, p.persone, "
+                     "p.telefono, p.note "
+                     "FROM combinazioni_tavoli ct JOIN prenotazioni p ON p.id = ct.prenotazione_id "
+                     "WHERE p.data = ? AND p.stato != 'libero'")
+            pparams = [data]
+            if servizio == 'pranzo':
+                psql += " AND p.ora < ?"
+                pparams.append(PRANZO_CENA_CUTOFF)
+            elif servizio == 'cena':
+                psql += " AND p.ora >= ?"
+                pparams.append(PRANZO_CENA_CUTOFF)
+            prenotazioni_rows = _rows(conn.execute(psql, tuple(pparams)))
+
+    # Se più prenotazioni attive insistono sullo stesso tavolo (caso limite),
+    # vince quella più "avanzata" nel servizio.
+    _PRIORITA = {'conto': 3, 'arrivato': 2, 'prenotato': 1}
+    prenotazione_per_tavolo = {}
+    for r in prenotazioni_rows:
+        attuale = prenotazione_per_tavolo.get(r['tavolo_id'])
+        if not attuale or _PRIORITA.get(r['stato'], 0) > _PRIORITA.get(attuale['stato'], 0):
+            prenotazione_per_tavolo[r['tavolo_id']] = r
+
+    disposizioni = get_disposizioni_giornaliere(data, servizio) if (data and servizio) else {}
 
     for t in tavoli:
-        if t['occupato']:
+        prenotazione = prenotazione_per_tavolo.get(t['id'])
+        if data is None:
+            t['stato'] = 'occupato' if t['occupato'] else 'libero'
+        elif t['occupato'] or (prenotazione and prenotazione['stato'] in ('arrivato', 'conto')):
             t['stato'] = 'occupato'
-        elif t['id'] in prenotati_ids:
+        elif prenotazione:
             t['stato'] = 'prenotato'
         else:
             t['stato'] = 'libero'
+        t['prenotazione'] = ({'id': prenotazione['prenotazione_id'], 'stato': prenotazione['stato'],
+                               'nome': prenotazione['nome'], 'ora': prenotazione['ora'],
+                               'persone': prenotazione['persone'], 'telefono': prenotazione['telefono'],
+                               'note': prenotazione['note']}
+                              if prenotazione else None)
+        override = disposizioni.get(t['id'])
+        if override:
+            t['posizione_x'] = override['posizione_x']
+            t['posizione_y'] = override['posizione_y']
     return tavoli
 
 
@@ -2121,6 +2183,14 @@ def update_tavolo(tavolo_id, **campi):
     params.append(tavolo_id)
     with get_conn() as conn:
         conn.execute(f"UPDATE tavoli SET {', '.join(sets)} WHERE id = ?", tuple(params))
+
+
+def update_tavolo_occupato(tavolo_id, occupato):
+    """Toggle manuale per un tavolo occupato da un cliente senza
+    prenotazione (walk-in) — accessibile allo staff di sala, non solo admin,
+    a differenza di update_tavolo() che modifica il layout permanente."""
+    with get_conn() as conn:
+        conn.execute("UPDATE tavoli SET occupato = ? WHERE id = ?", (1 if occupato else 0, tavolo_id))
 
 
 def delete_tavolo(tavolo_id):
@@ -2189,7 +2259,7 @@ def create_prenotazione(nome, persone, data, ora, telefono, note, operatore_id, 
     with get_conn() as conn:
         prenotazione_id = conn.execute_insert(
             "INSERT INTO prenotazioni (nome, persone, data, ora, telefono, note, stato, operatore_id) "
-            "VALUES (?, ?, ?, ?, ?, ?, 'confermata', ?)",
+            "VALUES (?, ?, ?, ?, ?, ?, 'prenotato', ?)",
             (nome, persone, data, ora, telefono, note, operatore_id)
         )
         for tavolo_id in tavoli_ids:
@@ -2215,6 +2285,13 @@ def update_prenotazione(prenotazione_id, nome, persone, data, ora, telefono, not
             )
 
 
+def update_stato_prenotazione(prenotazione_id, stato):
+    """Avanza solo lo stato di servizio (arrivato/conto/libero) — a
+    differenza di update_prenotazione() non tocca gli altri campi."""
+    with get_conn() as conn:
+        conn.execute("UPDATE prenotazioni SET stato = ? WHERE id = ?", (stato, prenotazione_id))
+
+
 def delete_prenotazione(prenotazione_id):
     with get_conn() as conn:
         conn.execute("DELETE FROM combinazioni_tavoli WHERE prenotazione_id = ?", (prenotazione_id,))
@@ -2222,12 +2299,14 @@ def delete_prenotazione(prenotazione_id):
 
 
 def get_coperti_giorno(data):
-    """Coperti totali/pranzo/cena per la data indicata (esclude le
-    prenotazioni cancellate) e coperti rimasti rispetto alla capienza
-    totale della sala (somma posti di tutti i tavoli attivi)."""
+    """Coperti totali/pranzo/cena per la data indicata (una prenotazione
+    cancellata prima dell'arrivo viene eliminata, quindi ogni riga rimasta
+    rappresenta un servizio reale, qualunque sia il suo stato attuale) e
+    coperti rimasti rispetto alla capienza totale della sala (somma posti
+    di tutti i tavoli attivi)."""
     with get_conn() as conn:
         rows = _rows(conn.execute(
-            "SELECT persone, ora FROM prenotazioni WHERE data = ? AND stato != 'cancellata'",
+            "SELECT persone, ora FROM prenotazioni WHERE data = ?",
             (data,)
         ))
         capienza_row = _row(conn.execute(
@@ -2252,23 +2331,41 @@ def get_coperti_giorno(data):
 
 def get_calendario_prenotazioni(anno, mese):
     """Giorni del mese in cui pranzo O cena hanno tutti i tavoli attivi
-    prenotati (basta un turno pieno perché il giorno sia 'al completo')."""
+    prenotati (basta un turno pieno perché il giorno sia 'al completo'),
+    più l'elenco dei tavoli prenotati per ciascun giorno (per le mini-mappe
+    del calendario) — una query grezza sola, aggregata in Python."""
     pattern = f"{anno:04d}-{mese:02d}-%"
     with get_conn() as conn:
         tot_tavoli = _row(conn.execute(
             "SELECT COUNT(*) AS n FROM tavoli WHERE attivo = 1"
         ))['n']
         rows = _rows(conn.execute(
-            "SELECT p.data AS giorno, "
-            "COUNT(DISTINCT CASE WHEN p.ora < ? THEN ct.tavolo_id END) AS tavoli_pranzo, "
-            "COUNT(DISTINCT CASE WHEN p.ora >= ? THEN ct.tavolo_id END) AS tavoli_cena "
+            "SELECT p.data AS giorno, ct.tavolo_id, p.ora "
             "FROM prenotazioni p JOIN combinazioni_tavoli ct ON ct.prenotazione_id = p.id "
-            "WHERE p.data LIKE ? AND p.stato != 'cancellata' GROUP BY p.data",
-            (PRANZO_CENA_CUTOFF, PRANZO_CENA_CUTOFF, pattern)
+            "WHERE p.data LIKE ?",
+            (pattern,)
         ))
-    pieni = {r['giorno'] for r in rows
-             if tot_tavoli > 0 and (r['tavoli_pranzo'] >= tot_tavoli or r['tavoli_cena'] >= tot_tavoli)}
-    return {'giorni_pieni': sorted(pieni)}
+
+    tavoli_per_giorno = {}
+    pranzo_per_giorno  = {}
+    cena_per_giorno    = {}
+    for r in rows:
+        giorno = r['giorno']
+        tavoli_per_giorno.setdefault(giorno, set()).add(r['tavolo_id'])
+        bucket = pranzo_per_giorno if (r['ora'] or '') < PRANZO_CENA_CUTOFF else cena_per_giorno
+        bucket.setdefault(giorno, set()).add(r['tavolo_id'])
+
+    pieni = {
+        giorno for giorno in tavoli_per_giorno
+        if tot_tavoli > 0 and (
+            len(pranzo_per_giorno.get(giorno, ())) >= tot_tavoli or
+            len(cena_per_giorno.get(giorno, ())) >= tot_tavoli
+        )
+    }
+    return {
+        'giorni_pieni':     sorted(pieni),
+        'tavoli_per_giorno': {g: sorted(ids) for g, ids in tavoli_per_giorno.items()},
+    }
 
 
 def log_eliminazione_prenotazione(prenotazione, eliminato_da):
@@ -2310,6 +2407,34 @@ def insert_sala_mura(percorso_svg):
         return conn.execute_insert(
             "INSERT INTO sala_mura (percorso_svg, created_at) VALUES (?, ?)",
             (percorso_svg, datetime.now(timezone.utc).isoformat(timespec='seconds'))
+        )
+
+
+# ─── SALA DISPOSIZIONE GIORNALIERA ────────────────────────────────────────────
+# Spostamenti temporanei di un tavolo per una data+servizio specifici (es.
+# accostare due tavoli per un gruppo solo a cena di sabato): non toccano mai
+# la posizione base di tavoli.posizione_x/y, che resta quella di Setup Sala.
+
+def get_disposizioni_giornaliere(data, servizio):
+    with get_conn() as conn:
+        cur = conn.execute(
+            "SELECT tavolo_id, posizione_x, posizione_y FROM sala_disposizione_giornaliera "
+            "WHERE data = ? AND servizio = ?",
+            (data, servizio)
+        )
+        return {r['tavolo_id']: r for r in _rows(cur)}
+
+
+def upsert_disposizione_giornaliera(tavolo_id, data, servizio, posizione_x, posizione_y):
+    with get_conn() as conn:
+        conn.execute(
+            "DELETE FROM sala_disposizione_giornaliera WHERE tavolo_id = ? AND data = ? AND servizio = ?",
+            (tavolo_id, data, servizio)
+        )
+        conn.execute(
+            "INSERT INTO sala_disposizione_giornaliera "
+            "(tavolo_id, data, servizio, posizione_x, posizione_y) VALUES (?, ?, ?, ?, ?)",
+            (tavolo_id, data, servizio, posizione_x, posizione_y)
         )
 
 

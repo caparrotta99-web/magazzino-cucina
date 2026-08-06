@@ -353,7 +353,6 @@ main {
 .hcard-temperature .hcard-icon { background: var(--teal); }
 .hcard-preparazioni .hcard-icon { background: var(--violet); }
 .hcard-prenotazioni .hcard-icon { background: var(--pink); }
-.hcard-gestione-sala .hcard-icon { background: var(--indigo); }
 /* Lista Spesa resta la card "hero", più grande delle altre 3 per riga */
 .hcard-spesa {
   background: var(--card);
@@ -1088,9 +1087,10 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
 .pren-badge {
   font-size: 11px; font-weight: 600; padding: 3px 10px; border-radius: 100px; white-space: nowrap; flex-shrink: 0;
 }
-.pren-badge.confermata { background: rgba(34,197,94,.12); color: var(--green); }
-.pren-badge.in_attesa  { background: rgba(180,83,9,.14); color: var(--amber); }
-.pren-badge.cancellata { background: rgba(239,68,68,.12); color: var(--red); }
+.pren-badge.prenotato { background: rgba(180,83,9,.14); color: var(--amber); }
+.pren-badge.arrivato  { background: rgba(0,188,212,.14); color: #00BCD4; }
+.pren-badge.conto     { background: rgba(239,68,68,.12); color: var(--red); }
+.pren-badge.libero    { background: rgba(34,197,94,.12); color: var(--green); }
 
 /* ─── CALENDARIO PRENOTAZIONI ───────────────────────────────────────────── */
 .pren-cal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; font-weight:700; font-size:15px; }
@@ -1105,6 +1105,22 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
 .pren-cal-day.fuori-mese { visibility:hidden; }
 .pren-cal-day.oggi  { border:2px solid var(--action); }
 .pren-cal-day.pieno { background:rgba(239,68,68,.15); color:var(--red); border-color:rgba(239,68,68,.35); font-weight:700; }
+.pren-cal-day {
+  aspect-ratio: unset; height: 62px; flex-direction: column; gap: 2px; padding: 4px 0 2px; overflow: hidden;
+}
+.pren-cal-day-num { line-height: 1; }
+.pren-cal-mini-mappa { width: 85%; height: 22px; color: var(--muted); }
+
+/* ─── MAPPA SERVIZIO (Prenotazioni) ─────────────────────────────────────── */
+.pren-mappa-header { display:flex; align-items:center; justify-content:space-between; gap:10px; margin-bottom:14px; flex-wrap:wrap; }
+.pren-servizio-switch { display:flex; gap:4px; padding:4px; background:var(--surface-2); border-radius:100px; }
+.pren-servizio-btn {
+  border:none; background:transparent; cursor:pointer;
+  padding:9px 20px; border-radius:100px;
+  font-family:'Inter',sans-serif; font-size:13px; font-weight:700; letter-spacing:.2px;
+  color:var(--muted); transition:background .2s ease, color .2s ease;
+}
+.pren-servizio-btn.active { background:#00BCD4; color:#fff; box-shadow:0 4px 14px rgba(0,188,212,.35); }
 
 /* ─── GESTIONE SALA ─────────────────────────────────────────────────────── */
 .sala-map-viewport {
@@ -1117,8 +1133,8 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
   background-image: radial-gradient(var(--border-2) 1px, transparent 1px);
   background-size: 24px 24px;
 }
-#sala-mura-svg { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
-#sala-mura-svg.editable { pointer-events: auto; touch-action: none; }
+#sala-mura-svg, #setup-sala-mura-svg { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+#sala-mura-svg.editable, #setup-sala-mura-svg.editable { pointer-events: auto; touch-action: none; }
 .mura-stroke { fill: none; stroke: var(--text); stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
 .tavolo-box {
   position: absolute; z-index: 2; display: flex; align-items: center; justify-content: center;
@@ -1136,6 +1152,18 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
 .tavolo-box.prenotato { background: var(--yellow); }
 .tavolo-numero { font-size: 15px; line-height: 1; }
 .tavolo-posti  { font-size: 10px; font-weight: 500; opacity: .85; }
+
+/* Desktop: il dettaglio tavolo diventa un pannello laterale fisso invece di
+   un bottom sheet — stesso overlay/interazione (click fuori chiude), solo
+   riposizionato. Scoped sul solo #tavolo-sheet-overlay, non tocca gli altri
+   usi condivisi di .lot-detail-overlay/.lot-detail-sheet nell'app. */
+@media (min-width: 900px) {
+  #tavolo-sheet-overlay { justify-content: flex-end; }
+  #tavolo-sheet-overlay .lot-detail-sheet {
+    width: 380px; max-width: 380px; height: 100%; max-height: 100dvh;
+    border-radius: 0; box-shadow: -4px 0 30px rgba(0,0,0,.18); animation: none;
+  }
+}
 
 /* ─── TEMPERATURE ───────────────────────────────────────────────────────── */
 .temp-app-card {
@@ -2155,11 +2183,6 @@ html.chat-no-scroll { overflow: hidden; }
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       <span class="lbl">Prenotazioni</span>
     </button>
-
-    <button class="drw-item" data-page="gestione-sala" onclick="navTo('gestione-sala')">
-      <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><circle cx="17.5" cy="6.5" r="3.5"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-      <span class="lbl">Gestione sala</span>
-    </button>
     {% endif %}
 
     {% if current_user.is_authenticated and current_user.puo_accedere_chat %}
@@ -2447,17 +2470,7 @@ html.chat-no-scroll { overflow: hidden; }
                 </div>
                 <div>
                   <div class="hcard-label">Prenotazioni</div>
-                  <div class="hcard-sub">Tavoli del giorno</div>
-                </div>
-              </div>
-
-              <div class="hcard hcard-gestione-sala" onclick="navTo('gestione-sala')">
-                <div class="hcard-icon">
-                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><circle cx="17.5" cy="6.5" r="3.5"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
-                </div>
-                <div>
-                  <div class="hcard-label">Gestione sala</div>
-                  <div class="hcard-sub">Mappa tavoli</div>
+                  <div class="hcard-sub">Mappa e calendario</div>
                 </div>
               </div>
 
@@ -3030,12 +3043,49 @@ html.chat-no-scroll { overflow: hidden; }
       <span class="back-label">Prenotazioni</span>
     </div>
 
+    <!-- MAPPA SERVIZIO (vista di default) -->
+    <div id="pren-mappa-view">
+      <div class="pren-mappa-torna-lista" id="pren-mappa-torna-lista" style="display:none">
+        <button type="button" class="chat-action-opt" style="text-align:left;margin-bottom:10px" onclick="tornaAllaListaDaMappa()">‹ Torna alla lista prenotazioni</button>
+      </div>
+      <div class="pren-mappa-header">
+        <div class="pren-servizio-switch" id="pren-servizio-switch">
+          <button type="button" class="pren-servizio-btn" data-servizio="pranzo" onclick="setPren4Servizio('pranzo')">Pranzo</button>
+          <button type="button" class="pren-servizio-btn" data-servizio="cena" onclick="setPren4Servizio('cena')">Cena</button>
+        </div>
+        <div style="display:flex;gap:8px">
+          {% if current_user.is_authenticated and current_user.puo_gestire_sala %}
+          <button class="btn-spesa-add" onclick="openNuovaPrenotazione()">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Nuova
+          </button>
+          {% endif %}
+          <button type="button" class="btn-svuota" onclick="apriCalendarioDaMappa()">Calendario</button>
+        </div>
+      </div>
+
+      <div class="sala-map-viewport" id="sala-map-viewport">
+        <div class="sala-map-canvas" id="sala-map-canvas">
+          <svg id="sala-mura-svg" width="1000" height="700" viewBox="0 0 1000 700"></svg>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
+        <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)"><span style="width:10px;height:10px;border-radius:50%;background:var(--green);display:inline-block"></span> Libero</div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)"><span style="width:10px;height:10px;border-radius:50%;background:var(--red);display:inline-block"></span> Occupato</div>
+        <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)"><span style="width:10px;height:10px;border-radius:50%;background:var(--yellow);display:inline-block"></span> Prenotato, non arrivato</div>
+      </div>
+    </div>
+
     <!-- VISTA CALENDARIO MENSILE -->
-    <div id="pren-cal-view">
+    <div id="pren-cal-view" style="display:none">
       <div class="pren-cal-header">
         <button type="button" onclick="prenCalNav(-1)" aria-label="Mese precedente">‹</button>
         <span id="pren-cal-label"></span>
         <button type="button" onclick="prenCalNav(1)" aria-label="Mese successivo">›</button>
+      </div>
+      <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+        <button type="button" class="btn-svuota" onclick="tornaAMappaDalCalendario()">Mappa</button>
       </div>
       <div class="pren-cal-weekdays">
         <span>Lun</span><span>Mar</span><span>Mer</span><span>Gio</span><span>Ven</span><span>Sab</span><span>Dom</span>
@@ -3052,6 +3102,10 @@ html.chat-no-scroll { overflow: hidden; }
       <div class="back-bar" onclick="prenCalTornaAlMese()">
         <div class="back-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
         <span class="back-label" id="pren-day-label">Prenotazioni del giorno</span>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;margin-bottom:10px">
+        <button type="button" class="btn-svuota" onclick="apriMappaPerGiorno()">Mappa di questo giorno</button>
       </div>
 
       <div class="coperti-row">
@@ -3088,24 +3142,22 @@ html.chat-no-scroll { overflow: hidden; }
     </div>
   </section>
 
-  <!-- GESTIONE SALA -->
-  <section class="page" id="page-gestione-sala">
+  <!-- SETUP SALA (solo admin) -->
+  <section class="page" id="page-setup-sala">
     <div class="back-bar" onclick="navTo('home')">
       <div class="back-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
-      <span class="back-label">Gestione sala</span>
+      <span class="back-label">Setup sala</span>
     </div>
 
+    {% if current_user.is_authenticated and current_user.role == 'admin' %}
     <div class="filter-row" id="gestione-sala-tabs">
-      {% if current_user.is_authenticated and current_user.puo_gestire_sala %}
       <button class="fpill" data-tab="mura" onclick="setGestioneSalaTab('mura')">Mura</button>
       <button class="fpill" data-tab="tavoli" onclick="setGestioneSalaTab('tavoli')">Tavoli</button>
-      {% endif %}
-      <button class="fpill" data-tab="prenotazioni" onclick="setGestioneSalaTab('prenotazioni')">Prenotazioni</button>
     </div>
 
-    <div class="sala-map-viewport" id="sala-map-viewport">
-      <div class="sala-map-canvas" id="sala-map-canvas">
-        <svg id="sala-mura-svg" width="1000" height="700" viewBox="0 0 1000 700"></svg>
+    <div class="sala-map-viewport" id="setup-sala-map-viewport">
+      <div class="sala-map-canvas" id="setup-sala-map-canvas">
+        <svg id="setup-sala-mura-svg" width="1000" height="700" viewBox="0 0 1000 700"></svg>
       </div>
     </div>
 
@@ -3124,15 +3176,13 @@ html.chat-no-scroll { overflow: hidden; }
       <button type="button" class="btn-svuota" style="width:100%;margin-top:-6px;margin-bottom:14px" onclick="openFormePredefinite()">Usa una forma predefinita</button>
     </div>
 
-    <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
-      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)"><span style="width:10px;height:10px;border-radius:50%;background:var(--green);display:inline-block"></span> Libero</div>
-      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)"><span style="width:10px;height:10px;border-radius:50%;background:var(--red);display:inline-block"></span> Occupato</div>
-      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)"><span style="width:10px;height:10px;border-radius:50%;background:var(--yellow);display:inline-block"></span> Prenotato, non arrivato</div>
-    </div>
-
-    {% if current_user.is_authenticated and current_user.puo_gestire_sala %}
     <div style="display:flex;gap:10px;margin-top:16px" id="sala-tavoli-actions">
       <button type="button" class="btn-svuota" onclick="openNuovoTavolo()">+ Nuovo tavolo</button>
+    </div>
+    {% else %}
+    <div class="empty-state">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <p>Sezione riservata agli amministratori.</p>
     </div>
     {% endif %}
   </section>
@@ -3626,17 +3676,6 @@ html.chat-no-scroll { overflow: hidden; }
         <input class="finput" type="tel" id="pren-telefono" placeholder="es. 333 1234567" autocomplete="off">
       </div>
 
-      <div class="fgroup" id="pren-stato-group">
-        <label class="flabel">Stato</label>
-        <div class="fselect-wrap">
-          <select class="fselect" id="pren-stato">
-            <option value="confermata">Confermata</option>
-            <option value="in_attesa">In attesa</option>
-            <option value="cancellata">Cancellata</option>
-          </select>
-        </div>
-      </div>
-
       <div class="fgroup" style="margin-bottom:8px">
         <label class="flabel">Tavolo assegnato</label>
       </div>
@@ -3790,10 +3829,20 @@ const S = {
   sale:                  [],
   tavoli:                [],
   tavoloEditId:          null,      // null = nuovo tavolo, altrimenti id in modifica
-  gestioneSalaTab:       'mura',    // 'mura' | 'tavoli' | 'prenotazioni'
+  setupSalaTab:          'mura',    // 'mura' | 'tavoli' (solo dentro Setup Sala)
   salaMuraPercorsoSalvato: '',      // d-string già persistito lato server
   salaMuraSottopercorsi:  [],       // sottopercorsi disegnati nella sessione corrente (non ancora salvati)
   muraTool:              'linea',
+  pren4Servizio:         'pranzo', // servizio selezionato nella mappa ('pranzo' | 'cena')
+  prenTavoloPreselezionato: null,  // id tavolo preselezionato aprendo "Nuova" dal pannello
+  prenCalTavoliPerGiorno: {},      // {iso: [tavolo_id,...]} per i pallini delle mini-mappe
+  // Contesto della mappa tavoli condivisa da Setup Sala e Prenotazioni:
+  // mode='setup' → planimetria base (Setup Sala, admin); mode='servizio' →
+  // stato/posizioni per una data+servizio specifici (mappa Prenotazioni).
+  mappaContext: {
+    mode: 'servizio', data: null, servizio: 'pranzo', origine: 'home',
+    canvasId: 'sala-map-canvas', svgId: 'sala-mura-svg',
+  },
 };
 
 // ── FILTRI REPARTO + CATEGORIA (Carico / In uso / Scarico) ────────────────
@@ -4325,7 +4374,7 @@ function navTo(page) {
   if (page === 'export')    initExportPage();
   if (page === 'preparazioni') loadPreparazioni();
   if (page === 'prenotazioni') initPrenotazioniPage();
-  if (page === 'gestione-sala') initGestioneSalaPage();
+  if (page === 'setup-sala') initSetupSalaPage();
   if (page === 'help')      closeTutorialSection(); // riparti sempre dal menu principale del tutorial
 
   document.body.classList.toggle('chat-active', page === 'chat');
@@ -7080,7 +7129,12 @@ async function copiaEtichettaPreparazione() {
 
 // ── PRENOTAZIONI ─────────────────────────────────────────────────────────
 const PRANZO_CENA_CUTOFF = '17:00';
-const PREN_STATO_LBL = { confermata: 'Confermata', in_attesa: 'In attesa', cancellata: 'Cancellata' };
+const PREN_STATO_LBL = { prenotato: 'Prenotato', arrivato: 'Arrivato', conto: 'Conto richiesto', libero: 'Libero' };
+const PREN_STATO_AZIONE = {
+  prenotato: { label: 'Arrivati',         next: 'arrivato' },
+  arrivato:  { label: 'Conto richiesto',  next: 'conto' },
+  conto:     { label: 'Libera tavolo',    next: 'libero' },
+};
 
 function initPrenotazioniPage() {
   if (!S.prenCalMese) {
@@ -7088,14 +7142,101 @@ function initPrenotazioniPage() {
     S.prenCalAnno = parseInt(oggi[0], 10);
     S.prenCalMese = parseInt(oggi[1], 10);
   }
-  document.getElementById('pren-cal-view').style.display = '';
+  document.getElementById('pren-cal-view').style.display = 'none';
   document.getElementById('pren-day-view').style.display = 'none';
+  document.getElementById('pren-mappa-view').style.display = '';
+  document.getElementById('pren-mappa-torna-lista').style.display = 'none';
+
+  const oggi = dataOraItaliana();
+  S.pren4Servizio = oggi.ora < PRANZO_CENA_CUTOFF ? 'pranzo' : 'cena';
+  S.mappaContext = {
+    mode: 'servizio', data: oggi.data, servizio: S.pren4Servizio, origine: 'home',
+    canvasId: 'sala-map-canvas', svgId: 'sala-mura-svg',
+  };
+  _renderPrenServizioSwitch();
+  loadMappaServizio();
+}
+
+function _renderPrenServizioSwitch() {
+  document.querySelectorAll('#pren-servizio-switch .pren-servizio-btn').forEach(b =>
+    b.classList.toggle('active', b.dataset.servizio === S.pren4Servizio)
+  );
+}
+
+function setPren4Servizio(servizio) {
+  S.pren4Servizio = servizio;
+  S.mappaContext.servizio = servizio;
+  _renderPrenServizioSwitch();
+  loadMappaServizio();
+}
+
+async function loadMappaServizio() {
+  const { data, servizio } = S.mappaContext;
+  const [tavoliData] = await Promise.all([
+    api(`/api/tavoli?data=${encodeURIComponent(data)}&servizio=${servizio}`),
+    loadSalaMura(),
+  ]);
+  S.tavoli = tavoliData.tavoli || [];
+  renderSalaMuraSvg();
+  renderMappaSala();
+  _avviaPollingMappa();
+}
+
+let _mappaPollTimer = null;
+function _avviaPollingMappa() {
+  clearInterval(_mappaPollTimer);
+  _mappaPollTimer = setInterval(async () => {
+    if (S.activePage !== 'prenotazioni' || document.getElementById('pren-mappa-view').style.display === 'none') {
+      clearInterval(_mappaPollTimer);
+      return;
+    }
+    const { data, servizio } = S.mappaContext;
+    const tavoliData = await api(`/api/tavoli?data=${encodeURIComponent(data)}&servizio=${servizio}`);
+    S.tavoli = tavoliData.tavoli || [];
+    renderMappaSala();
+  }, 20000);
+}
+
+function apriCalendarioDaMappa() {
+  document.getElementById('pren-mappa-view').style.display = 'none';
+  document.getElementById('pren-day-view').style.display = 'none';
+  document.getElementById('pren-cal-view').style.display = '';
   loadCalendarioPrenotazioni();
+}
+
+function tornaAMappaDalCalendario() {
+  document.getElementById('pren-cal-view').style.display = 'none';
+  document.getElementById('pren-day-view').style.display = 'none';
+  document.getElementById('pren-mappa-view').style.display = '';
+  document.getElementById('pren-mappa-torna-lista').style.display = 'none';
+  S.mappaContext = {
+    mode: 'servizio', data: dataOraItaliana().data, servizio: S.pren4Servizio, origine: 'home',
+    canvasId: 'sala-map-canvas', svgId: 'sala-mura-svg',
+  };
+  loadMappaServizio();
+}
+
+function apriMappaPerGiorno() {
+  document.getElementById('pren-day-view').style.display = 'none';
+  document.getElementById('pren-mappa-view').style.display = '';
+  document.getElementById('pren-mappa-torna-lista').style.display = '';
+  S.mappaContext = {
+    mode: 'servizio', data: S.prenData, servizio: S.pren4Servizio, origine: 'day',
+    canvasId: 'sala-map-canvas', svgId: 'sala-mura-svg',
+  };
+  loadMappaServizio();
+}
+
+function tornaAllaListaDaMappa() {
+  document.getElementById('pren-mappa-view').style.display = 'none';
+  document.getElementById('pren-mappa-torna-lista').style.display = 'none';
+  document.getElementById('pren-day-view').style.display = '';
 }
 
 async function loadCalendarioPrenotazioni() {
   const data = await api(`/api/prenotazioni/calendario?anno=${S.prenCalAnno}&mese=${S.prenCalMese}`);
   S.prenCalGiorniPieni = data.giorni_pieni || [];
+  S.prenCalTavoliPerGiorno = data.tavoli_per_giorno || {};
   renderCalendarioPrenotazioni();
 }
 
@@ -7118,9 +7259,27 @@ function renderCalendarioPrenotazioni() {
   while (celle.length % 7 !== 0) celle.push(null);
 
   document.getElementById('pren-cal-grid').innerHTML = celle.map(c => c
-    ? `<div class="pren-cal-day ${c.pieno ? 'pieno' : ''} ${c.oggi ? 'oggi' : ''}" onclick="prenCalApriGiorno('${c.iso}')">${c.giorno}</div>`
+    ? `<div class="pren-cal-day ${c.pieno ? 'pieno' : ''} ${c.oggi ? 'oggi' : ''}" onclick="prenCalApriGiorno('${c.iso}')">
+         <span class="pren-cal-day-num">${c.giorno}</span>
+         ${_miniMappaCella(c.iso)}
+       </div>`
     : `<div class="pren-cal-day fuori-mese"></div>`
   ).join('');
+}
+
+function _miniMappaCella(iso) {
+  if (!S.tavoli.length) return '';
+  const prenotati = new Set(S.prenCalTavoliPerGiorno[iso] || []);
+  const muri = S.salaMuraPercorsoSalvato
+    ? `<path d="${S.salaMuraPercorsoSalvato}" fill="none" stroke="currentColor" stroke-width="10" opacity="0.25"/>`
+    : '';
+  const punti = S.tavoli.map(t => {
+    const cx = (t.posizione_x || 0) + 28;
+    const cy = (t.posizione_y || 0) + 28;
+    const colore = prenotati.has(t.id) ? 'var(--yellow)' : 'var(--green)';
+    return `<circle cx="${cx}" cy="${cy}" r="22" fill="${colore}"/>`;
+  }).join('');
+  return `<svg class="pren-cal-mini-mappa" viewBox="0 0 1000 700" preserveAspectRatio="xMidYMid meet">${muri}${punti}</svg>`;
 }
 
 function prenCalNav(delta) {
@@ -7241,19 +7400,24 @@ function _closeSwipePren(row) {
   if (btn) btn.style.transform = 'translateX(84px)';
 }
 
-async function openNuovaPrenotazione() {
+function _prenFormDefaultData() {
+  const mappaVisible = document.getElementById('pren-mappa-view').style.display !== 'none';
+  return (mappaVisible ? S.mappaContext.data : S.prenData) || dataOraItaliana().data;
+}
+
+async function openNuovaPrenotazione(tavoloPreselezionato) {
   if (!S.sale.length) await loadSaleETavoli();
   S.prenEditId = null;
-  S.prenTavoliSelezionati = [];
+  S.prenTavoliSelezionati = typeof tavoloPreselezionato === 'number' ? [tavoloPreselezionato] : [];
   document.getElementById('pren-modal-title').textContent = 'Nuova prenotazione';
   document.getElementById('pren-nome').value = '';
   document.getElementById('pren-persone').value = '';
-  document.getElementById('pren-form-data').value = S.prenData || dataOraItaliana().data;
+  document.getElementById('pren-form-data').value = _prenFormDefaultData();
   document.getElementById('pren-ora').value = '';
   document.getElementById('pren-telefono').value = '';
   document.getElementById('pren-note').value = '';
-  document.getElementById('pren-stato').value = 'confermata';
   renderPrenTavoliCheckbox();
+  closeTavoloSheet();
   document.getElementById('modal-prenotazione').classList.add('open');
 }
 function closeNuovaPrenotazione() { document.getElementById('modal-prenotazione').classList.remove('open'); }
@@ -7272,7 +7436,6 @@ async function openModificaPrenotazione(id) {
   document.getElementById('pren-ora').value = p.ora;
   document.getElementById('pren-telefono').value = p.telefono || '';
   document.getElementById('pren-note').value = p.note || '';
-  document.getElementById('pren-stato').value = p.stato;
   renderPrenTavoliCheckbox();
   closePrenDetail();
   document.getElementById('modal-prenotazione').classList.add('open');
@@ -7303,7 +7466,6 @@ async function submitPrenotazione() {
   const ora      = document.getElementById('pren-ora').value;
   const telefono = document.getElementById('pren-telefono').value.trim();
   const note     = document.getElementById('pren-note').value.trim();
-  const stato    = document.getElementById('pren-stato').value;
 
   if (!nome)    { toast('Inserisci il nome', 'error'); return; }
   if (!persone || persone <= 0) { toast('Inserisci il numero di persone', 'error'); return; }
@@ -7315,7 +7477,7 @@ async function submitPrenotazione() {
 
   const body   = { nome, persone, data: dataVal, ora, telefono, note, tavoli: S.prenTavoliSelezionati };
   const result = S.prenEditId
-    ? await api(`/api/prenotazioni/${S.prenEditId}`, { method: 'PUT', body: { ...body, stato } })
+    ? await api(`/api/prenotazioni/${S.prenEditId}`, { method: 'PUT', body })
     : await api('/api/prenotazioni', { method: 'POST', body });
 
   btn.disabled = false;
@@ -7323,8 +7485,14 @@ async function submitPrenotazione() {
   if (!result.success) { toast(result.error || 'Errore', 'error'); return; }
   closeNuovaPrenotazione();
   toast(S.prenEditId ? 'Prenotazione aggiornata' : 'Prenotazione registrata', 'success');
-  await loadPrenotazioni();
-  if (S.activePage === 'gestione-sala') loadTavoliMappa();
+  await _refreshDopoModificaPrenotazione();
+}
+
+async function _refreshDopoModificaPrenotazione() {
+  const mappaVisible = document.getElementById('pren-mappa-view').style.display !== 'none';
+  const dayVisible    = document.getElementById('pren-day-view').style.display !== 'none';
+  if (mappaVisible) await loadMappaServizio();
+  if (dayVisible)   await loadPrenotazioni();
   loadCalendarioPrenotazioni();
 }
 
@@ -7356,25 +7524,20 @@ async function confermaEliminaPrenotazione(id) {
   const result = await api(`/api/prenotazioni/${id}`, { method: 'DELETE' });
   if (!result.success) { toast(result.error || 'Errore', 'error'); return; }
   toast('Prenotazione eliminata', 'success');
-  await loadPrenotazioni();
-  if (S.activePage === 'gestione-sala') loadTavoliMappa();
-  loadCalendarioPrenotazioni();
+  await _refreshDopoModificaPrenotazione();
 }
 
 // ── GESTIONE SALA ────────────────────────────────────────────────────────
 const TAVOLO_BASE_SIZE     = 56;
 const TAVOLO_SIZE_PER_POSTO = 6;
 
-async function initGestioneSalaPage() {
-  // Le prenotazioni di oggi servono al dettaglio tavolo (openTavoloSheet)
-  // per mostrare nome/ora/persone di chi ha prenotato — 'prenotato' in
-  // get_tavoli() è sempre relativo alla data odierna.
-  const oggi = dataOraItaliana().data;
-  const [, , prenData] = await Promise.all([
-    loadSaleETavoli(), loadSalaMura(), api(`/api/prenotazioni?data=${encodeURIComponent(oggi)}`),
-  ]);
-  S.prenotazioni = prenData.prenotazioni || [];
-  setGestioneSalaTab(CAN_GESTIRE_SALA ? S.gestioneSalaTab : 'prenotazioni');
+async function initSetupSalaPage() {
+  S.mappaContext = {
+    mode: 'setup', data: null, servizio: null, origine: 'setup',
+    canvasId: 'setup-sala-map-canvas', svgId: 'setup-sala-mura-svg',
+  };
+  await Promise.all([loadSaleETavoli(), loadSalaMura()]);
+  setGestioneSalaTab(S.setupSalaTab);
 }
 
 async function loadSaleETavoli() {
@@ -7395,7 +7558,7 @@ async function loadSalaMura() {
 }
 
 function setGestioneSalaTab(tab) {
-  S.gestioneSalaTab = tab;
+  S.setupSalaTab = tab;
   document.querySelectorAll('#gestione-sala-tabs .fpill').forEach(b =>
     b.classList.toggle('active', b.dataset.tab === tab)
   );
@@ -7403,9 +7566,6 @@ function setGestioneSalaTab(tab) {
   document.getElementById('mura-scan-row').style.display = tab === 'mura' ? '' : 'none';
   const azioniTavoli = document.getElementById('sala-tavoli-actions');
   if (azioniTavoli) azioniTavoli.style.display = tab === 'tavoli' ? 'flex' : 'none';
-
-  const svg = document.getElementById('sala-mura-svg');
-  svg.classList.toggle('editable', tab === 'mura');
 
   if (tab === 'mura') {
     // Si riparte da quanto già disegnato: l'utente può aggiungere altri
@@ -7418,12 +7578,15 @@ function setGestioneSalaTab(tab) {
 }
 
 function renderSalaMuraSvg() {
-  const svg = document.getElementById('sala-mura-svg');
-  const percorsi = S.gestioneSalaTab === 'mura' ? S.salaMuraSottopercorsi : [S.salaMuraPercorsoSalvato];
+  const svg = document.getElementById(S.mappaContext.svgId);
+  if (!svg) return;
+  const editing = S.mappaContext.mode === 'setup' && S.setupSalaTab === 'mura';
+  const percorsi = editing ? S.salaMuraSottopercorsi : [S.salaMuraPercorsoSalvato];
   svg.innerHTML = percorsi.filter(Boolean).map(d =>
     `<path class="mura-stroke" d="${d}"></path>`
   ).join('');
-  if (S.gestioneSalaTab === 'mura') _initMuraDraw();
+  svg.classList.toggle('editable', editing);
+  if (editing) _initMuraDraw(svg);
 }
 
 function setMuraTool(tool) {
@@ -7522,8 +7685,7 @@ function applicaFormaPredefinita(chiave) {
   toast('Forma applicata — modifica il disegno se serve, poi salva', 'success');
 }
 
-function _initMuraDraw() {
-  const svg = document.getElementById('sala-mura-svg');
+function _initMuraDraw(svg) {
   if (svg.dataset.drawInit) return;
   svg.dataset.drawInit = '1';
 
@@ -7536,7 +7698,7 @@ function _initMuraDraw() {
   };
 
   const onStart = e => {
-    if (S.gestioneSalaTab !== 'mura' || S.muraTool !== 'linea') return;
+    if (S.setupSalaTab !== 'mura' || S.muraTool !== 'linea') return;
     if (e.cancelable) e.preventDefault();
     const { x, y } = getPoint(e);
     d = `M${x.toFixed(1)},${y.toFixed(1)}`;
@@ -7568,16 +7730,24 @@ function _initMuraDraw() {
   window.addEventListener('mouseup', onEnd);
 }
 
+function canDragTavoli() {
+  return S.mappaContext.mode === 'setup'
+    ? (CAN_GESTIRE_SALA && S.setupSalaTab === 'tavoli')
+    : CAN_GESTIRE_SALA;
+}
+
 function renderMappaSala() {
-  const canvas = document.getElementById('sala-map-canvas');
+  const canvas = document.getElementById(S.mappaContext.canvasId);
   if (!canvas) return;
+  const canDrag = canDragTavoli();
   const wrap = document.createElement('div');
   wrap.innerHTML = S.tavoli.map(t => {
     const size = TAVOLO_BASE_SIZE + Math.max(0, t.posti - 2) * TAVOLO_SIZE_PER_POSTO;
     const w = t.forma === 'rettangolare' ? size * 1.4 : size;
-    const canDrag = CAN_GESTIRE_SALA && S.gestioneSalaTab === 'tavoli';
+    const p = t.prenotazione;
+    const tooltip = p ? ` title="${esc(p.nome)} · ${esc(p.ora)} · ${p.persone}p"` : '';
     return `<div class="tavolo-box ${t.forma} ${t.stato} ${canDrag ? '' : 'no-drag'}"
-                 data-id="${t.id}"
+                 data-id="${t.id}" tabindex="0"${tooltip}
                  style="left:${t.posizione_x}px;top:${t.posizione_y}px;width:${w}px;height:${size}px;transform:rotate(${t.rotazione || 0}deg)">
       <span class="tavolo-numero">${esc(t.numero)}</span>
       <span class="tavolo-posti">${t.posti}p</span>
@@ -7587,11 +7757,11 @@ function renderMappaSala() {
   canvas.querySelectorAll('.tavolo-box').forEach(el => el.remove());
   while (wrap.firstChild) canvas.appendChild(wrap.firstChild);
 
-  _initTavoloDrag();
+  _initTavoloDrag(canvas);
+  _initTavoloKeyboardNav(canvas);
 }
 
-function _initTavoloDrag() {
-  const canvas = document.getElementById('sala-map-canvas');
+function _initTavoloDrag(canvas) {
   if (!canvas || canvas.dataset.dragInit) return;
   canvas.dataset.dragInit = '1';
 
@@ -7608,7 +7778,7 @@ function _initTavoloDrag() {
       startClientX: p.clientX, startClientY: p.clientY,
       startLeft: parseFloat(box.style.left) || 0,
       startTop:  parseFloat(box.style.top)  || 0,
-      canDrag: CAN_GESTIRE_SALA && S.gestioneSalaTab === 'tavoli',
+      canDrag: canDragTavoli(),
       moved: false,
     };
     if (drag.canDrag) box.classList.add('dragging');
@@ -7633,18 +7803,28 @@ function _initTavoloDrag() {
     if (canDrag && moved) {
       const left = parseFloat(el.style.left) || 0;
       const top  = parseFloat(el.style.top)  || 0;
-      api(`/api/tavoli/${id}`, { method: 'PATCH', body: { posizione_x: left, posizione_y: top } });
+      if (S.mappaContext.mode === 'setup') {
+        api(`/api/tavoli/${id}`, { method: 'PATCH', body: { posizione_x: left, posizione_y: top } });
+      } else {
+        api('/api/sala-disposizione', { method: 'POST', body: {
+          tavolo_id: Number(id), data: S.mappaContext.data, servizio: S.mappaContext.servizio,
+          posizione_x: left, posizione_y: top,
+        }});
+      }
       lastTap = null;
     } else {
       // Tap (non un vero drag: o non c'è stato movimento, o il drag non è
-      // permesso — es. tab "Prenotazioni" — e allora un piccolo movimento
+      // permesso — es. mappa servizio — e allora un piccolo movimento
       // accidentale del dito non deve impedire l'apertura dello sheet).
+      // La rotazione (doppio tap) resta un'operazione di Setup Sala: cambia
+      // la planimetria base, non ha senso per il servizio di un solo giorno.
       const now = Date.now();
-      if (canDrag && lastTap && lastTap.id === id && now - lastTap.time < 350) {
+      const canRuota = canDrag && S.mappaContext.mode === 'setup';
+      if (canRuota && lastTap && lastTap.id === id && now - lastTap.time < 350) {
         ruotaTavolo(Number(id));
         lastTap = null;
       } else {
-        lastTap = canDrag ? { id, time: now } : null;
+        lastTap = canRuota ? { id, time: now } : null;
         openTavoloSheet(Number(id));
       }
     }
@@ -7661,11 +7841,44 @@ function _initTavoloDrag() {
   window.addEventListener('mouseup', onUp);
 }
 
+function _initTavoloKeyboardNav(canvas) {
+  if (!canvas || canvas.dataset.keynavInit) return;
+  canvas.dataset.keynavInit = '1';
+  canvas.addEventListener('keydown', e => {
+    const box = e.target.closest('.tavolo-box');
+    if (!box) return;
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      openTavoloSheet(Number(box.dataset.id));
+      return;
+    }
+    const dirs = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, -1], ArrowDown: [0, 1] };
+    const dir = dirs[e.key];
+    if (!dir) return;
+    e.preventDefault();
+    const cx = parseFloat(box.style.left) || 0;
+    const cy = parseFloat(box.style.top)  || 0;
+    let best = null, bestScore = Infinity;
+    canvas.querySelectorAll('.tavolo-box').forEach(other => {
+      if (other === box) return;
+      const ox = parseFloat(other.style.left) || 0;
+      const oy = parseFloat(other.style.top)  || 0;
+      const dx = ox - cx, dy = oy - cy;
+      const along = dx * dir[0] + dy * dir[1];
+      if (along <= 0) return;
+      const across = Math.abs(dx * dir[1] - dy * dir[0]);
+      const score = along + across * 2;
+      if (score < bestScore) { bestScore = score; best = other; }
+    });
+    if (best) best.focus();
+  });
+}
+
 async function ruotaTavolo(id) {
   const t = S.tavoli.find(x => x.id === id);
   if (!t) return;
   const nuovaRot = ((t.rotazione || 0) + 90) % 360;
-  const el = document.querySelector(`.tavolo-box[data-id="${id}"]`);
+  const el = document.querySelector(`#${S.mappaContext.canvasId} .tavolo-box[data-id="${id}"]`);
   if (el) el.style.transform = `rotate(${nuovaRot}deg)`;   // feedback immediato
   t.rotazione = nuovaRot;
   await api(`/api/tavoli/${id}`, { method: 'PATCH', body: { rotazione: nuovaRot } });
@@ -7675,32 +7888,72 @@ function openTavoloSheet(id) {
   const t = S.tavoli.find(x => x.id === id);
   if (!t) return;
   document.getElementById('tavolo-sheet-title').textContent = `Tavolo ${t.numero}`;
+  document.getElementById('tavolo-sheet-body').innerHTML =
+    S.mappaContext.mode === 'setup' ? _tavoloSheetSetupHtml(t) : _tavoloSheetServizioHtml(t);
+  document.getElementById('tavolo-sheet-overlay').classList.add('open');
+}
+function closeTavoloSheet() { document.getElementById('tavolo-sheet-overlay').classList.remove('open'); }
 
-  const statoLbl = { libero: 'Libero', occupato: 'Occupato', prenotato: 'Prenotato' };
-  const prenotazioneOggi = t.stato === 'prenotato'
-    ? S.prenotazioni.find(p => (p.tavoli || []).some(pt => pt.id === id) && p.stato !== 'cancellata')
-    : null;
-
+function _tavoloSheetSetupHtml(t) {
+  const statoLbl = { libero: 'Libero', occupato: 'Occupato' };
   let html = `
     <div class="lot-detail-row"><span style="font-size:12px;color:var(--muted)">Forma</span><span style="font-weight:600">${t.forma === 'rotondo' ? 'Rotondo' : 'Rettangolare'}</span></div>
     <div class="lot-detail-row"><span style="font-size:12px;color:var(--muted)">Posti</span><span style="font-weight:600">${t.posti}</span></div>
     <div class="lot-detail-row"><span style="font-size:12px;color:var(--muted)">Stato</span><span class="temp-badge ${t.stato === 'libero' ? 'ok' : 'danger'}">${statoLbl[t.stato]}</span></div>
   `;
-  if (prenotazioneOggi) {
-    html += `<div class="lot-detail-row"><span style="font-size:12px;color:var(--muted)">Prenotazione</span><span style="font-weight:600">${esc(prenotazioneOggi.nome)} · ${esc(prenotazioneOggi.ora)} · ${prenotazioneOggi.persone}p</span></div>`;
-  }
-  if (CAN_GESTIRE_SALA && S.gestioneSalaTab === 'tavoli') {
+  if (S.setupSalaTab === 'tavoli') {
     html += `
       <button type="button" class="btn-svuota" style="width:100%;margin-top:14px" onclick="toggleTavoloOccupato(${t.id})">${t.occupato ? 'Segna come libero' : 'Segna come occupato'}</button>
       <button type="button" class="btn-svuota" style="width:100%;margin-top:8px" onclick="openModificaTavolo(${t.id})">Modifica tavolo</button>
       <button type="button" class="btn-svuota" style="width:100%;margin-top:8px;color:var(--red);border-color:rgba(239,68,68,.3)" onclick="confermaEliminaTavolo(${t.id})">Elimina tavolo</button>
     `;
   }
-
-  document.getElementById('tavolo-sheet-body').innerHTML = html;
-  document.getElementById('tavolo-sheet-overlay').classList.add('open');
+  return html;
 }
-function closeTavoloSheet() { document.getElementById('tavolo-sheet-overlay').classList.remove('open'); }
+
+function _tavoloSheetServizioHtml(t) {
+  const p = t.prenotazione;
+  const statoLbl = { libero: 'Libero', occupato: 'Occupato', prenotato: 'Prenotato' };
+  let html = `<div class="lot-detail-row"><span style="font-size:12px;color:var(--muted)">Stato</span><span class="temp-badge ${t.stato === 'libero' ? 'ok' : 'danger'}">${statoLbl[t.stato]}</span></div>`;
+
+  if (p) {
+    html += `
+      <div class="lot-detail-row"><span style="font-size:12px;color:var(--muted)">Cliente</span><span style="font-weight:600">${esc(p.nome)}</span></div>
+      <div class="lot-detail-row"><span style="font-size:12px;color:var(--muted)">Persone</span><span style="font-weight:600">${p.persone}</span></div>
+      <div class="lot-detail-row"><span style="font-size:12px;color:var(--muted)">Ora</span><span style="font-weight:600">${esc(p.ora)}</span></div>
+      ${p.telefono ? `<div class="lot-detail-row"><span style="font-size:12px;color:var(--muted)">Telefono</span><span style="font-weight:600">${esc(p.telefono)}</span></div>` : ''}
+      ${p.note ? `<div class="lot-detail-row"><span style="font-size:12px;color:var(--muted)">Note</span><span style="font-weight:600;text-align:right">${esc(p.note)}</span></div>` : ''}
+    `;
+  }
+
+  if (CAN_GESTIRE_SALA) {
+    if (p && PREN_STATO_AZIONE[p.stato]) {
+      html += `<button type="button" class="btn-svuota" style="width:100%;margin-top:14px" onclick="avanzaStatoPrenotazione(${p.id}, '${PREN_STATO_AZIONE[p.stato].next}')">${PREN_STATO_AZIONE[p.stato].label}</button>`;
+    } else if (!p) {
+      html += t.occupato
+        ? `<button type="button" class="btn-svuota" style="width:100%;margin-top:14px" onclick="toggleTavoloOccupatoServizio(${t.id}, false)">Libera tavolo</button>`
+        : `<button type="button" class="btn-svuota" style="width:100%;margin-top:14px" onclick="toggleTavoloOccupatoServizio(${t.id}, true)">Segna occupato</button>`;
+    }
+    html += `<button type="button" class="btn-svuota" style="width:100%;margin-top:8px" onclick="openNuovaPrenotazione(${t.id})">Nuova prenotazione qui</button>`;
+  }
+
+  return html;
+}
+
+async function avanzaStatoPrenotazione(id, stato) {
+  const result = await api(`/api/prenotazioni/${id}/stato`, { method: 'POST', body: { stato } });
+  if (!result.success) { toast(result.error || 'Errore', 'error'); return; }
+  closeTavoloSheet();
+  toast(stato === 'libero' ? 'Tavolo liberato' : 'Aggiornato', 'success');
+  await loadMappaServizio();
+}
+
+async function toggleTavoloOccupatoServizio(id, occupato) {
+  const result = await api(`/api/tavoli/${id}/occupato`, { method: 'POST', body: { occupato } });
+  if (!result.success) { toast(result.error || 'Errore', 'error'); return; }
+  closeTavoloSheet();
+  await loadMappaServizio();
+}
 
 async function toggleTavoloOccupato(id) {
   const t = S.tavoli.find(x => x.id === id);

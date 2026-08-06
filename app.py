@@ -80,9 +80,12 @@ from database import (
     completa_preparazione,
     get_sale, create_sala, update_sala, delete_sala, get_or_create_sala_default,
     get_tavoli, get_tavolo_by_id, create_tavolo, update_tavolo, delete_tavolo,
+    update_tavolo_occupato,
     get_prenotazioni, get_prenotazione_by_id, create_prenotazione, update_prenotazione,
+    update_stato_prenotazione,
     delete_prenotazione, get_coperti_giorno, get_calendario_prenotazioni,
     get_sala_mura, insert_sala_mura,
+    get_disposizioni_giornaliere, upsert_disposizione_giornaliera,
     log_eliminazione_prenotazione, get_log_eliminazioni_prenotazioni,
     get_unsynced_registro, mark_registro_synced,
     get_unsynced_listino, mark_listino_synced,
@@ -1835,7 +1838,7 @@ def api_sale_list():
 
 @app.route('/api/sale', methods=['POST'])
 @login_required
-@gestione_sala_required
+@admin_required
 def api_sale_crea():
     d    = request.get_json(force=True)
     nome = (d.get('nome') or '').strip()
@@ -1847,7 +1850,7 @@ def api_sale_crea():
 
 @app.route('/api/sale/<int:sala_id>', methods=['PUT'])
 @login_required
-@gestione_sala_required
+@admin_required
 def api_sala_modifica(sala_id):
     d    = request.get_json(force=True)
     nome = (d.get('nome') or '').strip()
@@ -1859,7 +1862,7 @@ def api_sala_modifica(sala_id):
 
 @app.route('/api/sale/<int:sala_id>', methods=['DELETE'])
 @login_required
-@gestione_sala_required
+@admin_required
 def api_sala_elimina(sala_id):
     if not delete_sala(sala_id):
         return jsonify({'success': False, 'error': 'Sposta o elimina prima i tavoli di questa sala'}), 400
@@ -1871,17 +1874,19 @@ def api_sala_elimina(sala_id):
 @app.route('/api/tavoli', methods=['GET'])
 @login_required
 def api_tavoli_list():
-    sala_id = request.args.get('sala_id', type=int)
+    sala_id  = request.args.get('sala_id', type=int)
+    data     = (request.args.get('data') or '').strip() or None
+    servizio = (request.args.get('servizio') or '').strip() or None
     return jsonify({
         'success':     True,
-        'tavoli':      get_tavoli(sala_id),
+        'tavoli':      get_tavoli(sala_id, data=data, servizio=servizio),
         'puo_gestire': current_user.puo_gestire_sala,
     })
 
 
 @app.route('/api/tavoli', methods=['POST'])
 @login_required
-@gestione_sala_required
+@admin_required
 def api_tavoli_crea():
     d      = request.get_json(force=True)
     numero = (d.get('numero') or '').strip()
@@ -1914,7 +1919,7 @@ def api_tavoli_crea():
 
 @app.route('/api/tavoli/<int:tavolo_id>', methods=['PATCH'])
 @login_required
-@gestione_sala_required
+@admin_required
 def api_tavoli_modifica(tavolo_id):
     """Update parziale: posizione (drag), numero/forma/posti/sala (modifica
     rapida) o toggle occupato — solo i campi presenti nel body vengono
@@ -1973,11 +1978,25 @@ def api_tavoli_modifica(tavolo_id):
 
 @app.route('/api/tavoli/<int:tavolo_id>', methods=['DELETE'])
 @login_required
-@gestione_sala_required
+@admin_required
 def api_tavoli_elimina(tavolo_id):
     if not get_tavolo_by_id(tavolo_id):
         return jsonify({'success': False, 'error': 'Tavolo non trovato'}), 404
     delete_tavolo(tavolo_id)
+    return jsonify({'success': True})
+
+
+@app.route('/api/tavoli/<int:tavolo_id>/occupato', methods=['POST'])
+@login_required
+@gestione_sala_required
+def api_tavolo_occupato(tavolo_id):
+    """Toggle manuale walk-in (cliente senza prenotazione) — a differenza
+    del PATCH sopra è disponibile allo staff di sala, non solo admin,
+    perché non tocca il layout permanente."""
+    if not get_tavolo_by_id(tavolo_id):
+        return jsonify({'success': False, 'error': 'Tavolo non trovato'}), 404
+    d = request.get_json(force=True)
+    update_tavolo_occupato(tavolo_id, bool(d.get('occupato')))
     return jsonify({'success': True})
 
 
@@ -2032,7 +2051,8 @@ def api_prenotazioni_crea():
 @login_required
 @gestione_sala_required
 def api_prenotazioni_modifica(prenotazione_id):
-    if not get_prenotazione_by_id(prenotazione_id):
+    esistente = get_prenotazione_by_id(prenotazione_id)
+    if not esistente:
         return jsonify({'success': False, 'error': 'Prenotazione non trovata'}), 404
 
     d          = request.get_json(force=True)
@@ -2041,7 +2061,6 @@ def api_prenotazioni_modifica(prenotazione_id):
     note       = (d.get('note') or '').strip()
     data_val   = (d.get('data') or '').strip()
     ora        = (d.get('ora') or '').strip()
-    stato      = (d.get('stato') or '').strip()
     tavoli_ids = d.get('tavoli') or []
     try:
         persone = int(d.get('persone', 0))
@@ -2058,10 +2077,14 @@ def api_prenotazioni_modifica(prenotazione_id):
         return jsonify({'success': False, 'error': 'Numero persone non valido'}), 400
     if not data_val or not ora:
         return jsonify({'success': False, 'error': 'Data e ora obbligatorie'}), 400
-    if stato not in ('confermata', 'in_attesa', 'cancellata'):
-        return jsonify({'success': False, 'error': 'Stato non valido'}), 400
 
-    update_prenotazione(prenotazione_id, nome, persone, data_val, ora, telefono, note, stato, tavoli_ids)
+    # Lo stato di servizio (prenotato/arrivato/conto/libero) avanza solo dai
+    # pulsanti dedicati (vedi /stato sotto): l'edit del form non può
+    # resettarlo, quindi qui si ripassa sempre quello già in DB.
+    update_prenotazione(
+        prenotazione_id, nome, persone, data_val, ora, telefono, note,
+        esistente['stato'], tavoli_ids
+    )
     return jsonify({'success': True})
 
 
@@ -2074,6 +2097,48 @@ def api_prenotazioni_elimina(prenotazione_id):
         return jsonify({'success': False, 'error': 'Prenotazione non trovata'}), 404
     delete_prenotazione(prenotazione_id)
     log_eliminazione_prenotazione(prenotazione, current_user.nome)
+    return jsonify({'success': True})
+
+
+@app.route('/api/prenotazioni/<int:prenotazione_id>/stato', methods=['POST'])
+@login_required
+@gestione_sala_required
+def api_prenotazioni_stato(prenotazione_id):
+    """Avanza lo stato di servizio: prenotato -> arrivato -> conto -> libero.
+    Non validiamo la sequenza lato server (la UI offre solo il passo
+    successivo corretto) — accettiamo qualunque valore tra i tre raggiungibili."""
+    if not get_prenotazione_by_id(prenotazione_id):
+        return jsonify({'success': False, 'error': 'Prenotazione non trovata'}), 404
+    stato = (request.get_json(force=True).get('stato') or '').strip()
+    if stato not in ('arrivato', 'conto', 'libero'):
+        return jsonify({'success': False, 'error': 'Stato non valido'}), 400
+    update_stato_prenotazione(prenotazione_id, stato)
+    return jsonify({'success': True})
+
+
+@app.route('/api/sala-disposizione', methods=['POST'])
+@login_required
+@gestione_sala_required
+def api_sala_disposizione():
+    """Salva uno spostamento temporaneo di un tavolo per una data+servizio
+    specifici — non tocca mai la posizione base (quella si cambia solo in
+    Setup Sala, admin-only)."""
+    d = request.get_json(force=True)
+    servizio = (d.get('servizio') or '').strip()
+    data_val = (d.get('data') or '').strip()
+    if servizio not in ('pranzo', 'cena'):
+        return jsonify({'success': False, 'error': 'Servizio non valido'}), 400
+    if not data_val:
+        return jsonify({'success': False, 'error': 'Data obbligatoria'}), 400
+    try:
+        tavolo_id   = int(d.get('tavolo_id'))
+        posizione_x = float(d.get('posizione_x'))
+        posizione_y = float(d.get('posizione_y'))
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'Dati non validi'}), 400
+    if not get_tavolo_by_id(tavolo_id):
+        return jsonify({'success': False, 'error': 'Tavolo non trovato'}), 404
+    upsert_disposizione_giornaliera(tavolo_id, data_val, servizio, posizione_x, posizione_y)
     return jsonify({'success': True})
 
 
@@ -2096,7 +2161,7 @@ def api_sala_mura_get():
 
 @app.route('/api/sala-mura', methods=['POST'])
 @login_required
-@gestione_sala_required
+@admin_required
 def api_sala_mura_salva():
     d = request.get_json(force=True)
     percorso = (d.get('percorso_svg') or '').strip()
@@ -2106,7 +2171,7 @@ def api_sala_mura_salva():
 
 @app.route('/api/sala-scan', methods=['POST'])
 @login_required
-@gestione_sala_required
+@admin_required
 def api_sala_scan():
     """Analizza una foto della sala con Claude Vision e ritorna mura (percorsi
     SVG) e tavoli già convertiti nel sistema di coordinate della mappa

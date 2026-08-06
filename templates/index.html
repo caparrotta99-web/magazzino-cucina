@@ -4201,7 +4201,10 @@ async function loadChatPreview() {
 
   // Con messaggi: solo l'ultimo, su una riga compatta (niente più elenco
   // di 4 righe né pulsante "Apri chat" separato — la card è già tappabile).
-  const m = msgs[0];
+  // get_chat_preview ritorna i messaggi in ordine cronologico crescente
+  // (come get_chat_messaggi): il più recente è l'ULTIMO elemento, non il
+  // primo — indipendentemente da chi lo ha inviato.
+  const m = msgs[msgs.length - 1];
   wrap.innerHTML = `
     <div class="home-dash-card home-dash-card-chat" onclick="navTo('chat')">
       <div class="home-dash-chat-compact">

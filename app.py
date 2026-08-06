@@ -2104,6 +2104,100 @@ def api_sala_mura_salva():
     return jsonify({'success': True})
 
 
+@app.route('/api/sala-scan', methods=['POST'])
+@login_required
+@gestione_sala_required
+def api_sala_scan():
+    """Analizza una foto della sala con Claude Vision e ritorna mura (percorsi
+    SVG) e tavoli già convertiti nel sistema di coordinate della mappa
+    (0-1000 x, 0-700 y) — le coordinate normalizzate 0-100 restituite dal
+    modello sono relative all'inquadratura, non alla planimetria reale."""
+    api_key = os.environ.get('ANTHROPIC_API_KEY')
+    if not api_key:
+        return jsonify({'success': False, 'error': 'ANTHROPIC_API_KEY non configurata'}), 500
+
+    d          = request.get_json(force=True)
+    image_b64  = d.get('image', '')
+    media_type = d.get('media_type', 'image/jpeg')
+
+    if not image_b64:
+        return jsonify({'success': False, 'error': 'Immagine mancante'}), 400
+
+    if ',' in image_b64:
+        image_b64 = image_b64.split(',', 1)[1]
+
+    try:
+        import anthropic as _anthropic
+        client = _anthropic.Anthropic(api_key=api_key)
+        resp = client.messages.create(
+            model='claude-sonnet-4-6',
+            max_tokens=2000,
+            messages=[{
+                'role': 'user',
+                'content': [
+                    {
+                        'type': 'image',
+                        'source': {
+                            'type':       'base64',
+                            'media_type': media_type,
+                            'data':       image_b64,
+                        },
+                    },
+                    {
+                        'type': 'text',
+                        'text': (
+                            "Analizza questa immagine di una sala ristorante. Identifica: "
+                            "1) i muri perimetrali della sala, "
+                            "2) i tavoli presenti con la loro forma (rotondo/rettangolare) e posizione. "
+                            "Restituisci SOLO un JSON: "
+                            '{muri: [{x1,y1,x2,y2}], tavoli: [{id, forma: \'rotondo/rettangolare\', x, y, larghezza, altezza}]} '
+                            "dove tutte le coordinate sono normalizzate da 0 a 100 "
+                            "(0,0 in alto a sinistra dell'immagine, 100,100 in basso a destra)."
+                        ),
+                    },
+                ],
+            }],
+        )
+        text = resp.content[0].text
+        try:
+            dati = _extract_json_object(text)
+        except json.JSONDecodeError:
+            dati = None
+        if not dati:
+            return jsonify({'success': False, 'error': 'Nessun muro o tavolo riconosciuto nella foto'})
+    except Exception as e:
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+    def _pct(v, asse_max):
+        try:
+            return round(max(0.0, min(1.0, float(v) / 100)) * asse_max, 1)
+        except (TypeError, ValueError):
+            return None
+
+    muri = []
+    for m in (dati.get('muri') or [])[:200]:
+        x1, y1 = _pct(m.get('x1'), 1000), _pct(m.get('y1'), 700)
+        x2, y2 = _pct(m.get('x2'), 1000), _pct(m.get('y2'), 700)
+        if None in (x1, y1, x2, y2):
+            continue
+        muri.append(f"M{x1},{y1} L{x2},{y2}")
+
+    tavoli = []
+    for t in (dati.get('tavoli') or [])[:100]:
+        x, y = _pct(t.get('x'), 1000), _pct(t.get('y'), 700)
+        if x is None or y is None:
+            continue
+        forma_raw = str(t.get('forma') or '').strip().lower()
+        forma = 'rotondo' if forma_raw in ('rotondo', 'round', 'circolare', 'circle', 'tondo') else 'rettangolare'
+        tavoli.append({
+            'forma':       forma,
+            'posizione_x': max(20.0, min(980.0, x)),
+            'posizione_y': max(20.0, min(680.0, y)),
+        })
+
+    return jsonify({'success': True, 'muri': muri, 'tavoli': tavoli})
+
+
 @app.route('/api/controllo/log-eliminazioni-prenotazioni')
 @login_required
 @controllo_required

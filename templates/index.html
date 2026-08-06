@@ -3115,6 +3115,15 @@ html.chat-no-scroll { overflow: hidden; }
       <button class="btn-print" style="color:#10b981;font-weight:700" onclick="salvaMura()">Salva mura</button>
     </div>
 
+    <div id="mura-scan-row" style="display:none">
+      <button type="button" class="btn-scan" id="btn-scan-sala" onclick="triggerScanSala()">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+        Scansiona sala
+      </button>
+      <input type="file" id="sala-scan-input" accept="image/*" capture="environment" style="display:none" onchange="onSalaScanCapture(this)">
+      <button type="button" class="btn-svuota" style="width:100%;margin-top:-6px;margin-bottom:14px" onclick="openFormePredefinite()">Usa una forma predefinita</button>
+    </div>
+
     <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
       <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)"><span style="width:10px;height:10px;border-radius:50%;background:var(--green);display:inline-block"></span> Libero</div>
       <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)"><span style="width:10px;height:10px;border-radius:50%;background:var(--red);display:inline-block"></span> Occupato</div>
@@ -3682,6 +3691,18 @@ html.chat-no-scroll { overflow: hidden; }
       <button class="btn-close-modal" onclick="closeTavoloForm()">Annulla</button>
       <button class="btn-print" onclick="submitTavoloForm()" style="color:#10b981;font-weight:700">Salva</button>
     </div>
+  </div>
+</div>
+
+<!-- ── FORME PREDEFINITE SALA ──────────────────────────────────────────────── -->
+<div class="modal-backdrop" id="modal-forme-predefinite" onclick="bgCloseFormePredefinite(event)">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Forma predefinita della sala</div>
+    <button type="button" class="chat-action-opt" onclick="applicaFormaPredefinita('rettangolo_piccolo')">Rettangolo piccolo</button>
+    <button type="button" class="chat-action-opt" onclick="applicaFormaPredefinita('rettangolo_grande')">Rettangolo grande</button>
+    <button type="button" class="chat-action-opt" onclick="applicaFormaPredefinita('quadrato')">Quadrato</button>
+    <button type="button" class="chat-action-opt" onclick="applicaFormaPredefinita('elle')">A elle</button>
   </div>
 </div>
 
@@ -7379,6 +7400,7 @@ function setGestioneSalaTab(tab) {
     b.classList.toggle('active', b.dataset.tab === tab)
   );
   document.getElementById('mura-toolbar').style.display = tab === 'mura' ? '' : 'none';
+  document.getElementById('mura-scan-row').style.display = tab === 'mura' ? '' : 'none';
   const azioniTavoli = document.getElementById('sala-tavoli-actions');
   if (azioniTavoli) azioniTavoli.style.display = tab === 'tavoli' ? 'flex' : 'none';
 
@@ -7423,6 +7445,81 @@ async function salvaMura() {
   S.salaMuraPercorsoSalvato = percorso_svg;
   toast('Mura salvate', 'success');
   setGestioneSalaTab('tavoli');
+}
+
+// ── SCANSIONE FOTOCAMERA (mura + tavoli) ────────────────────────────────
+function triggerScanSala() {
+  document.getElementById('sala-scan-input').click();
+}
+
+async function onSalaScanCapture(input) {
+  const file = input.files[0];
+  input.value = '';
+  if (!file) return;
+
+  const btn = document.getElementById('btn-scan-sala');
+  btn.disabled = true;
+  btn.classList.add('scanning');
+  btn.innerHTML = '<div class="btn-scan-spinner"></div> Analisi in corso...';
+
+  let image, mediaType = 'image/jpeg';
+  try {
+    image = await compressImage(file, 1200, 0.8);
+  } catch {
+    image = await readFileAsDataURL(file);
+    mediaType = file.type || 'image/jpeg';
+  }
+
+  const data = await api('/api/sala-scan', { method: 'POST', body: { image, media_type: mediaType } });
+
+  btn.disabled = false;
+  btn.classList.remove('scanning');
+  btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg> Scansiona sala';
+
+  if (!data.success) {
+    toast(data.error || 'Analisi non riuscita — prova con una forma predefinita', 'error');
+    openFormePredefinite();
+    return;
+  }
+
+  S.salaMuraSottopercorsi = data.muri || [];
+  renderSalaMuraSvg();
+
+  let prossimoNumero = S.tavoli.reduce((max, t) => {
+    const n = parseInt(t.numero, 10);
+    return Number.isFinite(n) && n > max ? n : max;
+  }, 0);
+  let creati = 0;
+  for (const t of (data.tavoli || [])) {
+    prossimoNumero += 1;
+    const r = await api('/api/tavoli', { method: 'POST', body: {
+      numero: String(prossimoNumero), forma: t.forma, posti: 2,
+      posizione_x: t.posizione_x, posizione_y: t.posizione_y,
+    }});
+    if (r.success) creati += 1;
+  }
+  if (creati) await loadTavoliMappa();
+
+  const nMuri = (data.muri || []).length;
+  toast(`Rilevat${nMuri === 1 ? 'o' : 'i'} ${nMuri} mur${nMuri === 1 ? 'o' : 'a'} e ${creati} tavol${creati === 1 ? 'o' : 'i'} — rivedi e premi "Salva mura"`, 'success');
+}
+
+const FORME_PREDEFINITE = {
+  rettangolo_piccolo: ['M100,100 L700,100 L700,450 L100,450 L100,100'],
+  rettangolo_grande:  ['M60,60 L940,60 L940,640 L60,640 L60,60'],
+  quadrato:           ['M250,80 L750,80 L750,580 L250,580 L250,80'],
+  elle:               ['M80,80 L600,80 L600,350 L920,350 L920,620 L80,620 L80,80'],
+};
+
+function openFormePredefinite() { document.getElementById('modal-forme-predefinite').classList.add('open'); }
+function closeFormePredefinite() { document.getElementById('modal-forme-predefinite').classList.remove('open'); }
+function bgCloseFormePredefinite(e) { if (e.target === document.getElementById('modal-forme-predefinite')) closeFormePredefinite(); }
+
+function applicaFormaPredefinita(chiave) {
+  S.salaMuraSottopercorsi = [...(FORME_PREDEFINITE[chiave] || [])];
+  renderSalaMuraSvg();
+  closeFormePredefinite();
+  toast('Forma applicata — modifica il disegno se serve, poi salva', 'success');
 }
 
 function _initMuraDraw() {
@@ -8150,7 +8247,7 @@ function dismissNotifBanner() {
 }
 
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeLotDetail(); closeModificaLotto(); closeDrawer(); closeApparecchioModal(); closeRegistraTempModal(); closeNuovaPreparazione(); closePrepEtichetta(); closeScaricoModal(); closeNuovaPrenotazione(); closePrenDetail(); closeTavoloForm(); closeTavoloSheet(); closeChatAzioni(); closeChatPhotoViewer(); }
+  if (e.key === 'Escape') { closeLotDetail(); closeModificaLotto(); closeDrawer(); closeApparecchioModal(); closeRegistraTempModal(); closeNuovaPreparazione(); closePrepEtichetta(); closeScaricoModal(); closeNuovaPrenotazione(); closePrenDetail(); closeTavoloForm(); closeTavoloSheet(); closeFormePredefinite(); closeChatAzioni(); closeChatPhotoViewer(); }
 });
 
 // ── VISUAL VIEWPORT (tastiera mobile) ───────────────────────────────────

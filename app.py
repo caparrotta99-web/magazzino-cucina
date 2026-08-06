@@ -78,10 +78,11 @@ from database import (
     insert_preparazione, insert_preparazione_ingrediente,
     get_preparazioni, get_preparazione_by_id, get_preparazione_ingredienti,
     completa_preparazione,
-    get_sale, create_sala, update_sala, delete_sala,
+    get_sale, create_sala, update_sala, delete_sala, get_or_create_sala_default,
     get_tavoli, get_tavolo_by_id, create_tavolo, update_tavolo, delete_tavolo,
     get_prenotazioni, get_prenotazione_by_id, create_prenotazione, update_prenotazione,
-    delete_prenotazione, get_coperti_giorno,
+    delete_prenotazione, get_coperti_giorno, get_calendario_prenotazioni,
+    get_sala_mura, insert_sala_mura,
     log_eliminazione_prenotazione, get_log_eliminazioni_prenotazioni,
     get_unsynced_registro, mark_registro_synced,
     get_unsynced_listino, mark_listino_synced,
@@ -1828,14 +1829,12 @@ def api_preparazione_completa(prep_id):
 
 @app.route('/api/sale', methods=['GET'])
 @login_required
-@admin_required  # TODO: rimuovere quando Prenotazioni/Gestione Sala escono dalla fase admin-only
 def api_sale_list():
     return jsonify({'success': True, 'sale': get_sale(), 'puo_gestire': current_user.puo_gestire_sala})
 
 
 @app.route('/api/sale', methods=['POST'])
 @login_required
-@admin_required  # TODO: rimuovere quando Prenotazioni/Gestione Sala escono dalla fase admin-only
 @gestione_sala_required
 def api_sale_crea():
     d    = request.get_json(force=True)
@@ -1848,7 +1847,6 @@ def api_sale_crea():
 
 @app.route('/api/sale/<int:sala_id>', methods=['PUT'])
 @login_required
-@admin_required  # TODO: rimuovere quando Prenotazioni/Gestione Sala escono dalla fase admin-only
 @gestione_sala_required
 def api_sala_modifica(sala_id):
     d    = request.get_json(force=True)
@@ -1861,7 +1859,6 @@ def api_sala_modifica(sala_id):
 
 @app.route('/api/sale/<int:sala_id>', methods=['DELETE'])
 @login_required
-@admin_required  # TODO: rimuovere quando Prenotazioni/Gestione Sala escono dalla fase admin-only
 @gestione_sala_required
 def api_sala_elimina(sala_id):
     if not delete_sala(sala_id):
@@ -1873,7 +1870,6 @@ def api_sala_elimina(sala_id):
 
 @app.route('/api/tavoli', methods=['GET'])
 @login_required
-@admin_required  # TODO: rimuovere quando Prenotazioni/Gestione Sala escono dalla fase admin-only
 def api_tavoli_list():
     sala_id = request.args.get('sala_id', type=int)
     return jsonify({
@@ -1885,7 +1881,6 @@ def api_tavoli_list():
 
 @app.route('/api/tavoli', methods=['POST'])
 @login_required
-@admin_required  # TODO: rimuovere quando Prenotazioni/Gestione Sala escono dalla fase admin-only
 @gestione_sala_required
 def api_tavoli_crea():
     d      = request.get_json(force=True)
@@ -1895,10 +1890,6 @@ def api_tavoli_crea():
         posti = int(d.get('posti', 0))
     except (TypeError, ValueError):
         posti = 0
-    try:
-        sala_id = int(d.get('sala_id', 0))
-    except (TypeError, ValueError):
-        sala_id = 0
     try:
         posizione_x = float(d.get('posizione_x', 40))
         posizione_y = float(d.get('posizione_y', 40))
@@ -1911,8 +1902,11 @@ def api_tavoli_crea():
         return jsonify({'success': False, 'error': 'Seleziona la forma del tavolo'}), 400
     if posti <= 0:
         return jsonify({'success': False, 'error': 'Numero posti non valido'}), 400
-    if not sala_id:
-        return jsonify({'success': False, 'error': 'Seleziona la sala'}), 400
+
+    # La UI ha un'unica planimetria condivisa (niente più scelta della
+    # sala): assegna il tavolo a una sala di default, creata al volo se
+    # non esiste ancora, per non toccare la FK tavoli.sala_id.
+    sala_id = get_or_create_sala_default()
 
     tavolo_id = create_tavolo(numero, forma, posti, sala_id, posizione_x, posizione_y)
     return jsonify({'success': True, 'id': tavolo_id})
@@ -1920,7 +1914,6 @@ def api_tavoli_crea():
 
 @app.route('/api/tavoli/<int:tavolo_id>', methods=['PATCH'])
 @login_required
-@admin_required  # TODO: rimuovere quando Prenotazioni/Gestione Sala escono dalla fase admin-only
 @gestione_sala_required
 def api_tavoli_modifica(tavolo_id):
     """Update parziale: posizione (drag), numero/forma/posti/sala (modifica
@@ -1967,6 +1960,11 @@ def api_tavoli_modifica(tavolo_id):
             return jsonify({'success': False, 'error': 'Posizione non valida'}), 400
     if 'occupato' in d:
         campi['occupato'] = 1 if d.get('occupato') else 0
+    if 'rotazione' in d:
+        try:
+            campi['rotazione'] = int(d.get('rotazione')) % 360
+        except (TypeError, ValueError):
+            return jsonify({'success': False, 'error': 'Rotazione non valida'}), 400
 
     if campi:
         update_tavolo(tavolo_id, **campi)
@@ -1975,7 +1973,6 @@ def api_tavoli_modifica(tavolo_id):
 
 @app.route('/api/tavoli/<int:tavolo_id>', methods=['DELETE'])
 @login_required
-@admin_required  # TODO: rimuovere quando Prenotazioni/Gestione Sala escono dalla fase admin-only
 @gestione_sala_required
 def api_tavoli_elimina(tavolo_id):
     if not get_tavolo_by_id(tavolo_id):
@@ -1988,7 +1985,6 @@ def api_tavoli_elimina(tavolo_id):
 
 @app.route('/api/prenotazioni', methods=['GET'])
 @login_required
-@admin_required  # TODO: rimuovere quando Prenotazioni/Gestione Sala escono dalla fase admin-only
 def api_prenotazioni_list():
     data = (request.args.get('data') or now_it().strftime('%Y-%m-%d')).strip()
     return jsonify({
@@ -2001,7 +1997,6 @@ def api_prenotazioni_list():
 
 @app.route('/api/prenotazioni', methods=['POST'])
 @login_required
-@admin_required  # TODO: rimuovere quando Prenotazioni/Gestione Sala escono dalla fase admin-only
 @gestione_sala_required
 def api_prenotazioni_crea():
     d          = request.get_json(force=True)
@@ -2035,7 +2030,6 @@ def api_prenotazioni_crea():
 
 @app.route('/api/prenotazioni/<int:prenotazione_id>', methods=['PUT'])
 @login_required
-@admin_required  # TODO: rimuovere quando Prenotazioni/Gestione Sala escono dalla fase admin-only
 @gestione_sala_required
 def api_prenotazioni_modifica(prenotazione_id):
     if not get_prenotazione_by_id(prenotazione_id):
@@ -2073,7 +2067,6 @@ def api_prenotazioni_modifica(prenotazione_id):
 
 @app.route('/api/prenotazioni/<int:prenotazione_id>', methods=['DELETE'])
 @login_required
-@admin_required  # TODO: rimuovere quando Prenotazioni/Gestione Sala escono dalla fase admin-only
 @gestione_sala_required
 def api_prenotazioni_elimina(prenotazione_id):
     prenotazione = get_prenotazione_by_id(prenotazione_id)
@@ -2081,6 +2074,33 @@ def api_prenotazioni_elimina(prenotazione_id):
         return jsonify({'success': False, 'error': 'Prenotazione non trovata'}), 404
     delete_prenotazione(prenotazione_id)
     log_eliminazione_prenotazione(prenotazione, current_user.nome)
+    return jsonify({'success': True})
+
+
+@app.route('/api/prenotazioni/calendario', methods=['GET'])
+@login_required
+def api_prenotazioni_calendario():
+    anno = request.args.get('anno', type=int) or now_it().year
+    mese = request.args.get('mese', type=int) or now_it().month
+    if not (1 <= mese <= 12):
+        return jsonify({'success': False, 'error': 'Mese non valido'}), 400
+    return jsonify({'success': True, **get_calendario_prenotazioni(anno, mese)})
+
+
+@app.route('/api/sala-mura', methods=['GET'])
+@login_required
+def api_sala_mura_get():
+    mura = get_sala_mura()
+    return jsonify({'success': True, 'percorso_svg': mura['percorso_svg'] if mura else ''})
+
+
+@app.route('/api/sala-mura', methods=['POST'])
+@login_required
+@gestione_sala_required
+def api_sala_mura_salva():
+    d = request.get_json(force=True)
+    percorso = (d.get('percorso_svg') or '').strip()
+    insert_sala_mura(percorso)  # stringa vuota ammessa: "Cancella" + "Salva" azzera la planimetria
     return jsonify({'success': True})
 
 

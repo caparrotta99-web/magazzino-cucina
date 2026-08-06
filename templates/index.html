@@ -143,6 +143,7 @@ body {
 :root[data-theme="dark"] .ingr-row,
 :root[data-theme="dark"] .coperti-stat,
 :root[data-theme="dark"] .pren-row,
+:root[data-theme="dark"] .pren-cal-day,
 :root[data-theme="dark"] .carico-qty-card,
 :root[data-theme="dark"] .temp-app-card,
 :root[data-theme="dark"] .temp-storico-row,
@@ -1091,6 +1092,20 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
 .pren-badge.in_attesa  { background: rgba(180,83,9,.14); color: var(--amber); }
 .pren-badge.cancellata { background: rgba(239,68,68,.12); color: var(--red); }
 
+/* ─── CALENDARIO PRENOTAZIONI ───────────────────────────────────────────── */
+.pren-cal-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; font-weight:700; font-size:15px; }
+.pren-cal-header button { background:none; border:none; font-size:20px; line-height:1; color:var(--action); padding:4px 12px; cursor:pointer; }
+.pren-cal-weekdays { display:grid; grid-template-columns:repeat(7,1fr); font-size:11px; color:var(--muted); text-align:center; margin-bottom:6px; text-transform:uppercase; }
+.pren-cal-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:4px; }
+.pren-cal-day {
+  aspect-ratio:1; display:flex; align-items:center; justify-content:center;
+  border-radius:10px; font-size:13px; font-weight:600; color:var(--text);
+  background:var(--card); border:1px solid var(--border); cursor:pointer;
+}
+.pren-cal-day.fuori-mese { visibility:hidden; }
+.pren-cal-day.oggi  { border:2px solid var(--action); }
+.pren-cal-day.pieno { background:rgba(239,68,68,.15); color:var(--red); border-color:rgba(239,68,68,.35); font-weight:700; }
+
 /* ─── GESTIONE SALA ─────────────────────────────────────────────────────── */
 .sala-map-viewport {
   overflow: auto; border-radius: 16px; border: 1px solid var(--border);
@@ -1102,8 +1117,11 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
   background-image: radial-gradient(var(--border-2) 1px, transparent 1px);
   background-size: 24px 24px;
 }
+#sala-mura-svg { position: absolute; inset: 0; z-index: 1; pointer-events: none; }
+#sala-mura-svg.editable { pointer-events: auto; touch-action: none; }
+.mura-stroke { fill: none; stroke: var(--text); stroke-width: 6; stroke-linecap: round; stroke-linejoin: round; }
 .tavolo-box {
-  position: absolute; display: flex; align-items: center; justify-content: center;
+  position: absolute; z-index: 2; display: flex; align-items: center; justify-content: center;
   flex-direction: column; gap: 2px;
   color: #fff; font-weight: 700; cursor: grab;
   box-shadow: var(--shadow); user-select: none; touch-action: none;
@@ -1115,7 +1133,7 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
 .tavolo-box.rotondo      { border-radius: 50%; }
 .tavolo-box.libero    { background: var(--green); }
 .tavolo-box.occupato  { background: var(--red); }
-.tavolo-box.prenotato { background: var(--amber); }
+.tavolo-box.prenotato { background: var(--yellow); }
 .tavolo-numero { font-size: 15px; line-height: 1; }
 .tavolo-posti  { font-size: 10px; font-weight: 500; opacity: .85; }
 
@@ -2132,7 +2150,7 @@ html.chat-no-scroll { overflow: hidden; }
       <span class="lbl">Preparazioni</span>
     </button>
 
-    {% if current_user.is_authenticated and current_user.role == 'admin' %}
+    {% if current_user.is_authenticated %}
     <button class="drw-item" data-page="prenotazioni" onclick="navTo('prenotazioni')">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       <span class="lbl">Prenotazioni</span>
@@ -2197,8 +2215,6 @@ html.chat-no-scroll { overflow: hidden; }
   <!-- HOME -->
   <section class="page active" id="page-home">
     <button type="button" class="btn-help" onclick="navTo('help')" aria-label="Come usare Brigade">?</button>
-
-    {% set is_admin = current_user.is_authenticated and current_user.role == 'admin' %}
 
     <div class="home-switcher" id="home-switcher">
       <button type="button" class="home-switcher-btn active" data-idx="0" onclick="_setHomePage(0)">Dashboard</button>
@@ -2421,7 +2437,7 @@ html.chat-no-scroll { overflow: hidden; }
 
             </div>
 
-            {% if is_admin %}
+            {% if current_user.is_authenticated %}
             <div class="home-group-label">Sala</div>
             <div class="home-grid">
 
@@ -3014,39 +3030,60 @@ html.chat-no-scroll { overflow: hidden; }
       <span class="back-label">Prenotazioni</span>
     </div>
 
-    <div class="fgroup" style="margin-bottom:14px">
-      <input class="finput" type="date" id="pren-data" onchange="onPrenDataChange()">
-    </div>
-
-    <div class="coperti-row">
-      <div class="coperti-stat">
-        <div class="coperti-num" id="coperti-totale">0</div>
-        <div class="coperti-lbl">Coperti oggi</div>
+    <!-- VISTA CALENDARIO MENSILE -->
+    <div id="pren-cal-view">
+      <div class="pren-cal-header">
+        <button type="button" onclick="prenCalNav(-1)" aria-label="Mese precedente">‹</button>
+        <span id="pren-cal-label"></span>
+        <button type="button" onclick="prenCalNav(1)" aria-label="Mese successivo">›</button>
       </div>
-      <div class="coperti-stat">
-        <div class="coperti-num" id="coperti-pranzo">0</div>
-        <div class="coperti-lbl">Rimasti pranzo</div>
+      <div class="pren-cal-weekdays">
+        <span>Lun</span><span>Mar</span><span>Mer</span><span>Gio</span><span>Ven</span><span>Sab</span><span>Dom</span>
       </div>
-      <div class="coperti-stat">
-        <div class="coperti-num" id="coperti-cena">0</div>
-        <div class="coperti-lbl">Rimasti cena</div>
+      <div class="pren-cal-grid" id="pren-cal-grid"></div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-top:14px">
+        <span style="width:10px;height:10px;border-radius:3px;background:rgba(239,68,68,.4);display:inline-block"></span>
+        Sala al completo (pranzo o cena)
       </div>
     </div>
 
-    {% if current_user.is_authenticated and current_user.puo_gestire_sala %}
-    <div class="spesa-topbar">
-      <div></div>
-      <button class="btn-spesa-add" onclick="openNuovaPrenotazione()">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-        Nuova
-      </button>
-    </div>
-    {% endif %}
+    <!-- VISTA GIORNALIERA -->
+    <div id="pren-day-view" style="display:none">
+      <div class="back-bar" onclick="prenCalTornaAlMese()">
+        <div class="back-arrow"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></div>
+        <span class="back-label" id="pren-day-label">Prenotazioni del giorno</span>
+      </div>
 
-    <div id="pren-list">
-      <div class="empty-state">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-        <p>Caricamento…</p>
+      <div class="coperti-row">
+        <div class="coperti-stat">
+          <div class="coperti-num" id="coperti-totale">0</div>
+          <div class="coperti-lbl">Coperti oggi</div>
+        </div>
+        <div class="coperti-stat">
+          <div class="coperti-num" id="coperti-pranzo">0</div>
+          <div class="coperti-lbl">Rimasti pranzo</div>
+        </div>
+        <div class="coperti-stat">
+          <div class="coperti-num" id="coperti-cena">0</div>
+          <div class="coperti-lbl">Rimasti cena</div>
+        </div>
+      </div>
+
+      {% if current_user.is_authenticated and current_user.puo_gestire_sala %}
+      <div class="spesa-topbar">
+        <div></div>
+        <button class="btn-spesa-add" onclick="openNuovaPrenotazione()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Nuova
+        </button>
+      </div>
+      {% endif %}
+
+      <div id="pren-list">
+        <div class="empty-state">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          <p>Caricamento…</p>
+        </div>
       </div>
     </div>
   </section>
@@ -3058,21 +3095,34 @@ html.chat-no-scroll { overflow: hidden; }
       <span class="back-label">Gestione sala</span>
     </div>
 
-    <div class="filter-row" id="sala-pills-row"></div>
+    <div class="filter-row" id="gestione-sala-tabs">
+      {% if current_user.is_authenticated and current_user.puo_gestire_sala %}
+      <button class="fpill" data-tab="mura" onclick="setGestioneSalaTab('mura')">Mura</button>
+      <button class="fpill" data-tab="tavoli" onclick="setGestioneSalaTab('tavoli')">Tavoli</button>
+      {% endif %}
+      <button class="fpill" data-tab="prenotazioni" onclick="setGestioneSalaTab('prenotazioni')">Prenotazioni</button>
+    </div>
 
     <div class="sala-map-viewport" id="sala-map-viewport">
-      <div class="sala-map-canvas" id="sala-map-canvas"></div>
+      <div class="sala-map-canvas" id="sala-map-canvas">
+        <svg id="sala-mura-svg" width="1000" height="700" viewBox="0 0 1000 700"></svg>
+      </div>
+    </div>
+
+    <div class="filter-row" id="mura-toolbar" style="display:none">
+      <button class="fpill active" data-tool="linea" onclick="setMuraTool('linea')">Linea</button>
+      <button class="fpill" onclick="cancellaMuraDisegno()">Cancella</button>
+      <button class="btn-print" style="color:#10b981;font-weight:700" onclick="salvaMura()">Salva mura</button>
     </div>
 
     <div style="display:flex;gap:8px;margin-top:14px;flex-wrap:wrap">
       <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)"><span style="width:10px;height:10px;border-radius:50%;background:var(--green);display:inline-block"></span> Libero</div>
-      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)"><span style="width:10px;height:10px;border-radius:50%;background:var(--amber);display:inline-block"></span> Prenotato</div>
       <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)"><span style="width:10px;height:10px;border-radius:50%;background:var(--red);display:inline-block"></span> Occupato</div>
+      <div style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)"><span style="width:10px;height:10px;border-radius:50%;background:var(--yellow);display:inline-block"></span> Prenotato, non arrivato</div>
     </div>
 
     {% if current_user.is_authenticated and current_user.puo_gestire_sala %}
-    <div style="display:flex;gap:10px;margin-top:16px">
-      <button type="button" class="btn-svuota" onclick="openNuovaSala()">+ Nuova sala</button>
+    <div style="display:flex;gap:10px;margin-top:16px" id="sala-tavoli-actions">
       <button type="button" class="btn-svuota" onclick="openNuovoTavolo()">+ Nuovo tavolo</button>
     </div>
     {% endif %}
@@ -3604,24 +3654,6 @@ html.chat-no-scroll { overflow: hidden; }
   </div>
 </div>
 
-<!-- ── MODAL NUOVA SALA ─────────────────────────────────────────────────────── -->
-<div class="modal-backdrop" id="modal-nuova-sala" onclick="bgCloseSalaForm(event)">
-  <div class="modal">
-    <div class="modal-handle"></div>
-    <div class="modal-title">Nuova sala</div>
-    <div class="modal-body">
-      <div class="fgroup" style="margin-bottom:0">
-        <label class="flabel">Nome sala *</label>
-        <input class="finput" type="text" id="sala-nome" placeholder="es. Sala interna" autocomplete="off">
-      </div>
-    </div>
-    <div class="modal-actions">
-      <button class="btn-close-modal" onclick="closeNuovaSala()">Annulla</button>
-      <button class="btn-print" onclick="submitNuovaSala()" style="color:#10b981;font-weight:700">Salva</button>
-    </div>
-  </div>
-</div>
-
 <!-- ── MODAL NUOVO/MODIFICA TAVOLO ─────────────────────────────────────────── -->
 <div class="modal-backdrop" id="modal-tavolo" onclick="bgCloseTavoloForm(event)">
   <div class="modal">
@@ -3641,15 +3673,9 @@ html.chat-no-scroll { overflow: hidden; }
           </select>
         </div>
       </div>
-      <div class="fgroup">
+      <div class="fgroup" style="margin-bottom:0">
         <label class="flabel">Posti *</label>
         <input class="finput" type="number" id="tavolo-posti" placeholder="2" min="1" step="1" inputmode="numeric">
-      </div>
-      <div class="fgroup" style="margin-bottom:0">
-        <label class="flabel">Sala *</label>
-        <div class="fselect-wrap">
-          <select class="fselect" id="tavolo-sala"></select>
-        </div>
       </div>
     </div>
     <div class="modal-actions">
@@ -3737,10 +3763,16 @@ const S = {
   prenData:              '',
   prenEditId:            null,      // null = nuova prenotazione, altrimenti id in modifica
   prenTavoliSelezionati: [],        // id tavoli selezionati nel form prenotazione
+  prenCalMese:           null,      // mese visualizzato nel calendario (1-based)
+  prenCalAnno:           null,
+  prenCalGiorniPieni:    [],        // date 'YYYY-MM-DD' con sala al completo
   sale:                  [],
   tavoli:                [],
-  salaAttivaId:          null,
   tavoloEditId:          null,      // null = nuovo tavolo, altrimenti id in modifica
+  gestioneSalaTab:       'mura',    // 'mura' | 'tavoli' | 'prenotazioni'
+  salaMuraPercorsoSalvato: '',      // d-string già persistito lato server
+  salaMuraSottopercorsi:  [],       // sottopercorsi disegnati nella sessione corrente (non ancora salvati)
+  muraTool:              'linea',
 };
 
 // ── FILTRI REPARTO + CATEGORIA (Carico / In uso / Scarico) ────────────────
@@ -4271,8 +4303,8 @@ function navTo(page) {
   if (page === 'controllo')  loadControlloLogs();
   if (page === 'export')    initExportPage();
   if (page === 'preparazioni') loadPreparazioni();
-  if (page === 'prenotazioni') loadPrenotazioni();
-  if (page === 'gestione-sala') loadGestioneSala();
+  if (page === 'prenotazioni') initPrenotazioniPage();
+  if (page === 'gestione-sala') initGestioneSalaPage();
   if (page === 'help')      closeTutorialSection(); // riparti sempre dal menu principale del tutorial
 
   document.body.classList.toggle('chat-active', page === 'chat');
@@ -7029,20 +7061,76 @@ async function copiaEtichettaPreparazione() {
 const PRANZO_CENA_CUTOFF = '17:00';
 const PREN_STATO_LBL = { confermata: 'Confermata', in_attesa: 'In attesa', cancellata: 'Cancellata' };
 
+function initPrenotazioniPage() {
+  if (!S.prenCalMese) {
+    const oggi = dataOraItaliana().data.split('-');
+    S.prenCalAnno = parseInt(oggi[0], 10);
+    S.prenCalMese = parseInt(oggi[1], 10);
+  }
+  document.getElementById('pren-cal-view').style.display = '';
+  document.getElementById('pren-day-view').style.display = 'none';
+  loadCalendarioPrenotazioni();
+}
+
+async function loadCalendarioPrenotazioni() {
+  const data = await api(`/api/prenotazioni/calendario?anno=${S.prenCalAnno}&mese=${S.prenCalMese}`);
+  S.prenCalGiorniPieni = data.giorni_pieni || [];
+  renderCalendarioPrenotazioni();
+}
+
+const MESI_IT = ['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
+
+function renderCalendarioPrenotazioni() {
+  document.getElementById('pren-cal-label').textContent = `${MESI_IT[S.prenCalMese - 1]} ${S.prenCalAnno}`;
+
+  const primoGiorno  = new Date(S.prenCalAnno, S.prenCalMese - 1, 1);
+  const ultimoGiorno  = new Date(S.prenCalAnno, S.prenCalMese, 0).getDate();
+  const offset       = (primoGiorno.getDay() + 6) % 7;   // Lun=0 .. Dom=6
+  const oggiISO       = dataOraItaliana().data;
+
+  const celle = [];
+  for (let i = 0; i < offset; i++) celle.push(null);
+  for (let d = 1; d <= ultimoGiorno; d++) {
+    const iso = `${S.prenCalAnno}-${String(S.prenCalMese).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    celle.push({ giorno: d, iso, oggi: iso === oggiISO, pieno: S.prenCalGiorniPieni.includes(iso) });
+  }
+  while (celle.length % 7 !== 0) celle.push(null);
+
+  document.getElementById('pren-cal-grid').innerHTML = celle.map(c => c
+    ? `<div class="pren-cal-day ${c.pieno ? 'pieno' : ''} ${c.oggi ? 'oggi' : ''}" onclick="prenCalApriGiorno('${c.iso}')">${c.giorno}</div>`
+    : `<div class="pren-cal-day fuori-mese"></div>`
+  ).join('');
+}
+
+function prenCalNav(delta) {
+  S.prenCalMese += delta;
+  if (S.prenCalMese < 1)  { S.prenCalMese = 12; S.prenCalAnno--; }
+  if (S.prenCalMese > 12) { S.prenCalMese = 1;  S.prenCalAnno++; }
+  loadCalendarioPrenotazioni();
+}
+
+function prenCalApriGiorno(iso) {
+  S.prenData = iso;
+  document.getElementById('pren-cal-view').style.display = 'none';
+  document.getElementById('pren-day-view').style.display = '';
+  document.getElementById('pren-day-label').textContent = fmtDate(iso);
+  loadPrenotazioni();
+}
+
+function prenCalTornaAlMese() {
+  document.getElementById('pren-cal-view').style.display = '';
+  document.getElementById('pren-day-view').style.display = 'none';
+  loadCalendarioPrenotazioni();
+}
+
 async function loadPrenotazioni() {
   if (!S.prenData) S.prenData = dataOraItaliana().data;
-  document.getElementById('pren-data').value = S.prenData;
   const data = await api(`/api/prenotazioni?data=${encodeURIComponent(S.prenData)}`);
   S.prenotazioni = data.prenotazioni || [];
   S.coperti = data.coperti || S.coperti;
   renderCoperti();
   renderPrenotazioni();
   if (!S.sale.length) await loadSaleETavoli();
-}
-
-function onPrenDataChange() {
-  S.prenData = document.getElementById('pren-data').value;
-  loadPrenotazioni();
 }
 
 function renderCoperti() {
@@ -7172,24 +7260,14 @@ async function openModificaPrenotazione(id) {
 function renderPrenTavoliCheckbox() {
   const el = document.getElementById('pren-tavoli-list');
   if (!S.tavoli.length) { el.innerHTML = `<div style="font-size:13px;color:var(--muted)">Nessun tavolo configurato</div>`; return; }
-  const bySala = {};
-  S.tavoli.forEach(t => {
-    if (!bySala[t.sala_nome]) bySala[t.sala_nome] = [];
-    bySala[t.sala_nome].push(t);
-  });
-  el.innerHTML = Object.keys(bySala).map(salaNome => `
-    <div style="margin-bottom:10px">
-      <div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px">${esc(salaNome)}</div>
-      <div style="display:flex;flex-wrap:wrap;gap:8px">
-        ${bySala[salaNome].map(t => `
-          <label style="display:flex;align-items:center;gap:6px;padding:8px 12px;border:1.5px solid var(--border);border-radius:10px;cursor:pointer;font-size:13px">
-            <input type="checkbox" value="${t.id}" ${S.prenTavoliSelezionati.includes(t.id)?'checked':''} onchange="onPrenTavoloToggle(${t.id}, this.checked)">
-            Tavolo ${esc(t.numero)} (${t.posti})
-          </label>
-        `).join('')}
-      </div>
-    </div>
-  `).join('');
+  el.innerHTML = `<div style="display:flex;flex-wrap:wrap;gap:8px">
+    ${S.tavoli.map(t => `
+      <label style="display:flex;align-items:center;gap:6px;padding:8px 12px;border:1.5px solid var(--border);border-radius:10px;cursor:pointer;font-size:13px">
+        <input type="checkbox" value="${t.id}" ${S.prenTavoliSelezionati.includes(t.id)?'checked':''} onchange="onPrenTavoloToggle(${t.id}, this.checked)">
+        Tavolo ${esc(t.numero)} (${t.posti})
+      </label>
+    `).join('')}
+  </div>`;
 }
 
 function onPrenTavoloToggle(id, checked) {
@@ -7226,6 +7304,7 @@ async function submitPrenotazione() {
   toast(S.prenEditId ? 'Prenotazione aggiornata' : 'Prenotazione registrata', 'success');
   await loadPrenotazioni();
   if (S.activePage === 'gestione-sala') loadTavoliMappa();
+  loadCalendarioPrenotazioni();
 }
 
 function showPrenDetail(id) {
@@ -7258,23 +7337,29 @@ async function confermaEliminaPrenotazione(id) {
   toast('Prenotazione eliminata', 'success');
   await loadPrenotazioni();
   if (S.activePage === 'gestione-sala') loadTavoliMappa();
+  loadCalendarioPrenotazioni();
 }
 
 // ── GESTIONE SALA ────────────────────────────────────────────────────────
 const TAVOLO_BASE_SIZE     = 56;
 const TAVOLO_SIZE_PER_POSTO = 6;
 
-async function loadGestioneSala() {
-  await loadSaleETavoli();
-  renderSalaPills();
-  renderMappaSala();
+async function initGestioneSalaPage() {
+  // Le prenotazioni di oggi servono al dettaglio tavolo (openTavoloSheet)
+  // per mostrare nome/ora/persone di chi ha prenotato — 'prenotato' in
+  // get_tavoli() è sempre relativo alla data odierna.
+  const oggi = dataOraItaliana().data;
+  const [, , prenData] = await Promise.all([
+    loadSaleETavoli(), loadSalaMura(), api(`/api/prenotazioni?data=${encodeURIComponent(oggi)}`),
+  ]);
+  S.prenotazioni = prenData.prenotazioni || [];
+  setGestioneSalaTab(CAN_GESTIRE_SALA ? S.gestioneSalaTab : 'prenotazioni');
 }
 
 async function loadSaleETavoli() {
   const [saleData, tavoliData] = await Promise.all([api('/api/sale'), api('/api/tavoli')]);
   S.sale   = saleData.sale || [];
   S.tavoli = tavoliData.tavoli || [];
-  if (!S.salaAttivaId && S.sale.length) S.salaAttivaId = S.sale[0].id;
 }
 
 async function loadTavoliMappa() {
@@ -7283,36 +7368,127 @@ async function loadTavoliMappa() {
   renderMappaSala();
 }
 
-function renderSalaPills() {
-  const row = document.getElementById('sala-pills-row');
-  if (!row) return;
-  if (!S.sale.length) { row.innerHTML = ''; return; }
-  row.innerHTML = S.sale.map(s =>
-    `<button class="fpill ${S.salaAttivaId === s.id ? 'active' : ''}" onclick="setSalaAttiva(${s.id})">${esc(s.nome)}</button>`
-  ).join('');
+async function loadSalaMura() {
+  const data = await api('/api/sala-mura');
+  S.salaMuraPercorsoSalvato = data.percorso_svg || '';
 }
 
-function setSalaAttiva(id) {
-  S.salaAttivaId = id;
-  renderSalaPills();
+function setGestioneSalaTab(tab) {
+  S.gestioneSalaTab = tab;
+  document.querySelectorAll('#gestione-sala-tabs .fpill').forEach(b =>
+    b.classList.toggle('active', b.dataset.tab === tab)
+  );
+  document.getElementById('mura-toolbar').style.display = tab === 'mura' ? '' : 'none';
+  const azioniTavoli = document.getElementById('sala-tavoli-actions');
+  if (azioniTavoli) azioniTavoli.style.display = tab === 'tavoli' ? 'flex' : 'none';
+
+  const svg = document.getElementById('sala-mura-svg');
+  svg.classList.toggle('editable', tab === 'mura');
+
+  if (tab === 'mura') {
+    // Si riparte da quanto già disegnato: l'utente può aggiungere altri
+    // tratti o premere "Cancella" per ripartire da zero. "Salva mura"
+    // sostituisce sempre l'intera planimetria con ciò che c'è a schermo.
+    S.salaMuraSottopercorsi = S.salaMuraPercorsoSalvato ? [S.salaMuraPercorsoSalvato] : [];
+  }
+  renderSalaMuraSvg();
   renderMappaSala();
+}
+
+function renderSalaMuraSvg() {
+  const svg = document.getElementById('sala-mura-svg');
+  const percorsi = S.gestioneSalaTab === 'mura' ? S.salaMuraSottopercorsi : [S.salaMuraPercorsoSalvato];
+  svg.innerHTML = percorsi.filter(Boolean).map(d =>
+    `<path class="mura-stroke" d="${d}"></path>`
+  ).join('');
+  if (S.gestioneSalaTab === 'mura') _initMuraDraw();
+}
+
+function setMuraTool(tool) {
+  S.muraTool = tool;
+  document.querySelectorAll('#mura-toolbar .fpill[data-tool]').forEach(b =>
+    b.classList.toggle('active', b.dataset.tool === tool)
+  );
+}
+
+function cancellaMuraDisegno() {
+  S.salaMuraSottopercorsi = [];
+  renderSalaMuraSvg();
+}
+
+async function salvaMura() {
+  const percorso_svg = S.salaMuraSottopercorsi.join(' ');
+  const result = await api('/api/sala-mura', { method: 'POST', body: { percorso_svg } });
+  if (!result.success) { toast(result.error || 'Errore', 'error'); return; }
+  S.salaMuraPercorsoSalvato = percorso_svg;
+  toast('Mura salvate', 'success');
+  setGestioneSalaTab('tavoli');
+}
+
+function _initMuraDraw() {
+  const svg = document.getElementById('sala-mura-svg');
+  if (svg.dataset.drawInit) return;
+  svg.dataset.drawInit = '1';
+
+  let current = null, d = '';
+  const getPoint = e => {
+    const p = e.touches ? e.touches[0] : e;
+    const r = svg.getBoundingClientRect();
+    // width/height dell'svg = viewBox (1000x700, nessuno scaling): 1 unità = 1px.
+    return { x: p.clientX - r.left, y: p.clientY - r.top };
+  };
+
+  const onStart = e => {
+    if (S.gestioneSalaTab !== 'mura' || S.muraTool !== 'linea') return;
+    if (e.cancelable) e.preventDefault();
+    const { x, y } = getPoint(e);
+    d = `M${x.toFixed(1)},${y.toFixed(1)}`;
+    current = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    current.setAttribute('class', 'mura-stroke');
+    current.setAttribute('d', d);
+    svg.appendChild(current);
+  };
+  const onMove = e => {
+    if (!current) return;
+    if (e.cancelable) e.preventDefault();
+    const { x, y } = getPoint(e);
+    d += ` L${x.toFixed(1)},${y.toFixed(1)}`;
+    current.setAttribute('d', d);
+  };
+  const onEnd = () => {
+    if (!current) return;
+    S.salaMuraSottopercorsi.push(d);
+    current = null;
+  };
+
+  svg.addEventListener('touchstart', onStart, { passive: false });
+  svg.addEventListener('touchmove',  onMove,  { passive: false });
+  svg.addEventListener('touchend',   onEnd);
+  svg.addEventListener('touchcancel', () => { current = null; });
+
+  svg.addEventListener('mousedown', onStart);
+  window.addEventListener('mousemove', e => { if (current) onMove(e); });
+  window.addEventListener('mouseup', onEnd);
 }
 
 function renderMappaSala() {
   const canvas = document.getElementById('sala-map-canvas');
   if (!canvas) return;
-  const tavoli = S.salaAttivaId ? S.tavoli.filter(t => t.sala_id === S.salaAttivaId) : S.tavoli;
-
-  canvas.innerHTML = tavoli.map(t => {
+  const wrap = document.createElement('div');
+  wrap.innerHTML = S.tavoli.map(t => {
     const size = TAVOLO_BASE_SIZE + Math.max(0, t.posti - 2) * TAVOLO_SIZE_PER_POSTO;
     const w = t.forma === 'rettangolare' ? size * 1.4 : size;
-    return `<div class="tavolo-box ${t.forma} ${t.stato} ${CAN_GESTIRE_SALA ? '' : 'no-drag'}"
+    const canDrag = CAN_GESTIRE_SALA && S.gestioneSalaTab === 'tavoli';
+    return `<div class="tavolo-box ${t.forma} ${t.stato} ${canDrag ? '' : 'no-drag'}"
                  data-id="${t.id}"
-                 style="left:${t.posizione_x}px;top:${t.posizione_y}px;width:${w}px;height:${size}px">
+                 style="left:${t.posizione_x}px;top:${t.posizione_y}px;width:${w}px;height:${size}px;transform:rotate(${t.rotazione || 0}deg)">
       <span class="tavolo-numero">${esc(t.numero)}</span>
       <span class="tavolo-posti">${t.posti}p</span>
     </div>`;
   }).join('');
+  // Sostituisce solo i .tavolo-box, senza toccare l'svg delle mura già presente nel canvas.
+  canvas.querySelectorAll('.tavolo-box').forEach(el => el.remove());
+  while (wrap.firstChild) canvas.appendChild(wrap.firstChild);
 
   _initTavoloDrag();
 }
@@ -7323,6 +7499,7 @@ function _initTavoloDrag() {
   canvas.dataset.dragInit = '1';
 
   let drag = null;
+  let lastTap = null; // { id, time } — per rilevare il doppio tap (rotazione)
   const getPoint = e => e.touches ? e.touches[0] : e;
 
   const onDown = e => {
@@ -7334,9 +7511,10 @@ function _initTavoloDrag() {
       startClientX: p.clientX, startClientY: p.clientY,
       startLeft: parseFloat(box.style.left) || 0,
       startTop:  parseFloat(box.style.top)  || 0,
+      canDrag: CAN_GESTIRE_SALA && S.gestioneSalaTab === 'tavoli',
       moved: false,
     };
-    if (CAN_GESTIRE_SALA) box.classList.add('dragging');
+    if (drag.canDrag) box.classList.add('dragging');
   };
 
   const onMove = e => {
@@ -7345,7 +7523,7 @@ function _initTavoloDrag() {
     const dx = p.clientX - drag.startClientX;
     const dy = p.clientY - drag.startClientY;
     if (Math.abs(dx) > 4 || Math.abs(dy) > 4) drag.moved = true;
-    if (!CAN_GESTIRE_SALA || !drag.moved) return;
+    if (!drag.canDrag || !drag.moved) return;
     if (e.cancelable) e.preventDefault();
     drag.el.style.left = `${drag.startLeft + dx}px`;
     drag.el.style.top  = `${drag.startTop  + dy}px`;
@@ -7353,14 +7531,25 @@ function _initTavoloDrag() {
 
   const onUp = () => {
     if (!drag) return;
-    const { el, id, moved } = drag;
+    const { el, id, moved, canDrag } = drag;
     el.classList.remove('dragging');
-    if (CAN_GESTIRE_SALA && moved) {
+    if (canDrag && moved) {
       const left = parseFloat(el.style.left) || 0;
       const top  = parseFloat(el.style.top)  || 0;
       api(`/api/tavoli/${id}`, { method: 'PATCH', body: { posizione_x: left, posizione_y: top } });
+      lastTap = null;
     } else {
-      openTavoloSheet(Number(id));
+      // Tap (non un vero drag: o non c'è stato movimento, o il drag non è
+      // permesso — es. tab "Prenotazioni" — e allora un piccolo movimento
+      // accidentale del dito non deve impedire l'apertura dello sheet).
+      const now = Date.now();
+      if (canDrag && lastTap && lastTap.id === id && now - lastTap.time < 350) {
+        ruotaTavolo(Number(id));
+        lastTap = null;
+      } else {
+        lastTap = canDrag ? { id, time: now } : null;
+        openTavoloSheet(Number(id));
+      }
     }
     drag = null;
   };
@@ -7375,6 +7564,16 @@ function _initTavoloDrag() {
   window.addEventListener('mouseup', onUp);
 }
 
+async function ruotaTavolo(id) {
+  const t = S.tavoli.find(x => x.id === id);
+  if (!t) return;
+  const nuovaRot = ((t.rotazione || 0) + 90) % 360;
+  const el = document.querySelector(`.tavolo-box[data-id="${id}"]`);
+  if (el) el.style.transform = `rotate(${nuovaRot}deg)`;   // feedback immediato
+  t.rotazione = nuovaRot;
+  await api(`/api/tavoli/${id}`, { method: 'PATCH', body: { rotazione: nuovaRot } });
+}
+
 function openTavoloSheet(id) {
   const t = S.tavoli.find(x => x.id === id);
   if (!t) return;
@@ -7386,7 +7585,6 @@ function openTavoloSheet(id) {
     : null;
 
   let html = `
-    <div class="lot-detail-row"><span style="font-size:12px;color:var(--muted)">Sala</span><span style="font-weight:600">${esc(t.sala_nome)}</span></div>
     <div class="lot-detail-row"><span style="font-size:12px;color:var(--muted)">Forma</span><span style="font-weight:600">${t.forma === 'rotondo' ? 'Rotondo' : 'Rettangolare'}</span></div>
     <div class="lot-detail-row"><span style="font-size:12px;color:var(--muted)">Posti</span><span style="font-weight:600">${t.posti}</span></div>
     <div class="lot-detail-row"><span style="font-size:12px;color:var(--muted)">Stato</span><span class="temp-badge ${t.stato === 'libero' ? 'ok' : 'danger'}">${statoLbl[t.stato]}</span></div>
@@ -7394,7 +7592,7 @@ function openTavoloSheet(id) {
   if (prenotazioneOggi) {
     html += `<div class="lot-detail-row"><span style="font-size:12px;color:var(--muted)">Prenotazione</span><span style="font-weight:600">${esc(prenotazioneOggi.nome)} · ${esc(prenotazioneOggi.ora)} · ${prenotazioneOggi.persone}p</span></div>`;
   }
-  if (CAN_GESTIRE_SALA) {
+  if (CAN_GESTIRE_SALA && S.gestioneSalaTab === 'tavoli') {
     html += `
       <button type="button" class="btn-svuota" style="width:100%;margin-top:14px" onclick="toggleTavoloOccupato(${t.id})">${t.occupato ? 'Segna come libero' : 'Segna come occupato'}</button>
       <button type="button" class="btn-svuota" style="width:100%;margin-top:8px" onclick="openModificaTavolo(${t.id})">Modifica tavolo</button>
@@ -7431,7 +7629,6 @@ function openNuovoTavolo() {
   document.getElementById('tavolo-numero').value = '';
   document.getElementById('tavolo-forma').value = 'rettangolare';
   document.getElementById('tavolo-posti').value = '2';
-  populateSalaSelect();
   document.getElementById('modal-tavolo').classList.add('open');
 }
 
@@ -7443,16 +7640,8 @@ function openModificaTavolo(id) {
   document.getElementById('tavolo-numero').value = t.numero;
   document.getElementById('tavolo-forma').value = t.forma;
   document.getElementById('tavolo-posti').value = t.posti;
-  populateSalaSelect();
-  document.getElementById('tavolo-sala').value = t.sala_id;
   closeTavoloSheet();
   document.getElementById('modal-tavolo').classList.add('open');
-}
-
-function populateSalaSelect() {
-  const sel = document.getElementById('tavolo-sala');
-  sel.innerHTML = S.sale.map(s => `<option value="${s.id}">${esc(s.nome)}</option>`).join('');
-  if (S.salaAttivaId) sel.value = S.salaAttivaId;
 }
 
 function closeTavoloForm() { document.getElementById('modal-tavolo').classList.remove('open'); }
@@ -7462,40 +7651,18 @@ async function submitTavoloForm() {
   const numero = document.getElementById('tavolo-numero').value.trim();
   const forma  = document.getElementById('tavolo-forma').value;
   const posti  = parseInt(document.getElementById('tavolo-posti').value, 10);
-  const salaId = document.getElementById('tavolo-sala').value;
 
   if (!numero) { toast('Inserisci il numero del tavolo', 'error'); return; }
   if (!posti || posti <= 0) { toast('Inserisci il numero di posti', 'error'); return; }
-  if (!salaId) { toast('Seleziona la sala', 'error'); return; }
 
   const result = S.tavoloEditId
-    ? await api(`/api/tavoli/${S.tavoloEditId}`, { method: 'PATCH', body: { numero, forma, posti, sala_id: Number(salaId) } })
-    : await api('/api/tavoli', { method: 'POST', body: { numero, forma, posti, sala_id: Number(salaId), posizione_x: 40, posizione_y: 40 } });
+    ? await api(`/api/tavoli/${S.tavoloEditId}`, { method: 'PATCH', body: { numero, forma, posti } })
+    : await api('/api/tavoli', { method: 'POST', body: { numero, forma, posti, posizione_x: 40, posizione_y: 40 } });
 
   if (!result.success) { toast(result.error || 'Errore', 'error'); return; }
   closeTavoloForm();
   toast(S.tavoloEditId ? 'Tavolo aggiornato' : 'Tavolo creato', 'success');
   await loadTavoliMappa();
-}
-
-function openNuovaSala() {
-  document.getElementById('sala-nome').value = '';
-  document.getElementById('modal-nuova-sala').classList.add('open');
-}
-function closeNuovaSala() { document.getElementById('modal-nuova-sala').classList.remove('open'); }
-function bgCloseSalaForm(e) { if (e.target === document.getElementById('modal-nuova-sala')) closeNuovaSala(); }
-
-async function submitNuovaSala() {
-  const nome = document.getElementById('sala-nome').value.trim();
-  if (!nome) { toast('Inserisci il nome della sala', 'error'); return; }
-  const result = await api('/api/sale', { method: 'POST', body: { nome } });
-  if (!result.success) { toast(result.error || 'Errore', 'error'); return; }
-  closeNuovaSala();
-  toast('Sala creata', 'success');
-  S.salaAttivaId = result.id;
-  await loadSaleETavoli();
-  renderSalaPills();
-  renderMappaSala();
 }
 
 // ── EXPORT PDF ────────────────────────────────────────────────────────────
@@ -7983,7 +8150,7 @@ function dismissNotifBanner() {
 }
 
 document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') { closeLotDetail(); closeModificaLotto(); closeDrawer(); closeApparecchioModal(); closeRegistraTempModal(); closeNuovaPreparazione(); closePrepEtichetta(); closeScaricoModal(); closeNuovaPrenotazione(); closePrenDetail(); closeNuovaSala(); closeTavoloForm(); closeTavoloSheet(); closeChatAzioni(); closeChatPhotoViewer(); }
+  if (e.key === 'Escape') { closeLotDetail(); closeModificaLotto(); closeDrawer(); closeApparecchioModal(); closeRegistraTempModal(); closeNuovaPreparazione(); closePrepEtichetta(); closeScaricoModal(); closeNuovaPrenotazione(); closePrenDetail(); closeTavoloForm(); closeTavoloSheet(); closeChatAzioni(); closeChatPhotoViewer(); }
 });
 
 // ── VISUAL VIEWPORT (tastiera mobile) ───────────────────────────────────

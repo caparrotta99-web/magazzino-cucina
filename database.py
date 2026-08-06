@@ -389,6 +389,11 @@ def db_init():
                 prenotazione_id INTEGER NOT NULL,
                 tavolo_id       INTEGER NOT NULL
             )""",
+            f"""CREATE TABLE IF NOT EXISTS sala_mura (
+                id           {pk},
+                percorso_svg TEXT NOT NULL DEFAULT '',
+                created_at   TEXT NOT NULL DEFAULT ''
+            )""",
             f"""CREATE TABLE IF NOT EXISTS log_eliminazioni_prenotazioni (
                 id             {pk},
                 nome           TEXT NOT NULL DEFAULT '',
@@ -532,6 +537,7 @@ def db_init():
         ('users', 'rifiuti_lat', "REAL NOT NULL DEFAULT 0"),
         ('users', 'rifiuti_lon', "REAL NOT NULL DEFAULT 0"),
         ('users', 'rifiuti_geo_aggiornato_il', "TEXT NOT NULL DEFAULT ''"),
+        ('tavoli', 'rotazione', "INTEGER NOT NULL DEFAULT 0"),
     ]
     for table, col, defn in migrations:
         if _USE_PG:
@@ -2032,6 +2038,16 @@ def delete_sala(sala_id):
         return True
 
 
+def get_or_create_sala_default():
+    """La UI non fa più scegliere la sala (planimetria unica condivisa): i
+    tavoli vengono comunque assegnati a una 'sale' di default per non
+    toccare lo schema esistente (FK tavoli.sala_id)."""
+    sale = get_sale()
+    if sale:
+        return sale[0]['id']
+    return create_sala('Sala')
+
+
 # ─── TAVOLI ────────────────────────────────────────────────────────────────
 
 def get_tavoli(sala_id=None):
@@ -2040,7 +2056,7 @@ def get_tavoli(sala_id=None):
     prenotazione oggi non cancellata collegata) > 'libero'."""
     with get_conn() as conn:
         sql = ("SELECT t.id, t.numero, t.forma, t.posti, t.sala_id, "
-               "t.posizione_x, t.posizione_y, t.occupato, s.nome AS sala_nome "
+               "t.posizione_x, t.posizione_y, t.rotazione, t.occupato, s.nome AS sala_nome "
                "FROM tavoli t JOIN sale s ON s.id = t.sala_id WHERE t.attivo = 1")
         params = []
         if sala_id:
@@ -2071,7 +2087,7 @@ def get_tavoli(sala_id=None):
 def get_tavolo_by_id(tavolo_id):
     with get_conn() as conn:
         cur = conn.execute(
-            "SELECT id, numero, forma, posti, sala_id, posizione_x, posizione_y, "
+            "SELECT id, numero, forma, posti, sala_id, posizione_x, posizione_y, rotazione, "
             "occupato, attivo FROM tavoli WHERE id = ?",
             (tavolo_id,)
         )
@@ -2087,7 +2103,7 @@ def create_tavolo(numero, forma, posti, sala_id, posizione_x=40, posizione_y=40)
         )
 
 
-_TAVOLO_CAMPI = ('numero', 'forma', 'posti', 'sala_id', 'posizione_x', 'posizione_y', 'occupato')
+_TAVOLO_CAMPI = ('numero', 'forma', 'posti', 'sala_id', 'posizione_x', 'posizione_y', 'occupato', 'rotazione')
 
 
 def update_tavolo(tavolo_id, **campi):
@@ -2234,6 +2250,27 @@ def get_coperti_giorno(data):
     }
 
 
+def get_calendario_prenotazioni(anno, mese):
+    """Giorni del mese in cui pranzo O cena hanno tutti i tavoli attivi
+    prenotati (basta un turno pieno perché il giorno sia 'al completo')."""
+    pattern = f"{anno:04d}-{mese:02d}-%"
+    with get_conn() as conn:
+        tot_tavoli = _row(conn.execute(
+            "SELECT COUNT(*) AS n FROM tavoli WHERE attivo = 1"
+        ))['n']
+        rows = _rows(conn.execute(
+            "SELECT p.data AS giorno, "
+            "COUNT(DISTINCT CASE WHEN p.ora < ? THEN ct.tavolo_id END) AS tavoli_pranzo, "
+            "COUNT(DISTINCT CASE WHEN p.ora >= ? THEN ct.tavolo_id END) AS tavoli_cena "
+            "FROM prenotazioni p JOIN combinazioni_tavoli ct ON ct.prenotazione_id = p.id "
+            "WHERE p.data LIKE ? AND p.stato != 'cancellata' GROUP BY p.data",
+            (PRANZO_CENA_CUTOFF, PRANZO_CENA_CUTOFF, pattern)
+        ))
+    pieni = {r['giorno'] for r in rows
+             if tot_tavoli > 0 and (r['tavoli_pranzo'] >= tot_tavoli or r['tavoli_cena'] >= tot_tavoli)}
+    return {'giorni_pieni': sorted(pieni)}
+
+
 def log_eliminazione_prenotazione(prenotazione, eliminato_da):
     # Timestamp di log in UTC esplicito, vedi nota in log_eliminazione_temperatura.
     with get_conn() as conn:
@@ -2254,6 +2291,26 @@ def get_log_eliminazioni_prenotazioni(limit=200):
             (limit,)
         )
         return _rows(cur)
+
+
+# ─── SALA MURA ───────────────────────────────────────────────────────────────
+# Planimetria (mura disegnate a mano libera) condivisa da tutta la sala. Ogni
+# salvataggio inserisce una nuova riga (storicizzazione, mai update): la UI
+# fa sempre un replace totale del disegno, quindi l'ultima riga rappresenta
+# sempre "la planimetria attuale".
+
+def get_sala_mura():
+    with get_conn() as conn:
+        cur = conn.execute("SELECT percorso_svg FROM sala_mura ORDER BY id DESC LIMIT 1")
+        return _row(cur)
+
+
+def insert_sala_mura(percorso_svg):
+    with get_conn() as conn:
+        return conn.execute_insert(
+            "INSERT INTO sala_mura (percorso_svg, created_at) VALUES (?, ?)",
+            (percorso_svg, datetime.now(timezone.utc).isoformat(timespec='seconds'))
+        )
 
 
 # ─── LOCK MOVIMENTI ─────────────────────────────────────────────────────────

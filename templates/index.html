@@ -2200,17 +2200,14 @@ html.chat-no-scroll { overflow: hidden; }
 
     {% set is_admin = current_user.is_authenticated and current_user.role == 'admin' %}
 
-    {% if is_admin %}
     <div class="home-switcher" id="home-switcher">
       <button type="button" class="home-switcher-btn active" data-idx="0" onclick="_setHomePage(0)">Dashboard</button>
       <button type="button" class="home-switcher-btn" data-idx="1" onclick="_setHomePage(1)">Menu</button>
     </div>
-    {% endif %}
 
     <div class="home-swipe-viewport" id="home-swipe-viewport">
       <div class="home-swipe-track" id="home-swipe-track">
 
-        {% if is_admin %}
         <div class="home-swipe-page">
           <div class="home-dash" id="home-dash">
             <div class="home-dash-greeting">
@@ -2286,7 +2283,6 @@ html.chat-no-scroll { overflow: hidden; }
             <button type="button" class="chat-action-opt" data-zona="citta" onclick="salvaZonaRifiuti('citta')">Città</button>
           </div>
         </div>
-        {% endif %}
 
         <div class="home-swipe-page">
           <div class="home-actions">
@@ -3718,7 +3714,7 @@ const S = {
   giacFilter:   'all',
   giacRepartoFilter:  '',      // '' | 'cucina' | 'sala' | 'pizzeria'
   giacPageIdx:  0,             // 0 = In magazzino, 1 = In uso (swipe pages)
-  homePageIdx:  1,             // 0 = Dashboard (solo admin), 1 = Azioni rapide
+  homePageIdx:  1,             // 0 = Dashboard, 1 = Azioni rapide
   chatCanale:      'generale',
   chatMessaggi:    [],
   listaSpesa:      [],
@@ -3801,7 +3797,7 @@ async function init() {
   animHomeCards();
   _initGiacSwipe();
   _initHomeSwipe();
-  _setHomePage(IS_ADMIN ? 0 : 1, false);
+  _setHomePage(0, false);
   renderNotifBanner();
   initRifiutiGeoWatch();
   await Promise.all([loadCategorie(), loadProdottiCarico(), loadGiacenze(), loadAlerts(), loadListaSpesa(), loadInUso(), loadApparecchi(), loadStoricoTemperature(), loadLocks()]);
@@ -3851,9 +3847,9 @@ function _romeHour() {
 }
 
 function startHomeDashClock() {
-  // Aggiorna sia la Dashboard (Pagina 1, solo admin) sia la topbar
-  // integrata di Azioni rapide (Pagina 2, tutti gli utenti) — ogni
-  // pagina ha i propri id, quindi si aggiorna solo ciò che esiste.
+  // Aggiorna sia la Dashboard (Pagina 1) sia la topbar integrata di
+  // Azioni rapide (Pagina 2) — ogni pagina ha i propri id, quindi si
+  // aggiorna solo ciò che esiste.
   const tick = () => {
     const greetTxt = _romeHour() < 18 ? 'Buongiorno' : 'Buonasera';
     const dateTxt  = new Date().toLocaleDateString('it-IT', { weekday: 'long', day: 'numeric', month: 'long', timeZone: 'Europe/Rome' });
@@ -3877,7 +3873,7 @@ function startHomeDashClock() {
 }
 
 function renderHomeDashboard() {
-  if (!document.getElementById('home-dash-meteo')) return; // utente staff: dashboard non esiste
+  if (!document.getElementById('home-dash-meteo')) return;
 
   const docks = S.listaSpesa.filter(i => i.fornitore === 'DOCKS' && !i.completato);
   document.getElementById('home-dash-docks-num').textContent = docks.length;
@@ -5007,7 +5003,7 @@ function _initHomeSwipe() {
   const track    = document.getElementById('home-swipe-track');
   if (!viewport || !track || viewport.dataset.swipeInit) return;
   viewport.dataset.swipeInit = '1';
-  if (track.querySelectorAll('.home-swipe-page').length < 2) return; // utente staff: nessuna dashboard da swipare
+  if (track.querySelectorAll('.home-swipe-page').length < 2) return;
 
   let startX = 0, startY = 0, startTranslate = 0, dragging = false, horizontal = null;
 

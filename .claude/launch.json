@@ -5,7 +5,7 @@
       "name": "haccp",
       "runtimeExecutable": "python3",
       "runtimeArgs": ["app.py"],
-      "port": 5001
+      "port": 10000
     }
   ]
 }

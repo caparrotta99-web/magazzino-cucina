@@ -51,7 +51,7 @@ from database import (
     get_active_reset_tokens, confirm_reset_token,
     update_user_profile, update_user_reparto, update_user_tema, update_user_home_card, is_username_taken,
     update_user_dash_cards, get_ultimo_carico, update_user_tutorial_visto,
-    CHAT_CANALI, update_user_chat_permesso,
+    CHAT_CANALI,
     get_chat_messaggi, get_chat_preview, get_chat_messaggio_by_id, insert_chat_messaggio,
     update_chat_messaggio, elimina_chat_messaggio,
     set_chat_canale_letto, get_chat_unread_counts,
@@ -125,7 +125,6 @@ class User(UserMixin):
         self.tutorial_visto = bool(data.get('tutorial_visto'))
         self.puo_vedere_controllo = bool(data.get('puo_vedere_controllo'))
         self.puo_eliminare_carichi_raw = bool(data.get('puo_eliminare_carichi'))
-        self.puo_chat_raw = bool(data.get('puo_chat'))
 
     @property
     def puo_gestire_apparecchi(self):
@@ -145,14 +144,12 @@ class User(UserMixin):
 
     @property
     def puo_accedere_chat(self):
-        return self.role == 'admin' or self.puo_chat_raw
+        return True
 
     @property
     def canali_chat(self):
         """Canali chat visibili/accessibili: #generale per tutti, il canale
         del proprio reparto per lo staff, tutti per l'admin."""
-        if not self.puo_accedere_chat:
-            return []
         if self.role == 'admin':
             return list(CHAT_CANALI)
         canali = ['generale']
@@ -667,18 +664,6 @@ def admin_set_eliminazione_carichi_permesso():
     if not user_id:
         abort(400)
     update_user_eliminazione_carichi_permesso(user_id, permesso)
-    return redirect(url_for('admin_page'))
-
-
-@app.route('/admin/chat-permesso', methods=['POST'])
-@login_required
-@admin_required
-def admin_set_chat_permesso():
-    user_id  = request.form.get('user_id', type=int)
-    permesso = request.form.get('permesso') == '1'
-    if not user_id:
-        abort(400)
-    update_user_chat_permesso(user_id, permesso)
     return redirect(url_for('admin_page'))
 
 
@@ -2391,10 +2376,11 @@ def api_chat_invia():
     )
 
     # Notifica solo gli utenti che vedono davvero questo canale (stesso
-    # reparto o admin), non tutti gli abilitati alla chat.
+    # reparto o admin): #generale è visibile a tutti, gli altri canali solo
+    # al reparto corrispondente.
     dest = [u['id'] for u in get_all_users()
             if u['id'] != int(current_user.id) and u['stato'] == 'attivo'
-            and (u['role'] == 'admin' or (u['puo_chat'] and (canale == 'generale' or CHAT_CANALE_REPARTO.get(canale) == u['reparto'])))]
+            and (u['role'] == 'admin' or canale == 'generale' or CHAT_CANALE_REPARTO.get(canale) == u['reparto'])]
     push_to_users(
         dest, f'{current_user.nome} in #{canale}',
         testo if testo else 'Ha inviato una foto',

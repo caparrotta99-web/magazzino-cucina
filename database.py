@@ -1097,7 +1097,7 @@ def get_all_users():
     with get_conn() as conn:
         cur = conn.execute(
             "SELECT id, nome, email, telefono, reparto, role, gestisce_apparecchi, "
-            "stato, puo_vedere_controllo, puo_eliminare_carichi, puo_chat FROM users ORDER BY "
+            "stato, puo_vedere_controllo, puo_eliminare_carichi FROM users ORDER BY "
             "CASE WHEN stato = 'in_attesa' THEN 0 ELSE 1 END, nome"
         )
         return _rows(cur)
@@ -1311,13 +1311,6 @@ def update_user_tutorial_visto(user_id):
 
 # ─── CHAT ──────────────────────────────────────────────────────────────────
 CHAT_CANALI = ('generale', 'cucina', 'sala', 'pizzeria')
-
-
-def update_user_chat_permesso(user_id, permesso):
-    with get_conn() as conn:
-        conn.execute(
-            "UPDATE users SET puo_chat = ? WHERE id = ?", (1 if permesso else 0, user_id)
-        )
 
 
 def get_chat_messaggi(canale, limit=100):

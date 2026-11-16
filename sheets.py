@@ -145,6 +145,13 @@ def _parse_credentials_json(raw: str) -> dict:
 
 
 def _get_client():
+    # Interruttore di sicurezza per le prove in locale: con BRIGADE_SHEETS_OFF=1
+    # ogni accesso a Sheets fallisce subito, come se il foglio fosse
+    # irraggiungibile. Serve a non scrivere mai sul foglio vero del ristorante
+    # mentre si prova l'app sul proprio computer (credentials.json e' nella
+    # cartella, quindi senza questo un avvio in locale scriverebbe sui dati veri).
+    if os.environ.get('BRIGADE_SHEETS_OFF') == '1':
+        raise SheetsUnavailableError('Google Sheets disattivato (BRIGADE_SHEETS_OFF=1)')
     creds_json = os.environ.get('GOOGLE_CREDENTIALS_JSON')
     if creds_json:
         info = _parse_credentials_json(creds_json)

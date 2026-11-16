@@ -35,7 +35,9 @@ if _USE_PG:
           f"dbname={_PG_PARAMS['dbname']} user={_PG_PARAMS['user']}", flush=True)
 
 _data_dir = '/data' if os.path.isdir('/data') else os.path.dirname(__file__)
-DB_PATH = os.path.join(_data_dir, 'haccp.db')
+# BRIGADE_DB_PATH serve per le prove in locale: permette di lavorare su un
+# database usa-e-getta invece che su quello vero.
+DB_PATH = os.environ.get('BRIGADE_DB_PATH') or os.path.join(_data_dir, 'haccp.db')
 
 # Orario di confine tra Pranzo e Cena per raggruppare le prenotazioni e
 # calcolare i coperti (HH:MM, confronto lessicografico su stringa).
@@ -413,6 +415,12 @@ def db_init():
                 eliminato_da   TEXT NOT NULL DEFAULT '',
                 eliminato_il   TEXT NOT NULL DEFAULT ''
             )""",
+            f"""CREATE TABLE IF NOT EXISTS sheets_coda (
+                id        {pk},
+                azione    TEXT NOT NULL,
+                payload   TEXT NOT NULL,
+                creato_il TEXT NOT NULL
+            )""",
             f"""CREATE TABLE IF NOT EXISTS lock_movimenti (
                 id             {pk},
                 tipo           TEXT NOT NULL,
@@ -777,11 +785,65 @@ def get_carico_recente(prodotto, lotto, minuti=120):
         return _row(cur)
 
 
+# ─── CODA GOOGLE SHEETS ──────────────────────────────────────────────────────
+# Le modifiche a righe già esistenti su Sheets (es. IN USO -> SCARICO) non si
+# possono rappresentare col flag 'synced' delle righe nuove: finiscono in
+# questa coda, svuotata in ordine dal worker di sottofondo.
+
+def accoda_sheets(azione, payload):
+    import json as _json
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO sheets_coda (azione, payload, creato_il) VALUES (?, ?, ?)",
+            (azione, _json.dumps(payload), now_it().isoformat())
+        )
+
+
+def get_coda_sheets():
+    import json as _json
+    with get_conn() as conn:
+        rows = _rows(conn.execute("SELECT id, azione, payload FROM sheets_coda ORDER BY id"))
+    for r in rows:
+        r['payload'] = _json.loads(r['payload'])
+    return rows
+
+
+def rimuovi_da_coda_sheets(coda_id):
+    with get_conn() as conn:
+        conn.execute("DELETE FROM sheets_coda WHERE id = ?", (coda_id,))
+
+
+def conta_pendenti_sheets():
+    """Quante modifiche locali aspettano ancora di arrivare su Sheets."""
+    with get_conn() as conn:
+        a = _row(conn.execute("SELECT COUNT(*) AS n FROM registro WHERE synced = 0"))['n']
+        b = _row(conn.execute("SELECT COUNT(*) AS n FROM sheets_coda"))['n']
+        c = _row(conn.execute("SELECT COUNT(*) AS n FROM temperature WHERE synced = 0"))['n']
+    return int(a) + int(b) + int(c)
+
+
+def giacenze_per_lotto():
+    """Giacenza (carico - scarico) per ogni prodotto+lotto, calcolata dal
+    registro locale. Serve al controllo di allineamento con Google Sheets:
+    stessa formula applicata alle righe del foglio, i due risultati devono
+    coincidere."""
+    with get_conn() as conn:
+        rows = _rows(conn.execute(
+            "SELECT prodotto, lotto, "
+            "COALESCE(SUM(carico), 0) AS carico, COALESCE(SUM(scarico), 0) AS scarico "
+            "FROM registro GROUP BY prodotto, lotto"
+        ))
+    return {
+        (r['prodotto'], r['lotto']): round(float(r['carico']) - float(r['scarico']), 4)
+        for r in rows
+    }
+
+
 def get_unsynced_registro():
     """Righe scritte in locale mentre Google Sheets non era raggiungibile,
     ancora da inviare a Sheets."""
     with get_conn() as conn:
-        cur = conn.execute("SELECT * FROM registro WHERE synced = 0")
+        cur = conn.execute("SELECT * FROM registro WHERE synced = 0 ORDER BY id")
         return _rows(cur)
 
 
@@ -838,6 +900,7 @@ def finalizza_in_uso(row_id, data_scarico, qty=None, nuovo_movimento_id=None, ti
             'unita': original['unita'], 'etichetta': '', 'movimento_id': nuovo_movimento_id or '',
             'rimanenza': original['rimanenza'], 'operatore': original['operatore'],
             'reparto': original['reparto'], 'tipo': 'IN_USO', 'data_scarico': '',
+            'synced': False,
         })
         riga_residua = get_movimento_by_id(nuovo_id)
 

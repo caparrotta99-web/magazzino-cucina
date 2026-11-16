@@ -94,6 +94,8 @@ from database import (
     get_unsynced_temperature, mark_temperatura_synced,
     get_carico_recente,
     acquire_lock, release_lock, get_locks_attivi,
+    accoda_sheets, get_coda_sheets, rimuovi_da_coda_sheets, conta_pendenti_sheets,
+    giacenze_per_lotto,
 )
 from sheets import (
     load_listino, load_registro, append_registro, append_listino, aggiorna_tipo_movimento,
@@ -422,57 +424,229 @@ def push_to_all(title, body, url='/', tag=''):
     return _invia_push(subs, title, body, url, tag)
 
 
-def _push_pending_to_sheets():
-    """Invia a Google Sheets i movimenti/prodotti/temperature salvati solo in
-    locale perché Sheets non era raggiungibile al momento della scrittura
-    originale (vedi fallback nelle route /api/carico, /api/in-uso,
-    /api/temperature, /api/prodotti, /api/preparazioni/<id>/completa).
+# ─── INVIO A GOOGLE SHEETS IN SOTTOFONDO ─────────────────────────────────────
+# L'app non fa più aspettare chi la usa: ogni movimento viene salvato subito nel
+# database locale con synced=0 e la risposta parte immediatamente. A portare
+# tutto su Google Sheets ci pensa un thread in sottofondo, che si sveglia a ogni
+# movimento e comunque ogni due minuti per riprovare.
+#
+# Un solo lock per tutte le scritture verso Sheets: il foglio va riempito in
+# ordine e due thread che scrivono insieme produrrebbero righe mescolate.
+_SHEETS_LOCK    = threading.Lock()
+_SHEETS_SVEGLIA = threading.Event()
+_SHEETS_PAUSA   = 120  # secondi tra un tentativo e l'altro quando non succede nulla
 
-    Va chiamata SEMPRE prima di un refresh da Sheets (manuale o
-    automatico): quel refresh sovrascrive il DB locale con quello che trova
-    su Sheets, quindi qualunque riga non ancora inviata andrebbe persa se
-    non la spingessimo prima."""
+
+def _sveglia_worker_sheets():
+    """Da chiamare dopo ogni movimento salvato: il worker riparte subito
+    invece di aspettare il prossimo giro."""
+    _SHEETS_SVEGLIA.set()
+
+
+def _esegui_azione_coda(azione, payload):
+    """Applica a Sheets una modifica a una riga già esistente, presa dalla coda."""
+    if azione == 'aggiorna_tipo':
+        aggiorna_tipo_movimento(
+            payload['movimento_id'], payload['nuovo_tipo'],
+            nuovo_scarico=payload.get('nuovo_scarico')
+        )
+    else:
+        raise ValueError(f"azione di coda sconosciuta: {azione}")
+
+
+def _push_pending_to_sheets():
+    """Invia a Google Sheets quello che finora è stato salvato solo in locale:
+    prima le righe nuove (registro, listino, temperature), poi la coda delle
+    modifiche a righe già esistenti, in ordine di inserimento.
+
+    Si ferma al PRIMO errore di ogni gruppo: le scritture sul registro devono
+    restare nell'ordine in cui sono state fatte, e una modifica in coda può
+    riguardare una riga che la coda stessa non ha ancora creato. Quello che
+    resta indietro viene ritentato al giro successivo.
+
+    Va chiamata SEMPRE prima di un refresh da Sheets (manuale o automatico):
+    quel refresh sovrascrive il DB locale con quello che trova su Sheets,
+    quindi qualunque riga non ancora inviata andrebbe persa."""
     inviati = 0
+
     for row in get_unsynced_registro():
         try:
             append_registro(row)
             mark_registro_synced(row['id'])
             inviati += 1
-        except Exception:
-            pass  # resta 'da sincronizzare', ci riproverà il prossimo sync
+        except Exception as e:
+            print(f"[SHEETS] invio registro fermo: {e}", flush=True)
+            return inviati  # l'ordine del registro va rispettato
+
     for row in get_unsynced_listino():
         try:
             append_listino(row)
             mark_listino_synced(row['prodotto'], row['fornitore'])
             inviati += 1
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[SHEETS] invio listino fermo: {e}", flush=True)
+            break  # il listino non dipende dal registro: la coda può proseguire
+
     for row in get_unsynced_temperature():
         try:
             append_temperatura(row)
             mark_temperatura_synced(row['id'])
             inviati += 1
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[SHEETS] invio temperature fermo: {e}", flush=True)
+            break
+
+    for voce in get_coda_sheets():
+        try:
+            _esegui_azione_coda(voce['azione'], voce['payload'])
+            rimuovi_da_coda_sheets(voce['id'])
+            inviati += 1
+        except ValueError as e:
+            # Dato sbagliato (riga inesistente, azione sconosciuta): ritentare
+            # all'infinito bloccherebbe per sempre tutta la coda dietro.
+            print(f"[SHEETS] voce di coda scartata ({voce['azione']}): {e}", flush=True)
+            rimuovi_da_coda_sheets(voce['id'])
+        except Exception as e:
+            print(f"[SHEETS] coda ferma: {e}", flush=True)
+            return inviati
+
     return inviati
 
 
-def _sync_sheets_background():
+# Esito dell'ultimo controllo di allineamento con i fogli, mostrato nel
+# pannello Admin senza dover rileggere il foglio a ogni richiesta.
+_STATO_SHEETS = {
+    'ultimo_controllo': None,   # quando e' stato fatto l'ultimo confronto
+    'differenze': [],           # elenco leggibile delle differenze trovate
+    'errore': None,             # se il foglio non era leggibile
+}
+
+
+def _giacenze_da_righe(righe):
+    """Stessa formula di database.giacenze_per_lotto(), applicata alle righe
+    lette dal foglio REGISTRO."""
+    tot = {}
+    for r in righe:
+        chiave = (r.get('prodotto', ''), r.get('lotto', ''))
+        carico  = float(r.get('carico') or 0)
+        scarico = float(r.get('scarico') or 0)
+        prec = tot.get(chiave, 0.0)
+        tot[chiave] = prec + carico - scarico
+    return {k: round(v, 4) for k, v in tot.items()}
+
+
+def _controlla_allineamento(righe_foglio=None):
+    """Confronta prodotto per prodotto e lotto per lotto la giacenza calcolata
+    dal database con quella che risulta dal foglio REGISTRO, e scrive nei log
+    ogni differenza. Non corregge niente da solo: serve ad accorgersi subito
+    se i due archivi hanno smesso di raccontare la stessa storia."""
     try:
-        inviati = _push_pending_to_sheets()
-        listino  = load_listino()
+        if righe_foglio is None:
+            righe_foglio = load_registro()
+    except Exception as e:
+        _STATO_SHEETS['errore'] = str(e)
+        print(f"[ALLINEAMENTO] foglio non leggibile: {e}", flush=True)
+        return []
+
+    locali  = giacenze_per_lotto()
+    foglio  = _giacenze_da_righe(righe_foglio)
+    chiavi  = set(locali) | set(foglio)
+
+    differenze = []
+    for prodotto, lotto in sorted(chiavi):
+        qui = locali.get((prodotto, lotto), 0.0)
+        la  = foglio.get((prodotto, lotto), 0.0)
+        if abs(qui - la) > 1e-6:
+            differenze.append({
+                'prodotto': prodotto, 'lotto': lotto,
+                'database': qui, 'foglio': la,
+                'testo': f"{prodotto} lotto {lotto or '(senza lotto)'}: "
+                         f"database {qui}, foglio {la}",
+            })
+
+    _STATO_SHEETS['ultimo_controllo'] = now_it().isoformat()
+    _STATO_SHEETS['differenze'] = differenze
+    _STATO_SHEETS['errore'] = None
+
+    if differenze:
+        print(f"[ALLINEAMENTO] {len(differenze)} differenze tra database e foglio REGISTRO:", flush=True)
+        for d in differenze:
+            print(f"[ALLINEAMENTO]   {d['testo']}", flush=True)
+    else:
+        print("[ALLINEAMENTO] database e foglio REGISTRO coincidono", flush=True)
+    return differenze
+
+
+def _invia_pendenti():
+    """_push_pending_to_sheets() protetta dal lock condiviso."""
+    with _SHEETS_LOCK:
+        return _push_pending_to_sheets()
+
+
+def _worker_sheets():
+    """Thread che porta su Sheets tutto quello che aspetta in locale."""
+    while True:
+        _SHEETS_SVEGLIA.wait(timeout=_SHEETS_PAUSA)
+        _SHEETS_SVEGLIA.clear()
+        try:
+            inviati = _invia_pendenti()
+            if inviati:
+                print(f"[SHEETS] {inviati} movimenti inviati", flush=True)
+                # Controllo di allineamento solo quando non e' rimasto niente
+                # indietro: a meta' invio le differenze sarebbero normali.
+                if conta_pendenti_sheets() == 0:
+                    _controlla_allineamento()
+        except Exception as e:
+            print(f"[SHEETS] worker: {e}", flush=True)
+
+
+def _ricarica_da_sheets():
+    """Riscarica listino, registro e temperature da Sheets sovrascrivendo il DB.
+
+    ATTENZIONE: replace_registro() svuota la tabella locale. Si ricarica solo
+    dopo aver svuotato tutto quello che era in attesa; se qualcosa resta
+    indietro NON si ricarica, altrimenti i movimenti non ancora arrivati su
+    Sheets sparirebbero per sempre."""
+    with _SHEETS_LOCK:
+        inviati  = _push_pending_to_sheets()
+        pendenti = conta_pendenti_sheets()
+        if pendenti:
+            print(f"[SYNC] ricaricamento rimandato: {pendenti} movimenti non ancora "
+                  f"su Sheets andrebbero persi. Riprovo al prossimo giro.", flush=True)
+            return {'ricaricato': False, 'inviati': inviati, 'pendenti': pendenti}
+
+        listino = load_listino()
         replace_listino(listino)
         registro = load_registro()
         replace_registro(registro)
         temperature = load_temperatura()
         replace_temperatura(temperature)
-        extra = f" | {inviati} in sospeso sincronizzati" if inviati else ""
-        print(f"[SYNC] Listino: {len(listino)} prodotti | Registro: {len(registro)} movimenti | "
-              f"Temperature: {len(temperature)} rilevazioni{extra}")
+        # Appena ricaricato i due archivi devono coincidere: se non coincidono
+        # c'e' qualcosa da guardare subito.
+        _controlla_allineamento(registro)
+        return {
+            'ricaricato': True, 'inviati': inviati, 'pendenti': 0,
+            'listino': len(listino), 'registro': len(registro),
+            'temperature': len(temperature),
+        }
+
+
+def _sync_sheets_background():
+    try:
+        esito = _ricarica_da_sheets()
+        if not esito['ricaricato']:
+            return
+        extra = f" | {esito['inviati']} in sospeso sincronizzati" if esito['inviati'] else ""
+        print(f"[SYNC] Listino: {esito['listino']} prodotti | Registro: {esito['registro']} movimenti | "
+              f"Temperature: {esito['temperature']} rilevazioni{extra}")
     except Exception as e:
         print(f"[SYNC] Sheets non raggiungibile: {e}")
 
-threading.Thread(target=_sync_sheets_background, daemon=True).start()
+
+# Nei test niente thread: devono restare prevedibili e non parlare con Sheets.
+if os.environ.get('BRIGADE_NO_SCHEDULER') != '1':
+    threading.Thread(target=_sync_sheets_background, daemon=True).start()
+    threading.Thread(target=_worker_sheets, daemon=True).start()
 
 
 # ─── AUTH ─────────────────────────────────────────────────────────────────────
@@ -1121,18 +1295,12 @@ def api_aggiungi_prodotto():
     if scorta_min < 0:
         return jsonify({'success': False, 'error': 'Scorta minima non valida'}), 400
 
-    warning = None
-    try:
-        append_listino({'prodotto': prodotto, 'fornitore': fornitore, 'unita': unita,
-                        'scorta_min': scorta_min, 'categoria': categoria, 'reparto': reparto})
-    except SheetsUnavailableError:
-        warning = 'Salvato localmente — Google Sheets non raggiungibile. Verrà sincronizzato automaticamente.'
-
     insert_listino_row(prodotto, fornitore, unita, scorta_min, categoria, reparto,
-                        synced=(warning is None))
+                        synced=False)
+    _sveglia_worker_sheets()
     return jsonify({'success': True, 'prodotto': prodotto, 'fornitore': fornitore,
                     'unita': unita, 'scorta_min': float(scorta_min or 0),
-                    'categoria': categoria, 'reparto': reparto, 'warning': warning})
+                    'categoria': categoria, 'reparto': reparto})
 
 
 # ─── API REGISTRO ─────────────────────────────────────────────────────────────
@@ -1273,14 +1441,11 @@ def api_carico():
         'reparto':      get_reparto_prodotto(prodotto, fornitore),
     }
 
-    warning = None
-    try:
-        append_registro(row)
-    except SheetsUnavailableError:
-        row['synced'] = False
-        warning = 'Salvato localmente — Google Sheets non raggiungibile. Verrà sincronizzato automaticamente.'
-
+    # Salvataggio immediato: la riga parte come "da inviare" e la risposta
+    # torna subito, senza aspettare Google Sheets.
+    row['synced'] = False
     insert_movimento(row)
+    _sveglia_worker_sheets()
 
     return jsonify({
         'success':      True,
@@ -1293,7 +1458,6 @@ def api_carico():
         'scadenza':     scadenza,
         'qty':          qty,
         'unita':        unita,
-        'warning':      warning,
     })
 
 
@@ -1349,14 +1513,9 @@ def api_in_uso_crea():
         'tipo':         'IN_USO',
     }
 
-    warning = None
-    try:
-        append_registro(row)
-    except SheetsUnavailableError:
-        row['synced'] = False
-        warning = 'Salvato localmente — Google Sheets non raggiungibile. Verrà sincronizzato automaticamente.'
-
+    row['synced'] = False
     row_id = insert_movimento(row)
+    _sveglia_worker_sheets()
 
     return jsonify({
         'success':      True,
@@ -1367,7 +1526,6 @@ def api_in_uso_crea():
         'lotto':        lotto,
         'qty':          qty,
         'unita':        row['unita'],
-        'warning':      warning,
     })
 
 
@@ -1404,24 +1562,23 @@ def api_scarico():
     residuo   = round(row['scarico'] - qty, 4)
     nuovo_mov_id = _gen_id() if residuo > 0 else None
 
-    try:
-        aggiorna_tipo_movimento(row['movimento_id'], 'SCARICO', nuovo_scarico=qty)
-        if residuo > 0:
-            append_registro({
-                'data': row['data'], 'fornitore': row['fornitore'], 'prodotto': row['prodotto'],
-                'lotto': row['lotto'], 'scadenza': row['scadenza'], 'carico': 0, 'scarico': residuo,
-                'unita': row['unita'], 'etichetta': '', 'movimento_id': nuovo_mov_id,
-                'rimanenza': row['rimanenza'], 'operatore': row['operatore'], 'reparto': row['reparto'],
-                'tipo': 'IN_USO',
-            })
-    except Exception as e:
-        return jsonify({'success': False, 'error': f'Errore Google Sheets: {e}'}), 500
+    # La riga IN USO esiste già su Sheets: trasformarla in SCARICO è una
+    # modifica, non un'aggiunta, quindi passa dalla coda. L'eventuale riga di
+    # residuo viene creata da finalizza_in_uso() con synced=0 e la invia il
+    # worker. Lo scarico non deve più fallire se Sheets non risponde.
+    accoda_sheets('aggiorna_tipo', {
+        'movimento_id': row['movimento_id'],
+        'nuovo_tipo': 'SCARICO',
+        'nuovo_scarico': qty,
+    })
 
     oggi = now_it().strftime('%Y-%m-%d')
     finalized, residua = finalizza_in_uso(row_id, oggi, qty, nuovo_mov_id)
 
     if not finalized:
         return jsonify({'success': False, 'error': 'Elemento non trovato o già scaricato'}), 400
+
+    _sveglia_worker_sheets()
 
     return jsonify({
         'success':      True,
@@ -1630,17 +1787,12 @@ def api_temperature_registra():
         'operatore':   current_user.nome,
     }
 
-    warning = None
-    try:
-        append_temperatura(row)
-    except SheetsUnavailableError:
-        row['synced'] = False
-        warning = 'Salvato localmente — Google Sheets non raggiungibile. Verrà sincronizzato automaticamente.'
-
+    row['synced'] = False
     insert_temperatura(row)
     registra_controllo_apparecchio(apparecchio_id)
+    _sveglia_worker_sheets()
 
-    return jsonify({'success': True, 'esito': esito, 'warning': warning})
+    return jsonify({'success': True, 'esito': esito})
 
 
 @app.route('/api/temperature/<int:temperatura_id>', methods=['DELETE'])
@@ -1693,23 +1845,68 @@ def api_controllo_log_eliminazioni_registro():
     return jsonify({'success': True, 'log': get_log_eliminazioni_registro()})
 
 
+@app.route('/api/stato-sheets', methods=['GET'])
+@login_required
+@controllo_required
+def api_stato_sheets():
+    """Indicatore per il pannello Admin: i fogli Google sono allineati, o c'e'
+    qualcosa che aspetta di essere inviato, o sono state trovate differenze."""
+    pendenti   = conta_pendenti_sheets()
+    differenze = _STATO_SHEETS['differenze']
+    errore     = _STATO_SHEETS['errore']
+
+    if pendenti:
+        stato = 'in_attesa'
+        testo = (f"{pendenti} movimenti in attesa di invio" if pendenti > 1
+                 else "1 movimento in attesa di invio")
+    elif errore:
+        stato = 'sconosciuto'
+        testo = f"Fogli Google non raggiungibili: {errore}"
+    elif differenze:
+        stato = 'differenze'
+        elenco = '; '.join(d['testo'] for d in differenze[:5])
+        if len(differenze) > 5:
+            elenco += f"; e altre {len(differenze) - 5}"
+        testo = f"Differenze trovate: {elenco}"
+    elif _STATO_SHEETS['ultimo_controllo'] is None:
+        stato = 'sconosciuto'
+        testo = "Allineamento non ancora verificato"
+    else:
+        stato = 'allineato'
+        testo = "Fogli Google allineati"
+
+    return jsonify({
+        'success': True,
+        'stato': stato,
+        'testo': testo,
+        'pendenti': pendenti,
+        'differenze': differenze,
+        'ultimo_controllo': _STATO_SHEETS['ultimo_controllo'],
+    })
+
+
 @app.route('/api/sync', methods=['POST'])
 @login_required
 def api_sync():
     try:
-        inviati = _push_pending_to_sheets()
-        listino  = load_listino()
-        replace_listino(listino)
-        registro = load_registro()
-        replace_registro(registro)
-        temperature = load_temperatura()
-        replace_temperatura(temperature)
+        esito = _ricarica_da_sheets()
+        if not esito['ricaricato']:
+            return jsonify({
+                'success': True,
+                'ricaricato': False,
+                'inviati': esito['inviati'],
+                'pendenti': esito['pendenti'],
+                'messaggio': f"Inviati {esito['inviati']} movimenti. Ne restano "
+                             f"{esito['pendenti']} da inviare: il ricaricamento da "
+                             f"Google Sheets e' stato rimandato per non perderli.",
+            })
         return jsonify({
             'success':     True,
-            'listino':     len(listino),
-            'registro':    len(registro),
-            'temperature': len(temperature),
-            'inviati':     inviati,
+            'ricaricato':  True,
+            'listino':     esito['listino'],
+            'registro':    esito['registro'],
+            'temperature': esito['temperature'],
+            'inviati':     esito['inviati'],
         })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
@@ -1873,26 +2070,21 @@ def api_preparazione_crea():
         nuovo_mov_id = _gen_id() if residuo > 0 else None
         in_uso_da_finalizzare.append((original, tot_qty, residuo, nuovo_mov_id))
 
-    try:
-        for row in righe_registro:
-            append_registro(row)
-        for original, tot_qty, residuo, nuovo_mov_id in in_uso_da_finalizzare:
-            aggiorna_tipo_movimento(original['movimento_id'], 'PREPARAZIONE', nuovo_scarico=tot_qty)
-            if residuo > 0:
-                append_registro({
-                    'data': original['data'], 'fornitore': original['fornitore'], 'prodotto': original['prodotto'],
-                    'lotto': original['lotto'], 'scadenza': original['scadenza'], 'carico': 0, 'scarico': residuo,
-                    'unita': original['unita'], 'etichetta': '', 'movimento_id': nuovo_mov_id,
-                    'rimanenza': original['rimanenza'], 'operatore': original['operatore'],
-                    'reparto': original['reparto'], 'tipo': 'IN_USO',
-                })
-    except Exception as e:
-        return jsonify({'success': False, 'error': f'Errore Google Sheets: {e}'}), 500
-
+    # Niente attesa di Google Sheets: le righe nuove nascono "da inviare" e le
+    # modifiche alle righe IN USO già esistenti vanno in coda. Al resto pensa
+    # il worker di sottofondo.
     for row in righe_registro:
+        row['synced'] = False
         insert_movimento(row)
     for original, tot_qty, residuo, nuovo_mov_id in in_uso_da_finalizzare:
+        accoda_sheets('aggiorna_tipo', {
+            'movimento_id': original['movimento_id'],
+            'nuovo_tipo': 'PREPARAZIONE',
+            'nuovo_scarico': tot_qty,
+        })
         finalizza_in_uso(original['id'], oggi, tot_qty, nuovo_mov_id, tipo_finale='PREPARAZIONE')
+
+    _sveglia_worker_sheets()
 
     prep_id = insert_preparazione(nome, reparto, data_prep, scadenza, quantita, unita,
                                    int(current_user.id), note)
@@ -1948,17 +2140,12 @@ def api_preparazione_completa(prep_id):
         'tipo':         'SCARICO_PREPARAZIONE',
     }
 
-    warning = None
-    try:
-        append_registro(row)
-    except SheetsUnavailableError:
-        row['synced'] = False
-        warning = 'Salvato localmente — Google Sheets non raggiungibile. Verrà sincronizzato automaticamente.'
-
+    row['synced'] = False
     insert_movimento(row)
     completa_preparazione(prep_id)
+    _sveglia_worker_sheets()
 
-    return jsonify({'success': True, 'warning': warning})
+    return jsonify({'success': True})
 
 
 # ─── SALE ──────────────────────────────────────────────────────────────────

@@ -23,6 +23,13 @@
   color: var(--muted); margin: 26px 0 12px;
 }
 .section-label:first-child { margin-top: 0; }
+.stato-sheets {
+  border: 1px solid var(--border); border-radius: 12px;
+  padding: 12px 14px; font-size: 14px; line-height: 1.45;
+}
+.stato-sheets-ok      { border-color: rgba(16,185,129,.45); }
+.stato-sheets-attesa  { border-color: rgba(180,83,9,.45); }
+.stato-sheets-errore  { border-color: rgba(220,38,38,.5); }
 
 .user-list { display: flex; flex-direction: column; gap: 12px; }
 .user-card {
@@ -146,6 +153,9 @@
       <button type="submit" class="btn-secondary" style="width:100%">🛠 Debug notifiche</button>
     </form>
   </div>
+
+  <div class="section-label">Fogli Google</div>
+  <div id="stato-sheets" class="stato-sheets stato-sheets-attesa">Controllo in corso...</div>
 
   <div class="section-label">Sala</div>
   <a href="/?goto=setup-sala" class="btn-secondary" style="display:block;text-align:center;text-decoration:none">Configura sala (mura e tavoli)</a>
@@ -415,6 +425,29 @@ function toggleSettings(id) {
   const panel = document.getElementById('settings-' + id);
   if (panel) panel.classList.toggle('open');
 }
+
+// Indicatore allineamento con i fogli Google: si aggiorna da solo ogni mezzo
+// minuto, cosi' si vede subito se qualcosa e' rimasto indietro.
+function aggiornaStatoSheets() {
+  const box = document.getElementById('stato-sheets');
+  if (!box) return;
+  fetch('/api/stato-sheets')
+    .then(r => r.json())
+    .then(d => {
+      if (!d.success) throw new Error('errore');
+      box.textContent = d.testo;
+      box.className = 'stato-sheets ' + (
+        d.stato === 'allineato' ? 'stato-sheets-ok' :
+        d.stato === 'differenze' ? 'stato-sheets-errore' : 'stato-sheets-attesa'
+      );
+    })
+    .catch(() => {
+      box.textContent = 'Stato dei fogli non disponibile';
+      box.className = 'stato-sheets stato-sheets-attesa';
+    });
+}
+aggiornaStatoSheets();
+setInterval(aggiornaStatoSheets, 30000);
 </script>
 
 </body>

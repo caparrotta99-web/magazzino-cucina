@@ -34,6 +34,9 @@ const S = {
   // Nome letto sull'etichetta che aspetta di essere abbinato a un prodotto
   // del listino: quando l'utente sceglie, l'abbinamento viene salvato.
   caricoScanTesto: '',
+  caricoScanNota: '',
+  // Fornitore dell'ultimo carico: i suoi prodotti vengono proposti per primi.
+  ultimoFornitore: '',
   inUsoReparto:    '', inUsoCategoria:    '',
   prepIngReparto:  '',
   apparecchi:            [],
@@ -654,12 +657,12 @@ function resetCaricoWizard() {
   document.getElementById('carico-search-dropdown')?.classList.remove('open');
   document.getElementById('carico-step-1').style.display = '';
   document.getElementById('carico-step-2').style.display = 'none';
-  document.getElementById('carico-step-3').style.display = 'none';
   document.getElementById('carico-success').classList.remove('show');
 }
 
 function closeCaricoWizard() {
   resetCaricoWizard();
+  S.ultimoFornitore = '';   // la consegna in corso finisce qui
   navTo('home');
 }
 
@@ -671,11 +674,32 @@ function releaseCaricoLock() {
 function onCaricoSearchInput() {
   const q  = document.getElementById('carico-search-input').value.trim().toLowerCase();
   const dd = document.getElementById('carico-search-dropdown');
-  if (!q) { dd.classList.remove('open'); dd.innerHTML = ''; return; }
+  const forn = S.ultimoFornitore || '';
+
+  // A campo vuoto, subito dopo un carico, si propongono gli altri prodotti
+  // dello stesso fornitore: e' il caso di una consegna da registrare tutta.
+  if (!q) {
+    if (!forn) { dd.classList.remove('open'); dd.innerHTML = ''; return; }
+    const stesso = S.prodotti.filter(p => (p.fornitore || '') === forn).slice(0, 30);
+    if (!stesso.length) { dd.classList.remove('open'); dd.innerHTML = ''; return; }
+    dd.innerHTML = `<div class="spesa-search-empty">Altri prodotti di ${esc(forn)}</div>` +
+      stesso.map(p => `
+      <div class="spesa-search-item" onclick="pickCaricoSearchResult(${esc(JSON.stringify(p))})">
+        <span class="spesa-search-item-nome">${esc(p.prodotto)}</span>
+        <span class="spesa-search-item-forn">${esc(p.fornitore || '—')}${p.reparto ? ' · ' + esc(p.reparto) : ''}</span>
+      </div>`).join('');
+    dd.classList.add('open');
+    return;
+  }
 
   const matches = S.prodotti.filter(p =>
     p.prodotto.toLowerCase().includes(q) || (p.fornitore || '').toLowerCase().includes(q)
-  ).slice(0, 30);
+  ).sort((a, b) => {
+    // stesso fornitore dell'ultimo carico in cima, poi ordine alfabetico
+    const sa = (a.fornitore || '') === forn ? 0 : 1;
+    const sb = (b.fornitore || '') === forn ? 0 : 1;
+    return sa - sb || a.prodotto.localeCompare(b.prodotto);
+  }).slice(0, 30);
 
   dd.innerHTML = matches.length
     ? matches.map(p => `
@@ -730,8 +754,18 @@ async function goToCaricoStep2() {
 
   document.getElementById('c2-prodotto').textContent  = S.caricoData.prodotto;
   document.getElementById('c2-fornitore').textContent = S.caricoData.fornitore || '—';
-  document.getElementById('c2-unita').textContent     = S.caricoData.unita || '—';
   document.getElementById('c2-reparto').textContent   = S.caricoData.reparto || '—';
+  document.getElementById('c2-qty-unita').textContent = S.caricoData.unita || '';
+
+  const nota = document.getElementById('c2-qty-nota');
+  if (S.caricoScanNota) {
+    nota.textContent = S.caricoScanNota;
+    nota.classList.add('show');
+    S.caricoScanNota = '';
+  } else {
+    nota.textContent = '';
+    nota.classList.remove('show');
+  }
 
   const lottoEl = document.getElementById('c2-lotto');
   const scadEl  = document.getElementById('c2-scadenza');
@@ -747,7 +781,6 @@ async function goToCaricoStep2() {
 
   document.getElementById('carico-step-1').style.display = 'none';
   document.getElementById('carico-step-2').style.display = '';
-  document.getElementById('carico-step-3').style.display = 'none';
 }
 
 function adjustCaricoQty(delta) {
@@ -759,43 +792,28 @@ function adjustCaricoQty(delta) {
   el.value = val;
 }
 
-function goToCaricoStep3() {
+async function confermaCarico() {
+  // Una schermata sola: i campi si leggono e si controllano qui, senza il
+  // passaggio di riepilogo che prima stava in mezzo.
   const lotto    = document.getElementById('c2-lotto').value.trim();
   const scadenza = document.getElementById('c2-scadenza').value;
   const qty      = parseFloat(document.getElementById('c2-qty').value);
 
-  if (!lotto)           { toast('Inserisci il numero di lotto', 'error'); return; }
-  if (!qty || qty <= 0) { toast('Inserisci una quantità valida', 'error'); return; }
+  if (!qty || qty <= 0) {
+    toast('Inserisci il peso o la quantità', 'error');
+    document.getElementById('c2-qty').focus();
+    return;
+  }
+  if (!lotto) {
+    toast('Inserisci il numero di lotto', 'error');
+    document.getElementById('c2-lotto').focus();
+    return;
+  }
 
   S.caricoData.lotto    = lotto;
   S.caricoData.scadenza = scadenza;
   S.caricoData.qty      = qty;
 
-  _renderCaricoRiepilogo();
-
-  document.getElementById('carico-step-2').style.display = 'none';
-  document.getElementById('carico-step-3').style.display = '';
-}
-
-function backToCaricoStep2() {
-  document.getElementById('carico-step-3').style.display = 'none';
-  document.getElementById('carico-step-2').style.display = '';
-}
-
-function _renderCaricoRiepilogo() {
-  const d = S.caricoData;
-  document.getElementById('carico-riepilogo').innerHTML = `
-    <div class="eti-hdr-lbl">HACCP — Magazzino Cucina</div>
-    <div class="eti-row"><span>Prodotto</span><strong>${esc(d.prodotto)}</strong></div>
-    <div class="eti-row"><span>Fornitore</span><strong>${esc(d.fornitore||'—')}</strong></div>
-    <div class="eti-row"><span>Lotto</span><strong>${esc(d.lotto)}</strong></div>
-    <div class="eti-row"><span>Scadenza</span><strong>${d.scadenza?fmtDate(d.scadenza):'—'}</strong></div>
-    <div class="eti-row"><span>Quantità</span><strong>${d.qty}&nbsp;${esc(d.unita||'')}</strong></div>
-    <div class="eti-row"><span>Reparto</span><strong>${esc(d.reparto||'—')}</strong></div>
-  `;
-}
-
-async function confermaCarico() {
   const btn = document.getElementById('btn-carico-confirm');
   btn.classList.add('loading'); btn.disabled = true;
 
@@ -827,12 +845,20 @@ async function confermaCarico() {
 }
 
 function showCaricoSuccess() {
-  document.getElementById('carico-step-3').style.display = 'none';
+  document.getElementById('carico-step-2').style.display = 'none';
+  // Si scarica quasi sempre una consegna intera: il fornitore appena usato
+  // resta in memoria e i suoi prodotti vengono proposti per primi.
+  S.ultimoFornitore = S.caricoData.fornitore || '';
   const el = document.getElementById('carico-success');
   el.classList.add('show');
   setTimeout(() => {
     el.classList.remove('show');
     resetCaricoWizard();
+    const searchEl = document.getElementById('carico-search-input');
+    if (searchEl) {
+      onCaricoSearchInput();   // mostra subito i prodotti dello stesso fornitore
+      searchEl.focus();
+    }
   }, 1300);
 }
 
@@ -936,6 +962,9 @@ async function onCameraCapture(input) {
       // Prodotto riconosciuto: si va dritti alla schermata del carico, gia'
       // compilata con lotto, scadenza e peso letti dall'etichetta.
       S.caricoScanTesto = '';
+      S.caricoScanNota = data.convertita
+        ? `In etichetta ${data.quantita_letta} ${data.unita_letta}, convertito in ${data.quantita} ${data.unita}. Puoi correggerlo.`
+        : '';
       S.caricoData.prodotto  = data.prodotto;
       S.caricoData.fornitore = data.fornitore || '';
       S.caricoData.unita     = data.unita || '';

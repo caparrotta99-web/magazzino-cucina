@@ -796,14 +796,21 @@
           <label class="flabel">Fornitore</label>
           <div class="freadonly has-val" id="c2-fornitore"></div>
         </div>
-        <div class="fgroup">
-          <label class="flabel">Unità di misura</label>
-          <div class="freadonly has-val" id="c2-unita"></div>
-        </div>
         <div class="fgroup" style="margin-bottom:0">
           <label class="flabel">Reparto</label>
           <div class="freadonly has-val" id="c2-reparto"></div>
         </div>
+      </div>
+
+      <div class="carico-qty-card">
+        <label class="flabel" style="text-align:center;display:block">Peso o quantità *</label>
+        <div class="carico-qty-stepper">
+          <button type="button" class="carico-qty-btn" onclick="adjustCaricoQty(-1)" aria-label="Diminuisci">−</button>
+          <input class="carico-qty-input" type="number" id="c2-qty" inputmode="decimal" min="0" step="0.01" placeholder="0">
+          <button type="button" class="carico-qty-btn" onclick="adjustCaricoQty(1)" aria-label="Aumenta">+</button>
+        </div>
+        <div class="carico-qty-unita" id="c2-qty-unita"></div>
+        <div class="carico-qty-nota" id="c2-qty-nota"></div>
       </div>
 
       <div class="form-card">
@@ -818,28 +825,9 @@
         </div>
       </div>
 
-      <div class="carico-qty-card">
-        <label class="flabel" style="text-align:center;display:block">Quantità *</label>
-        <div class="carico-qty-stepper">
-          <button type="button" class="carico-qty-btn" onclick="adjustCaricoQty(-1)" aria-label="Diminuisci">−</button>
-          <input class="carico-qty-input" type="number" id="c2-qty" inputmode="decimal" min="0" step="0.01" placeholder="0">
-          <button type="button" class="carico-qty-btn" onclick="adjustCaricoQty(1)" aria-label="Aumenta">+</button>
-        </div>
-      </div>
-
-      <button class="btn-primary" onclick="goToCaricoStep3()"><span class="btn-lbl">Avanti</span></button>
-    </div>
-
-    <!-- STEP 3: Riepilogo e conferma -->
-    <div class="carico-step carico-step-3" id="carico-step-3" style="display:none">
-      <div class="pg-sub" style="text-align:center">Controlla i dati prima di confermare</div>
-      <div class="eti-box show" id="carico-riepilogo"></div>
-      <div class="carico-step3-actions">
-        <button class="btn-secondary" onclick="backToCaricoStep2()">Modifica</button>
-        <button class="btn-primary" id="btn-carico-confirm" onclick="confermaCarico()">
-          <span class="spinner"></span><span class="btn-lbl">Conferma</span>
-        </button>
-      </div>
+      <button class="btn-primary" id="btn-carico-confirm" onclick="confermaCarico()">
+        <span class="spinner"></span><span class="btn-lbl">Registra carico</span>
+      </button>
     </div>
 
     <!-- Animazione di successo -->

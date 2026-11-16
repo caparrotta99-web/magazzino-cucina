@@ -860,10 +860,15 @@ body.home-p1 .home-swipe-page  { height: 100%; overflow-y: auto; -webkit-overflo
 }
 .carico-qty-input::-webkit-outer-spin-button,
 .carico-qty-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-.carico-step-3 { padding-top: 8px; }
-.carico-step3-actions { display: flex; gap: 10px; margin-top: 16px; }
-.carico-step3-actions .btn-secondary,
-.carico-step3-actions .btn-primary { margin-top: 0; }
+.carico-qty-unita {
+  text-align: center; margin-top: 2px;
+  font-size: 15px; font-weight: 600; color: var(--text-soft, var(--text));
+}
+.carico-qty-nota {
+  text-align: center; margin-top: 6px; font-size: 13px; line-height: 1.4;
+  color: var(--text-soft, var(--text)); display: none;
+}
+.carico-qty-nota.show { display: block; }
 .carico-success {
   display: none; position: fixed; inset: 0; z-index: 250;
   background: var(--bg);

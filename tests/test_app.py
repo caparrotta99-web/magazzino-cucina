@@ -31,6 +31,10 @@ def test_admin123_non_funziona_piu(app_mod):
     assert c.get('/api/alerts').status_code != 200
 
 
+def test_secret_key_non_e_piu_quella_fissa(app_mod):
+    assert app_mod.app.secret_key != 'haccp-brigade-2024'
+
+
 def test_modello_scansioni_aggiornato(app_mod):
     assert app_mod.AI_MODEL != 'claude-sonnet-4-6'
 

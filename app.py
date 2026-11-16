@@ -111,7 +111,19 @@ from pdf_export import (
 AI_MODEL = os.environ.get('ANTHROPIC_MODEL', 'claude-sonnet-5-5')
 
 app = Flask(__name__)
-app.secret_key = os.environ.get('SECRET_KEY', 'haccp-brigade-2024')
+# La chiave che firma i login deve venire da Render (SECRET_KEY). Se manca
+# non si usa più un valore fisso scritto nel codice (chiunque lo leggesse
+# potrebbe falsificare un login): se ne genera uno casuale a ogni avvio.
+# Effetto collaterale voluto: senza SECRET_KEY gli utenti vengono
+# disconnessi a ogni riavvio, così il problema si nota.
+_SECRET_KEY_ENV = os.environ.get('SECRET_KEY', '')
+if _SECRET_KEY_ENV:
+    app.secret_key = _SECRET_KEY_ENV
+else:
+    import secrets as _secrets
+    app.secret_key = _secrets.token_hex(32)
+    print('[Sicurezza] ATTENZIONE: SECRET_KEY non impostata, uso una chiave '
+          'casuale (i login si perdono a ogni riavvio).', flush=True)
 
 # ─── FILE STATICI CON VERSIONE ───────────────────────────────────────────────
 # Il service worker tiene in cache i file statici: aggiungendo all'indirizzo

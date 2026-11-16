@@ -37,7 +37,9 @@ from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 
 from database import (
-    db_init,
+    db_init, turno_e_data_riferimento, get_scadenze_promemoria,
+    NOTIFICHE_TIPI, get_user_notifiche, update_user_notifica, get_utenti_con_notifica,
+    update_user_rifiuti_zona, get_zona_rifiuti_utente,
     replace_listino, replace_registro,
     insert_listino_row,
     get_fornitori, get_categorie, CATEGORIE_FISSE, get_all_prodotti, get_prodotti_by_fornitore, get_reparto_prodotto,
@@ -103,8 +105,37 @@ from pdf_export import (
     genera_pdf_registro, genera_pdf_temperature, genera_pdf_report_mensile,
 )
 
+# Modello Claude usato per le scansioni (etichette, apparecchi, sala).
+# Si può cambiare da Render senza toccare il codice con la variabile
+# ANTHROPIC_MODEL (utile per tornare indietro se un modello legge peggio).
+AI_MODEL = os.environ.get('ANTHROPIC_MODEL', 'claude-sonnet-5-5')
+
 app = Flask(__name__)
 app.secret_key = os.environ.get('SECRET_KEY', 'haccp-brigade-2024')
+
+# ─── FILE STATICI CON VERSIONE ───────────────────────────────────────────────
+# Il service worker tiene in cache i file statici: aggiungendo all'indirizzo
+# un'impronta del contenuto (?v=...), ogni modifica a CSS/JS cambia l'URL e
+# i telefoni scaricano subito la versione nuova invece di quella vecchia.
+import hashlib as _hashlib
+_asset_versioni = {}
+
+
+def asset_url(filename):
+    path = os.path.join(app.static_folder, filename)
+    try:
+        mtime = os.path.getmtime(path)
+    except OSError:
+        return url_for('static', filename=filename)
+    cached = _asset_versioni.get(filename)
+    if not cached or cached[0] != mtime:
+        with open(path, 'rb') as f:
+            cached = (mtime, _hashlib.md5(f.read()).hexdigest()[:10])
+        _asset_versioni[filename] = cached
+    return url_for('static', filename=filename, v=cached[1])
+
+
+app.jinja_env.globals['asset_url'] = asset_url
 
 # ─── FLASK-LOGIN ──────────────────────────────────────────────────────────────
 
@@ -251,15 +282,27 @@ def _fmt_data_it(iso):
 
 db_init()
 
-# Crea utente admin di default se non esiste
-if not get_user_by_login('admin'):
+# Crea l'utente admin se non esiste. La password viene da ADMIN_PASSWORD;
+# se manca se ne genera una casuale e la si stampa una sola volta nei log.
+# Niente più password fissa "admin123" uguale per tutte le installazioni.
+_admin = get_user_by_login('admin')
+if not _admin:
+    _admin_pw = os.environ.get('ADMIN_PASSWORD', '')
+    if not _admin_pw:
+        import secrets as _secrets
+        _admin_pw = _secrets.token_urlsafe(9)
+        print(f"[Sicurezza] Creato utente 'admin' con password: {_admin_pw} "
+              f"(cambiala dal Profilo dopo il primo accesso)", flush=True)
     create_user(
         nome='Admin',
         username='admin',
-        password_hash=generate_password_hash('admin123', method='pbkdf2:sha256'),
+        password_hash=generate_password_hash(_admin_pw, method='pbkdf2:sha256'),
         reparto='',
         role='admin',
     )
+elif check_password_hash(_admin.get('password') or '', 'admin123'):
+    print("[Sicurezza] ATTENZIONE: l'utente 'admin' ha ancora la password di "
+          "default 'admin123'. Cambiala subito dal Profilo.", flush=True)
 
 # Le chiavi VAPID possono essere fissate da variabili d'ambiente (utile su
 # Render per garantire che restino identiche tra un deploy e l'altro anche
@@ -348,6 +391,15 @@ def push_to_users(user_ids, title, body, url='/', tag=''):
         print(f"[Push] nessuna subscription trovata per utenti {list(user_ids)}, notifica '{title}' non inviata")
         return 0, 0
     return _invia_push(subs, title, body, url, tag)
+
+
+def push_per_tipo(tipo, title, body, url='/', tag=''):
+    """Invia la notifica solo a chi l'ha lasciata attiva nel Profilo."""
+    utenti = get_utenti_con_notifica(tipo)
+    if not utenti:
+        print(f"[Push] nessun utente vuole notifiche '{tipo}', '{title}' non inviata")
+        return 0, 0
+    return push_to_users(utenti, title, body, url, tag)
 
 
 def push_to_all(title, body, url='/', tag=''):
@@ -588,7 +640,23 @@ def profile():
             success = 'Profilo aggiornato con successo'
             user = get_user_by_id(uid)
 
-    return render_template('profile.html', user=user, error=error, success=success, vapid_public_key=VAPID_PUBLIC_KEY)
+    return render_template('profile.html', user=user, error=error, success=success, vapid_public_key=VAPID_PUBLIC_KEY,
+                           notifiche=get_user_notifiche(int(current_user.id)))
+
+
+@app.route('/api/notifiche-preferenze', methods=['GET', 'POST'])
+@login_required
+def api_notifiche_preferenze():
+    """Legge o cambia quali notifiche riceve l'utente corrente.
+    POST {"tipo": "scadenze", "attiva": false}"""
+    uid = int(current_user.id)
+    if request.method == 'POST':
+        d = request.get_json(force=True) or {}
+        tipo = d.get('tipo')
+        if tipo not in NOTIFICHE_TIPI:
+            return jsonify({'success': False, 'error': 'Tipo di notifica non valido'}), 400
+        update_user_notifica(uid, tipo, bool(d.get('attiva')))
+    return jsonify({'success': True, 'notifiche': get_user_notifiche(uid)})
 
 
 # ─── ADMIN ────────────────────────────────────────────────────────────────────
@@ -2195,7 +2263,7 @@ def api_sala_scan():
         import anthropic as _anthropic
         client = _anthropic.Anthropic(api_key=api_key)
         resp = client.messages.create(
-            model='claude-sonnet-4-6',
+            model=AI_MODEL,
             max_tokens=2000,
             messages=[{
                 'role': 'user',
@@ -2347,7 +2415,7 @@ def api_scan_label():
         import anthropic as _anthropic
         client = _anthropic.Anthropic(api_key=api_key)
         resp = client.messages.create(
-            model='claude-sonnet-4-6',
+            model=AI_MODEL,
             max_tokens=500,
             messages=[{
                 'role': 'user',
@@ -2412,7 +2480,7 @@ def api_scan_apparecchio():
         import anthropic as _anthropic
         client = _anthropic.Anthropic(api_key=api_key)
         resp = client.messages.create(
-            model='claude-sonnet-4-6',
+            model=AI_MODEL,
             max_tokens=500,
             messages=[{
                 'role': 'user',
@@ -2557,8 +2625,10 @@ def api_chat_invia():
     # Notifica solo gli utenti che vedono davvero questo canale (stesso
     # reparto o admin): #generale è visibile a tutti, gli altri canali solo
     # al reparto corrispondente.
+    vogliono_chat = set(get_utenti_con_notifica('chat'))
     dest = [u['id'] for u in get_all_users()
             if u['id'] != int(current_user.id) and u['stato'] == 'attivo'
+            and u['id'] in vogliono_chat
             and (u['role'] == 'admin' or canale == 'generale' or CHAT_CANALE_REPARTO.get(canale) == u['reparto'])]
     push_to_users(
         dest, f'{current_user.nome} in #{canale}',
@@ -2655,10 +2725,9 @@ def _tipi_per_sera(sera, zona, info, calendario):
     return [r['tipo_rifiuto'] for r in calendario if r['giorno_settimana'] == giorno_raccolta.weekday()]
 
 
-def _calcola_rifiuti_oggi():
-    """Zona configurata, sue info e lista dei tipi di rifiuto da esporre
-    stasera. Usata dal job dello scheduler (promemoria delle 18:00)."""
-    zona = get_impostazione('zona_rifiuti', '')
+def _calcola_rifiuti_oggi(zona):
+    """Info della zona e lista dei tipi di rifiuto da esporre stasera.
+    Usata dal job dello scheduler (promemoria delle 18:00)."""
     info = RIFIUTI_ZONE_INFO.get(zona)
     if not info:
         return zona, info, []
@@ -2667,10 +2736,9 @@ def _calcola_rifiuti_oggi():
     return zona, info, tipi
 
 
-def _calcola_rifiuti_esteso():
+def _calcola_rifiuti_esteso(zona):
     """Come _calcola_rifiuti_oggi ma con l'anteprima di domani e dei
     prossimi RIFIUTI_GIORNI_PROSSIMI giorni, per la card della dashboard."""
-    zona = get_impostazione('zona_rifiuti', '')
     info = RIFIUTI_ZONE_INFO.get(zona)
     if not info:
         return zona, info, [], None, []
@@ -2691,7 +2759,7 @@ def _calcola_rifiuti_esteso():
 @app.route('/api/rifiuti/oggi')
 @login_required
 def api_rifiuti_oggi():
-    zona, info, stasera, domani, prossimi = _calcola_rifiuti_esteso()
+    zona, info, stasera, domani, prossimi = _calcola_rifiuti_esteso(get_zona_rifiuti_utente(int(current_user.id)))
     if not info:
         return jsonify({'success': True, 'zona': '', 'zona_label': '', 'tipi': [], 'domani': None, 'prossimi': []})
     return jsonify({
@@ -2709,10 +2777,8 @@ def api_rifiuti_oggi():
 @app.route('/api/rifiuti/posizione', methods=['POST'])
 @login_required
 def api_rifiuti_set_posizione():
-    """Riceve una lettura GPS (da watchPosition, quindi potenzialmente
-    frequente): salva l'ultima posizione nota per QUESTO utente — da usare
-    come fallback quando la geolocalizzazione del browser è momentaneamente
-    irraggiungibile — e ricalcola/aggiorna la zona condivisa del locale."""
+    """Riceve una lettura GPS (solo su richiesta dell'utente): salva
+    l'ultima posizione nota e la zona rifiuti di QUESTO utente."""
     data = request.get_json(silent=True) or {}
     try:
         lat = float(data.get('lat'))
@@ -2722,7 +2788,7 @@ def api_rifiuti_set_posizione():
         return jsonify({'success': False, 'error': 'Coordinate non valide'}), 400
     update_user_rifiuti_posizione(int(current_user.id), lat, lon)
     zona = zona_rifiuti_da_coordinate(lat, lon)
-    set_impostazione('zona_rifiuti', zona)
+    update_user_rifiuti_zona(int(current_user.id), zona)
     print(f"[Rifiuti] posizione utente {current_user.id}: lat={lat:.5f} lon={lon:.5f} -> zona={zona}")
     return jsonify({'success': True, 'zona': zona})
 
@@ -2738,7 +2804,7 @@ def api_rifiuti_usa_ultima_posizione():
         print(f"[Rifiuti] nessuna posizione precedente salvata per utente {current_user.id}")
         return jsonify({'success': False, 'error': 'Nessuna posizione precedente salvata'}), 404
     zona = zona_rifiuti_da_coordinate(pos['rifiuti_lat'], pos['rifiuti_lon'])
-    set_impostazione('zona_rifiuti', zona)
+    update_user_rifiuti_zona(int(current_user.id), zona)
     print(f"[Rifiuti] fallback su ultima posizione nota (utente {current_user.id}, "
           f"aggiornata il {pos['rifiuti_geo_aggiornato_il']}): zona={zona}")
     return jsonify({'success': True, 'zona': zona})
@@ -2757,7 +2823,7 @@ def api_rifiuti_set_zona():
     if zona not in RIFIUTI_ZONE_INFO:
         print(f"[Rifiuti] zona non valida ricevuta: {zona!r}")
         return jsonify({'success': False, 'error': 'Zona non valida'}), 400
-    set_impostazione('zona_rifiuti', zona)
+    update_user_rifiuti_zona(int(current_user.id), zona)
     print(f"[Rifiuti] zona impostata: {zona} (utente {current_user.id})")
     return jsonify({'success': True})
 
@@ -2818,23 +2884,101 @@ def api_meteo_log():
 # ─── NOTIFICHE AUTOMATICHE GIORNALIERE ──────────────────────────────────────
 
 def _job_promemoria_rifiuti():
+    """Ognuno ha la sua zona: raggruppa chi vuole la notifica per zona e
+    manda a ciascun gruppo cosa esporre stasera nella propria zona."""
     print('[Scheduler] job promemoria_rifiuti in esecuzione...')
-    zona, info, tipi = _calcola_rifiuti_oggi()
-    if not info or not tipi:
-        print(f"[Scheduler] promemoria_rifiuti: nessuna raccolta stasera (zona={zona!r}, tipi={tipi})")
-        return
-    nomi = ', '.join(RIFIUTI_TIPI_LABEL.get(t, t) for t in tipi)
-    print(f"[Scheduler] promemoria_rifiuti: invio notifica per {nomi} (zona={zona})")
-    push_to_all('Raccolta rifiuti', f'Stasera esponi: {nomi}', url='/?goto=home', tag='promemoria-rifiuti')
+    per_zona = {}
+    for uid in get_utenti_con_notifica('rifiuti'):
+        per_zona.setdefault(get_zona_rifiuti_utente(uid), []).append(uid)
+    for zona, utenti in per_zona.items():
+        _, info, tipi = _calcola_rifiuti_oggi(zona)
+        if not info or not tipi:
+            print(f"[Scheduler] promemoria_rifiuti: zona={zona!r} nessuna raccolta stasera")
+            continue
+        nomi = ', '.join(RIFIUTI_TIPI_LABEL.get(t, t) for t in tipi)
+        print(f"[Scheduler] promemoria_rifiuti: zona={zona} -> {nomi} ({len(utenti)} utenti)")
+        push_to_users(utenti, 'Raccolta rifiuti', f'Stasera esponi: {nomi}',
+                      url='/?goto=home', tag='promemoria-rifiuti')
 
 
-_scheduler = BackgroundScheduler(timezone=TZ_ITALIA)
-_scheduler.add_job(_job_promemoria_rifiuti,
-                    CronTrigger(hour=18, minute=0, timezone=TZ_ITALIA), id='promemoria_rifiuti')
-_scheduler.start()
-_job_rifiuti_ref = _scheduler.get_job('promemoria_rifiuti')
-print(f"[Scheduler] avviato, prossima esecuzione promemoria_rifiuti: "
-      f"{_job_rifiuti_ref.next_run_time if _job_rifiuti_ref else 'N/D'}")
+# ─── PROMEMORIA HACCP ───────────────────────────────────────────────────────
+# Orari delle notifiche (ora italiana). Le temperature si controllano a
+# metà turno: se a quell'ora un apparecchio non ha ancora la rilevazione
+# del turno (mattina 08-21, sera 21-08) arriva il promemoria.
+PROMEMORIA_SCADENZE_ORA     = (10, 0)
+PROMEMORIA_TEMP_MATTINA_ORA = (12, 0)
+PROMEMORIA_TEMP_SERA_ORA    = (22, 30)
+
+
+def _elenco(nomi, max_n=4):
+    nomi = list(dict.fromkeys(nomi))  # toglie i doppioni mantenendo l'ordine
+    testo = ', '.join(nomi[:max_n])
+    if len(nomi) > max_n:
+        testo += f' e altri {len(nomi) - max_n}'
+    return testo
+
+
+def testo_promemoria_temperature():
+    """(titolo, testo) se ci sono apparecchi senza rilevazione nel turno
+    corrente, altrimenti None."""
+    mancanti = [a['nome'] for a in get_apparecchi() if a['stato_controllo'] != 'OK']
+    if not mancanti:
+        return None
+    turno, _ = turno_e_data_riferimento()
+    return (f'Temperature turno {turno}',
+            f'Da registrare ({len(mancanti)}): {_elenco(mancanti)}')
+
+
+def testo_promemoria_scadenze(oggi=None):
+    """(titolo, testo) con lotti in scadenza/scaduti e preparazioni che
+    scadono oggi, altrimenti None."""
+    d = get_scadenze_promemoria(oggi)
+    righe = []
+    if d['scaduti']:
+        righe.append('Scaduti ancora in magazzino: ' + _elenco(l['prodotto'] for l in d['scaduti']))
+    if d['oggi']:
+        righe.append('Scadono oggi: ' + _elenco(l['prodotto'] for l in d['oggi']))
+    if d['domani']:
+        righe.append('Scadono domani: ' + _elenco(l['prodotto'] for l in d['domani']))
+    if d['preparazioni_oggi']:
+        righe.append('Preparazioni in scadenza oggi: ' + _elenco(p['nome'] for p in d['preparazioni_oggi']))
+    if not righe:
+        return None
+    return ('Scadenze', '. '.join(righe))
+
+
+def _job_promemoria_temperature():
+    msg = testo_promemoria_temperature()
+    print(f'[Scheduler] promemoria_temperature: {msg or "tutto registrato"}')
+    if msg:
+        push_per_tipo('temperature', msg[0], msg[1], url='/?goto=temperature', tag='promemoria-temperature')
+
+
+def _job_promemoria_scadenze():
+    msg = testo_promemoria_scadenze()
+    print(f'[Scheduler] promemoria_scadenze: {msg or "nessuna scadenza"}')
+    if msg:
+        push_per_tipo('scadenze', msg[0], msg[1], url='/?goto=alert', tag='promemoria-scadenze')
+
+
+# Nei test lo scheduler non parte (BRIGADE_NO_SCHEDULER=1), così nessuna
+# notifica vera viene inviata mentre si prova il codice.
+if os.environ.get('BRIGADE_NO_SCHEDULER') != '1':
+    _scheduler = BackgroundScheduler(timezone=TZ_ITALIA)
+    _scheduler.add_job(_job_promemoria_rifiuti,
+                       CronTrigger(hour=18, minute=0, timezone=TZ_ITALIA), id='promemoria_rifiuti')
+    _scheduler.add_job(_job_promemoria_scadenze,
+                       CronTrigger(hour=PROMEMORIA_SCADENZE_ORA[0], minute=PROMEMORIA_SCADENZE_ORA[1],
+                                   timezone=TZ_ITALIA), id='promemoria_scadenze')
+    _scheduler.add_job(_job_promemoria_temperature,
+                       CronTrigger(hour=PROMEMORIA_TEMP_MATTINA_ORA[0], minute=PROMEMORIA_TEMP_MATTINA_ORA[1],
+                                   timezone=TZ_ITALIA), id='promemoria_temp_mattina')
+    _scheduler.add_job(_job_promemoria_temperature,
+                       CronTrigger(hour=PROMEMORIA_TEMP_SERA_ORA[0], minute=PROMEMORIA_TEMP_SERA_ORA[1],
+                                   timezone=TZ_ITALIA), id='promemoria_temp_sera')
+    _scheduler.start()
+    for _job in _scheduler.get_jobs():
+        print(f"[Scheduler] {_job.id}: prossima esecuzione {_job.next_run_time}")
 
 
 if __name__ == '__main__':

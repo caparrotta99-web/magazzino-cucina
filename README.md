@@ -5,7 +5,7 @@ App web per la gestione del magazzino di cucina con tracciabilità HACCP, colleg
 ## Stack
 
 - **Backend**: Python / Flask
-- **Database**: SQLite (locale + sincronizzazione Google Sheets)
+- **Database**: SQLite in locale, PostgreSQL se è impostata `DATABASE_URL` (+ sincronizzazione Google Sheets)
 - **Auth**: Flask-Login (ruoli: admin / staff)
 - **AI**: Anthropic Claude per scansione etichette via fotocamera
 - **Frontend**: SPA vanilla JS, mobile-first, PWA
@@ -21,7 +21,16 @@ python3 app.py
 
 Apri **http://localhost:5001**
 
-Credenziali default: `admin@admin.com` / `admin123`
+Al primo avvio viene creato l'utente `admin`: la password è quella della variabile `ADMIN_PASSWORD`, oppure ne viene generata una casuale e stampata nei log. Cambiala dal Profilo dopo il primo accesso.
+
+## Test
+
+```bash
+pip install pytest
+python3 -m pytest -q tests
+```
+
+I test usano un database temporaneo: `haccp.db` non viene toccato.
 
 ---
 

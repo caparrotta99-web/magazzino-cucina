@@ -538,6 +538,10 @@ def db_init():
         ('users',        'dash_card2', "TEXT NOT NULL DEFAULT 'temperature'"),
         ('users',        'dash_card3', "TEXT NOT NULL DEFAULT 'scadenza'"),
         ('users',        'tutorial_visto', "INTEGER NOT NULL DEFAULT 0"),
+        ('users',        'notif_scadenze',    "INTEGER NOT NULL DEFAULT 1"),
+        ('users',        'notif_temperature', "INTEGER NOT NULL DEFAULT 1"),
+        ('users',        'notif_rifiuti',     "INTEGER NOT NULL DEFAULT 1"),
+        ('users',        'notif_chat',        "INTEGER NOT NULL DEFAULT 1"),
         ('users',        'puo_chat', "INTEGER NOT NULL DEFAULT 0"),
         ('users',        'chat_last_seen', "TEXT NOT NULL DEFAULT ''"),
         ('chat_messaggi', 'autore_badge', "TEXT NOT NULL DEFAULT ''"),
@@ -546,6 +550,7 @@ def db_init():
         ('users', 'rifiuti_lat', "REAL NOT NULL DEFAULT 0"),
         ('users', 'rifiuti_lon', "REAL NOT NULL DEFAULT 0"),
         ('users', 'rifiuti_geo_aggiornato_il', "TEXT NOT NULL DEFAULT ''"),
+        ('users', 'rifiuti_zona', "TEXT NOT NULL DEFAULT ''"),
         ('tavoli', 'rotazione', "INTEGER NOT NULL DEFAULT 0"),
     ]
     for table, col, defn in migrations:
@@ -1041,6 +1046,39 @@ def get_alerts():
     }
 
 
+def get_scadenze_promemoria(oggi=None):
+    """Dati per la notifica mattutina delle scadenze: lotti ancora in
+    magazzino che scadono domani o sono già scaduti, e preparazioni non
+    completate che scadono oggi."""
+    oggi = oggi or today_it()
+    oggi_s = oggi.isoformat()
+    domani_s = (oggi + timedelta(days=1)).isoformat()
+    with get_conn() as conn:
+        lotti = _rows(conn.execute(
+            """SELECT r.prodotto, r.lotto, r.scadenza
+               FROM registro r
+               WHERE r.id = (
+                   SELECT MAX(r2.id) FROM registro r2
+                   WHERE r2.prodotto = r.prodotto AND r2.lotto = r.lotto
+               )
+               AND r.rimanenza > 0 AND r.scadenza != '' AND r.scadenza <= ?
+               ORDER BY r.scadenza, LOWER(r.prodotto)""",
+            (domani_s,)
+        ))
+        prep = _rows(conn.execute(
+            "SELECT nome, scadenza FROM preparazioni "
+            "WHERE COALESCE(completata, 0) = 0 AND substr(scadenza, 1, 10) = ? "
+            "ORDER BY LOWER(nome)",
+            (oggi_s,)
+        ))
+    return {
+        'domani':  [l for l in lotti if l['scadenza'][:10] == domani_s],
+        'scaduti': [l for l in lotti if l['scadenza'][:10] < oggi_s],
+        'oggi':    [l for l in lotti if l['scadenza'][:10] == oggi_s],
+        'preparazioni_oggi': prep,
+    }
+
+
 def replace_registro(rows):
     with get_conn() as conn:
         conn.execute("DELETE FROM registro")
@@ -1320,6 +1358,21 @@ def get_user_rifiuti_posizione(user_id):
         return _row(cur)
 
 
+def update_user_rifiuti_zona(user_id, zona):
+    """Zona rifiuti scelta da questo utente (ognuno ha la propria)."""
+    with get_conn() as conn:
+        conn.execute("UPDATE users SET rifiuti_zona = ? WHERE id = ?", (zona, user_id))
+
+
+def get_zona_rifiuti_utente(user_id):
+    """Zona dell'utente; se non l'ha mai scelta si usa quella del ristorante
+    (impostazione condivisa 'zona_rifiuti')."""
+    with get_conn() as conn:
+        row = _row(conn.execute("SELECT rifiuti_zona FROM users WHERE id = ?", (user_id,)))
+    zona = (row or {}).get('rifiuti_zona') or ''
+    return zona or get_impostazione('zona_rifiuti', '')
+
+
 def update_user_home_card(user_id, home_card):
     with get_conn() as conn:
         conn.execute(
@@ -1333,6 +1386,45 @@ def update_user_dash_cards(user_id, card1, card2, card3):
             "UPDATE users SET dash_card1 = ?, dash_card2 = ?, dash_card3 = ? WHERE id = ?",
             (card1, card2, card3, user_id)
         )
+
+
+# Tipi di notifica che ogni utente può attivare/disattivare dal Profilo.
+# Chiave = tipo, valore = colonna in users.
+NOTIFICHE_TIPI = {
+    'scadenze':    'notif_scadenze',
+    'temperature': 'notif_temperature',
+    'rifiuti':     'notif_rifiuti',
+    'chat':        'notif_chat',
+}
+
+
+def get_user_notifiche(user_id):
+    """{tipo: bool} con le notifiche scelte dall'utente."""
+    with get_conn() as conn:
+        row = _row(conn.execute(
+            "SELECT " + ", ".join(NOTIFICHE_TIPI.values()) + " FROM users WHERE id = ?",
+            (user_id,)
+        ))
+    if not row:
+        return {t: True for t in NOTIFICHE_TIPI}
+    return {t: bool(row[c]) for t, c in NOTIFICHE_TIPI.items()}
+
+
+def update_user_notifica(user_id, tipo, attiva):
+    colonna = NOTIFICHE_TIPI[tipo]  # KeyError se il tipo non esiste
+    with get_conn() as conn:
+        conn.execute(f"UPDATE users SET {colonna} = ? WHERE id = ?",
+                     (1 if attiva else 0, user_id))
+
+
+def get_utenti_con_notifica(tipo):
+    """Id degli utenti attivi che vogliono ricevere questo tipo di notifica."""
+    colonna = NOTIFICHE_TIPI[tipo]
+    with get_conn() as conn:
+        rows = _rows(conn.execute(
+            f"SELECT id FROM users WHERE COALESCE(stato, 'attivo') = 'attivo' AND {colonna} = 1"
+        ))
+    return [r['id'] for r in rows]
 
 
 def update_user_tutorial_visto(user_id):

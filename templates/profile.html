@@ -18,6 +18,20 @@
 .avatar-row { display: flex; align-items: center; gap: 16px; margin-bottom: 28px; }
 .avatar-name { font-size: 18px; font-weight: 700; color: var(--text); }
 .avatar-role { margin-top: 5px; }
+.notif-list { margin-top: 18px; display: flex; flex-direction: column; }
+.notif-row { display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  padding: 12px 0; border-top: 1px solid var(--border); cursor: pointer; }
+.notif-testo { display: flex; flex-direction: column; }
+.notif-nome { font-size: 15px; font-weight: 600; color: var(--text); }
+.notif-desc { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.switch { position: relative; flex-shrink: 0; width: 46px; height: 28px; }
+.switch input { opacity: 0; width: 0; height: 0; position: absolute; }
+.switch .slider { position: absolute; inset: 0; border-radius: 28px; background: var(--border-2); transition: background .2s; }
+.switch .slider::before { content: ''; position: absolute; width: 22px; height: 22px; left: 3px; top: 3px;
+  border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,.25); transition: transform .2s; }
+.switch input:checked + .slider { background: var(--green); }
+.switch input:checked + .slider::before { transform: translateX(18px); }
+.switch input:disabled + .slider { opacity: .5; }
 </style>
 </head>
 <body>
@@ -114,6 +128,27 @@
       <button type="button" class="btn-secondary" id="btn-notifiche" onclick="toggleNotifiche()">Attiva notifiche</button>
       <span class="hint" id="notifiche-status"></span>
     </div>
+    <div class="notif-list">
+      <span class="hint" style="margin-top:0">Scegli quali notifiche ricevere. Le modifiche si salvano subito.</span>
+      {% set voci = [
+        ('scadenze',    'Scadenze',         'Ogni mattina alle 10: lotti scaduti o in scadenza e preparazioni di oggi'),
+        ('temperature', 'Temperature',      'Alle 12 e alle 22:30, se manca una rilevazione del turno'),
+        ('rifiuti',     'Raccolta rifiuti', 'Alle 18, cosa esporre stasera nella tua zona'),
+        ('chat',        'Chat',             'Nuovi messaggi nei tuoi canali'),
+      ] %}
+      {% for tipo, nome, desc in voci %}
+      <label class="notif-row">
+        <span class="notif-testo">
+          <span class="notif-nome">{{ nome }}</span>
+          <span class="notif-desc">{{ desc }}</span>
+        </span>
+        <span class="switch">
+          <input type="checkbox" data-notifica="{{ tipo }}" {{ 'checked' if notifiche[tipo] }} onchange="salvaNotifica(this)">
+          <span class="slider"></span>
+        </span>
+      </label>
+      {% endfor %}
+    </div>
   </div>
 
   <button type="submit" form="profile-form" class="btn-primary">Salva</button>
@@ -157,6 +192,22 @@ function _isIOS() {
 }
 function _isStandalonePwa() {
   return window.matchMedia('(display-mode: standalone)').matches || navigator.standalone === true;
+}
+
+async function salvaNotifica(input) {
+  const attiva = input.checked;
+  input.disabled = true;
+  try {
+    const r = await _apiJson('/api/notifiche-preferenze', {
+      method: 'POST', body: { tipo: input.dataset.notifica, attiva },
+    });
+    if (!r.success) throw new Error(r.error || 'errore');
+  } catch (e) {
+    input.checked = !attiva;  // salvataggio fallito: rimetti com'era
+    alert('Non sono riuscito a salvare la preferenza. Riprova.');
+  } finally {
+    input.disabled = false;
+  }
 }
 
 async function toggleNotifiche() {

@@ -3,6 +3,7 @@ haccp.db
 haccp.db-shm
 haccp.db-wal
 magazzino.db
+db_backups/
 __pycache__/
 *.pyc
 *.pyo
@@ -10,3 +11,4 @@ __pycache__/
 .env.*
 .DS_Store
 static/chat_uploads/
+.pytest_cache/

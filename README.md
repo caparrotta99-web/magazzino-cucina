@@ -91,6 +91,10 @@ Senza disco il database si azzera ad ogni deploy.
 
 | Variabile | Descrizione | Default |
 |---|---|---|
-| `SECRET_KEY` | Chiave segreta Flask per le sessioni | `haccp-brigade-2024` |
+| `SECRET_KEY` | Chiave segreta Flask per le sessioni — **obbligatoria** | nessuno |
 | `GOOGLE_CREDENTIALS_JSON` | JSON del Service Account Google | legge `credentials.json` |
 | `ANTHROPIC_API_KEY` | API key per scansione etichette | nessuno |
+
+**`SECRET_KEY` va impostata su Render** (Environment), con un valore lungo e casuale tenuto fuori dal codice: è la chiave che firma i cookie di sessione, quindi chi la conosce può falsificare un login.
+
+Se manca, l'app non usa nessun valore di ripiego: ne genera una casuale a ogni avvio e lo segnala nei log. Di conseguenza **tutti gli utenti vengono disconnessi a ogni riavvio**, finché la variabile non viene impostata.

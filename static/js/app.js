@@ -86,6 +86,7 @@ function onInUsoFilterChange(sel) {
   S.inUsoReparto   = document.getElementById('u-filter-reparto').value;
   S.inUsoCategoria = document.getElementById('u-filter-categoria').value;
   resetInUsoProdotto();
+  renderAperti();
 }
 
 // ── CATEGORIE ────────────────────────────────────────────────────────────
@@ -1191,6 +1192,72 @@ async function submitInUso() {
 async function loadInUso() {
   const data = await api('/api/in-uso');
   S.inUso = data.in_uso || [];
+  renderAperti();
+}
+
+// ── APERTI ADESSO ────────────────────────────────────────────────────────
+// Quello che e' gia' stato tirato fuori dal magazzino, in cima alla pagina:
+// e' la domanda che ci si fa piu' spesso ("cosa abbiamo aperto?") e da qui si
+// chiude in un tocco, senza passare dalle Giacenze.
+function renderAperti() {
+  const wrap = document.getElementById('aperti-wrap');
+  const list = document.getElementById('aperti-list');
+  if (!wrap || !list) return;
+
+  const aperti = filterProdotti(S.inUso, S.inUsoReparto, S.inUsoCategoria);
+  if (!aperti.length) { wrap.style.display = 'none'; list.innerHTML = ''; return; }
+
+  list.innerHTML = aperti.map(r => {
+    const giorni  = r.scadenza ? daysTo(r.scadenza) : null;
+    const scaduto = giorni !== null && giorni < 0;
+    const scadTxt = r.scadenza
+      ? `scade ${fmtDate(r.scadenza)}${giorni !== null ? ` (${giorni}gg)` : ''}`
+      : 'senza scadenza';
+    return `
+      <div class="aperto-card ${scaduto ? 'scaduto' : ''}">
+        <div class="aperto-top">
+          <span class="aperto-nome">${esc(r.prodotto)}</span>
+          <span class="aperto-qty">${r.qty} ${esc(r.unita)}</span>
+        </div>
+        <div class="aperto-sub">${r.lotto ? 'lotto ' + esc(r.lotto) + ' · ' : ''}aperto il ${fmtDate(r.data)} · ${scadTxt}</div>
+        <div class="aperto-azioni">
+          <button type="button" class="az-finito"  onclick="apertoFinito(${r.id})">Finito</button>
+          <button type="button" class="az-parziale" onclick="openScaricoModal(${r.id})">Parziale</button>
+          <button type="button" class="az-buttato" onclick="apertoButtato(${r.id})">Buttato</button>
+        </div>
+      </div>`;
+  }).join('');
+  wrap.style.display = '';
+}
+
+async function apertoFinito(id) {
+  const r = S.inUso.find(x => x.id === id);
+  if (!r) return;
+  await _chiudiAperto(r, r.qty, 'SCARICO', `${r.prodotto} finito`);
+}
+
+async function apertoButtato(id) {
+  const r = S.inUso.find(x => x.id === id);
+  if (!r) return;
+  // Buttare roba e' un movimento che resta nel registro HACCP: va confermato.
+  if (!confirm(`Buttare ${r.qty} ${r.unita} di ${r.prodotto}${r.lotto ? ' (lotto ' + r.lotto + ')' : ''}?`)) return;
+  await _chiudiAperto(r, r.qty, 'SCARTO', `${r.prodotto} buttato`);
+}
+
+async function _chiudiAperto(r, qty, tipo, messaggio) {
+  const ok = await tryAcquireLock({ tipo: 'prodotto_lotto', prodotto: r.prodotto, lotto: r.lotto, form: 'scarico' });
+  if (!ok) return;
+  const data = await api('/api/scarico', { method: 'POST', body: { id: r.id, qty, tipo } });
+  releaseLock({ tipo: 'prodotto_lotto', prodotto: r.prodotto, lotto: r.lotto });
+
+  if (data.success) {
+    toast(messaggio, 'success');
+    await Promise.all([loadInUso(), loadGiacenze(), loadAlerts()]);
+    renderInUsoProdotti();
+    if (S.activePage === 'giacenze') renderGiacenze();
+  } else {
+    toast(data.error || 'Errore durante lo scarico', 'error');
+  }
 }
 
 let _scaricoModalRowId = null;

@@ -1564,18 +1564,23 @@ def api_scarico():
     residuo   = round(row['scarico'] - qty, 4)
     nuovo_mov_id = _gen_id() if residuo > 0 else None
 
-    # La riga IN USO esiste già su Sheets: trasformarla in SCARICO è una
-    # modifica, non un'aggiunta, quindi passa dalla coda. L'eventuale riga di
-    # residuo viene creata da finalizza_in_uso() con synced=0 e la invia il
-    # worker. Lo scarico non deve più fallire se Sheets non risponde.
+    # 'SCARTO' = prodotto buttato perché scaduto o rovinato. Resta un movimento
+    # del registro HACCP come gli altri: sul foglio si legge 'BUTTATO'.
+    tipo_finale = 'SCARTO' if (d.get('tipo') or '').upper() == 'SCARTO' else 'SCARICO'
+
+    # La riga IN USO esiste già su Sheets: cambiarle il tipo è una modifica,
+    # non un'aggiunta, quindi passa dalla coda. L'eventuale riga di residuo
+    # viene creata da finalizza_in_uso() con synced=0 e la invia il worker.
+    # Lo scarico non deve più fallire se Sheets non risponde.
     accoda_sheets('aggiorna_tipo', {
         'movimento_id': row['movimento_id'],
-        'nuovo_tipo': 'SCARICO',
+        'nuovo_tipo': tipo_finale,
         'nuovo_scarico': qty,
     })
 
     oggi = now_it().strftime('%Y-%m-%d')
-    finalized, residua = finalizza_in_uso(row_id, oggi, qty, nuovo_mov_id)
+    finalized, residua = finalizza_in_uso(row_id, oggi, qty, nuovo_mov_id,
+                                           tipo_finale=tipo_finale)
 
     if not finalized:
         return jsonify({'success': False, 'error': 'Elemento non trovato o già scaricato'}), 400
@@ -1590,6 +1595,7 @@ def api_scarico():
         'unita':        finalized['unita'],
         'data_scarico': finalized['data_scarico'],
         'residuo':      residua['scarico'] if residua else 0,
+        'tipo':         tipo_finale,
     })
 
 

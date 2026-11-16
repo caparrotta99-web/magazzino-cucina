@@ -52,6 +52,9 @@ REGISTRO_COLS = [
 _TIPO_DISPLAY = {
     'CARICO': 'CARICO', 'IN_USO': 'IN USO', 'SCARICO': 'SCARICO',
     'PREPARAZIONE': 'PREPARAZIONE', 'SCARICO_PREPARAZIONE': 'SCARICO PREPARAZIONE',
+    # Prodotto buttato perche' scaduto o rovinato: sul foglio si legge
+    # 'BUTTATO', che e' la parola che si usa in cucina.
+    'SCARTO': 'BUTTATO',
 }
 
 
@@ -70,6 +73,8 @@ def _normalizza_tipo(raw):
         return 'CARICO'
     if t == 'PREPARAZIONE':
         return 'PREPARAZIONE'
+    if t in ('BUTTATO', 'SCARTO', 'SCARTATO'):
+        return 'SCARTO'
     return None
 
 # Sinonimi per il rilevamento automatico delle colonne

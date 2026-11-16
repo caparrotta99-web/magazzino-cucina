@@ -20,7 +20,10 @@ MESI_IT = [
     'Luglio', 'Agosto', 'Settembre', 'Ottobre', 'Novembre', 'Dicembre',
 ]
 
-_TIPO_LABEL = {'CARICO': 'Carico', 'IN_USO': 'In uso', 'SCARICO': 'Scarico'}
+_TIPO_LABEL = {'CARICO': 'Carico', 'IN_USO': 'In uso', 'SCARICO': 'Scarico',
+               'PREPARAZIONE': 'Preparazione',
+               'SCARICO_PREPARAZIONE': 'Scarico preparazione',
+               'SCARTO': 'Buttato'}
 
 _styles = getSampleStyleSheet()
 _stile_brand = ParagraphStyle(

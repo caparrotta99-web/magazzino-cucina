@@ -2053,3 +2053,30 @@ html.chat-no-scroll { overflow: hidden; }
 }
 .btn-tutto:active { background: var(--border); }
 .btn-tutto:disabled { opacity: .45; cursor: default; }
+
+/* ─── IN USO: prodotti aperti adesso ────────────────────────────────────── */
+.aperti-wrap { margin-bottom: 18px; }
+.aperti-wrap .section-title {
+  font-size: 13px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase;
+  opacity: .7; margin-bottom: 8px;
+}
+.aperti-list { display: flex; flex-direction: column; gap: 10px; }
+.aperto-card {
+  background: var(--card); border: 1px solid var(--border); border-radius: 16px;
+  padding: 12px 14px; box-shadow: var(--shadow);
+}
+.aperto-card.scaduto { border-color: rgba(220,38,38,.55); }
+.aperto-top { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.aperto-nome { font-size: 16px; font-weight: 700; }
+.aperto-qty  { font-size: 15px; font-weight: 700; white-space: nowrap; }
+.aperto-sub  { margin-top: 3px; font-size: 13px; line-height: 1.45; opacity: .8; }
+.aperto-azioni { display: flex; gap: 8px; margin-top: 11px; }
+.aperto-azioni button {
+  flex: 1; height: 42px; border-radius: 11px; cursor: pointer;
+  font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 700;
+  border: 1.5px solid var(--border); background: var(--surface-2); color: var(--text);
+}
+.aperto-azioni button:active { transform: scale(.97); }
+.aperto-azioni .az-finito  { border-color: rgba(16,185,129,.5); }
+.aperto-azioni .az-buttato { border-color: rgba(220,38,38,.5); }
+.aperti-vuoto { font-size: 14px; opacity: .7; }

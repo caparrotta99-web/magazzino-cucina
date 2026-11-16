@@ -211,3 +211,80 @@ def test_stato_sheets_per_admin(app_mod, db):
     r = c.get('/api/stato-sheets').get_json()
     assert r['stato'] == 'in_attesa'
     assert 'in attesa di invio' in r['testo']
+
+
+# ─── BUTTATO (FASE 5) ────────────────────────────────────────────────────────
+
+def test_buttato_arriva_sul_foglio_come_BUTTATO(app_mod, db, monkeypatch):
+    """Il prodotto buttato resta un movimento del registro HACCP: sul foglio
+    la colonna Tipo movimento deve leggersi 'BUTTATO'."""
+    import sheets
+    foglio = finto_foglio.installa(monkeypatch, sheets)
+
+    _prodotto(db)
+    c = _login(app_mod)
+    c.post('/api/carico', json={
+        'prodotto': 'Macinato', 'fornitore': 'Fornitore Test', 'lotto': 'L1',
+        'scadenza': '2026-12-31', 'qty': 5, 'unita': 'kg',
+    })
+    r = c.post('/api/in-uso', json={'prodotto': 'Macinato', 'lotto': 'L1', 'qty': 2})
+    in_uso_id = r.get_json()['id']
+    app_mod._invia_pendenti()
+
+    r = c.post('/api/scarico', json={'id': in_uso_id, 'qty': 2, 'tipo': 'SCARTO'})
+    assert r.get_json()['tipo'] == 'SCARTO'
+    app_mod._invia_pendenti()
+
+    righe = [dict(zip(finto_foglio.HEADER_REGISTRO, x))
+             for x in foglio.worksheet('REGISTRO').righe_dati]
+    buttata = righe[1]
+    assert buttata['Tipo movimento'] == 'BUTTATO'
+    assert buttata['Scarico'] == 2
+    assert db.conta_pendenti_sheets() == 0
+
+
+def test_buttato_torna_SCARTO_quando_si_ricarica_dai_fogli(app_mod, db, monkeypatch):
+    """Rileggendo il foglio, 'BUTTATO' deve tornare a essere SCARTO dentro
+    l'app, altrimenti il movimento si perderebbe a ogni ricaricamento."""
+    import sheets
+    assert sheets._normalizza_tipo('BUTTATO') == 'SCARTO'
+
+    righe_foglio = [{
+        'data': '2026-11-16', 'fornitore': 'Fornitore Test', 'prodotto': 'Macinato',
+        'lotto': 'L1', 'scadenza': '2026-12-31', 'carico': 0, 'scarico': 2,
+        'unita': 'kg', 'etichetta': '', 'movimento_id': 'X1', 'rimanenza': 3,
+        'operatore': 'Admin', 'reparto': 'Cucina', 'tipo': 'SCARTO',
+    }]
+    monkeypatch.setattr(app_mod, 'load_registro', lambda: righe_foglio)
+    monkeypatch.setattr(app_mod, 'load_listino', lambda: [])
+    monkeypatch.setattr(app_mod, 'load_temperatura', lambda: [])
+
+    assert app_mod._ricarica_da_sheets()['ricaricato'] is True
+    with db.get_conn() as conn:
+        tipi = [r['tipo'] for r in db._rows(conn.execute("SELECT tipo FROM registro"))]
+    assert tipi == ['SCARTO']
+
+
+def test_scarico_parziale_di_un_buttato_lascia_il_residuo_in_uso(app_mod, db, monkeypatch):
+    import sheets
+    foglio = finto_foglio.installa(monkeypatch, sheets)
+
+    _prodotto(db)
+    c = _login(app_mod)
+    c.post('/api/carico', json={
+        'prodotto': 'Macinato', 'fornitore': 'Fornitore Test', 'lotto': 'L1',
+        'scadenza': '2026-12-31', 'qty': 5, 'unita': 'kg',
+    })
+    r = c.post('/api/in-uso', json={'prodotto': 'Macinato', 'lotto': 'L1', 'qty': 4})
+    in_uso_id = r.get_json()['id']
+    app_mod._invia_pendenti()
+
+    c.post('/api/scarico', json={'id': in_uso_id, 'qty': 1, 'tipo': 'SCARTO'})
+    app_mod._invia_pendenti()
+
+    righe = [dict(zip(finto_foglio.HEADER_REGISTRO, x))
+             for x in foglio.worksheet('REGISTRO').righe_dati]
+    assert righe[1]['Tipo movimento'] == 'BUTTATO'
+    assert righe[1]['Scarico'] == 1
+    assert righe[2]['Tipo movimento'] == 'IN USO'   # il resto e' ancora aperto
+    assert righe[2]['Scarico'] == 3

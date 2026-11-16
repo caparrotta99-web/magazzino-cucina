@@ -415,6 +415,13 @@ def db_init():
                 eliminato_da   TEXT NOT NULL DEFAULT '',
                 eliminato_il   TEXT NOT NULL DEFAULT ''
             )""",
+            f"""CREATE TABLE IF NOT EXISTS etichette_alias (
+                id            {pk},
+                testo         TEXT NOT NULL UNIQUE,
+                prodotto      TEXT NOT NULL,
+                fornitore     TEXT NOT NULL DEFAULT '',
+                creato_il     TEXT NOT NULL
+            )""",
             f"""CREATE TABLE IF NOT EXISTS sheets_coda (
                 id        {pk},
                 azione    TEXT NOT NULL,
@@ -820,6 +827,62 @@ def conta_pendenti_sheets():
         b = _row(conn.execute("SELECT COUNT(*) AS n FROM sheets_coda"))['n']
         c = _row(conn.execute("SELECT COUNT(*) AS n FROM temperature WHERE synced = 0"))['n']
     return int(a) + int(b) + int(c)
+
+
+# ─── ABBINAMENTI ETICHETTA -> PRODOTTO ───────────────────────────────────────
+# Sulle etichette il prodotto ha quasi sempre un nome diverso da quello del
+# listino ("FILETTO DI MANZO IRLANDESE 1KG" invece di "Filetto"). La prima
+# volta lo abbina l'utente; da li' in poi l'abbinamento resta salvato qui e il
+# prodotto viene riconosciuto da solo. E' un'impostazione dell'app: non va su
+# Google Sheets e il ricaricamento dai fogli non la tocca.
+
+def normalizza_testo_etichetta(testo):
+    """Riduce il testo letto dall'etichetta a una forma confrontabile:
+    minuscole, senza accenti, senza punteggiatura, spazi singoli."""
+    import unicodedata
+    t = unicodedata.normalize('NFKD', (testo or ''))
+    t = ''.join(c for c in t if not unicodedata.combining(c))
+    t = t.lower()
+    t = ''.join(c if c.isalnum() else ' ' for c in t)
+    return ' '.join(t.split())
+
+
+def get_alias_etichetta(testo):
+    """Il prodotto gia' abbinato a questo testo di etichetta, se c'e'."""
+    chiave = normalizza_testo_etichetta(testo)
+    if not chiave:
+        return None
+    with get_conn() as conn:
+        return _row(conn.execute(
+            "SELECT prodotto, fornitore FROM etichette_alias WHERE testo = ?", (chiave,)
+        ))
+
+
+def salva_alias_etichetta(testo, prodotto, fornitore=''):
+    """Ricorda che questo testo di etichetta corrisponde a questo prodotto."""
+    chiave = normalizza_testo_etichetta(testo)
+    if not chiave or not prodotto:
+        return False
+    with get_conn() as conn:
+        esistente = _row(conn.execute(
+            "SELECT id FROM etichette_alias WHERE testo = ?", (chiave,)))
+        if esistente:
+            conn.execute(
+                "UPDATE etichette_alias SET prodotto = ?, fornitore = ? WHERE testo = ?",
+                (prodotto, fornitore or '', chiave))
+        else:
+            conn.execute(
+                "INSERT INTO etichette_alias (testo, prodotto, fornitore, creato_il) "
+                "VALUES (?, ?, ?, ?)",
+                (chiave, prodotto, fornitore or '', now_it().isoformat()))
+    return True
+
+
+def get_alias_etichette():
+    """Tutti gli abbinamenti salvati (per il pannello Admin)."""
+    with get_conn() as conn:
+        return _rows(conn.execute(
+            "SELECT testo, prodotto, fornitore, creato_il FROM etichette_alias ORDER BY prodotto"))
 
 
 def giacenze_per_lotto():

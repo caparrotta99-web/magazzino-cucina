@@ -31,6 +31,9 @@ const S = {
   alertCatFilter:  'all',   // 'all' | category name
   alertRepartoFilter: 'all',   // 'all' | 'cucina' | 'sala' | 'pizzeria'
   caricoData: { prodotto:'', fornitore:'', unita:'', reparto:'', categoria:'', lotto:'', scadenza:'', qty:null, _scanPending:false },
+  // Nome letto sull'etichetta che aspetta di essere abbinato a un prodotto
+  // del listino: quando l'utente sceglie, l'abbinamento viene salvato.
+  caricoScanTesto: '',
   inUsoReparto:    '', inUsoCategoria:    '',
   prepIngReparto:  '',
   apparecchi:            [],
@@ -645,6 +648,7 @@ async function loadProdottiCarico() {
 function resetCaricoWizard() {
   releaseCaricoLock();
   S.caricoData = { prodotto:'', fornitore:'', unita:'', reparto:'', categoria:'', lotto:'', scadenza:'', qty:null, _scanPending:false };
+  S.caricoScanTesto = '';
   const searchEl = document.getElementById('carico-search-input');
   if (searchEl) searchEl.value = '';
   document.getElementById('carico-search-dropdown')?.classList.remove('open');
@@ -679,11 +683,15 @@ function onCaricoSearchInput() {
         <span class="spesa-search-item-nome">${esc(p.prodotto)}</span>
         <span class="spesa-search-item-forn">${esc(p.fornitore || '—')}${p.reparto ? ' · ' + esc(p.reparto) : ''}</span>
       </div>`).join('')
-    : `<div class="spesa-search-empty">Nessun prodotto trovato</div>
+    : (S.caricoScanTesto
+        // Dopo una scansione il prodotto esiste gia' a listino, solo con un
+        // altro nome: va cercato e abbinato, non creato da capo.
+        ? `<div class="spesa-search-empty">Nessun prodotto trovato con questo nome. Cerca come si chiama nel listino.</div>`
+        : `<div class="spesa-search-empty">Nessun prodotto trovato</div>
        <div class="spesa-search-addnew" onclick="openNuovoProdotto('carico')">
          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
          Aggiungi nuovo prodotto
-       </div>`;
+       </div>`);
   dd.classList.add('open');
 }
 
@@ -695,6 +703,17 @@ function _closeCaricoDropdownDelayed() {
 
 async function pickCaricoSearchResult(p) {
   document.getElementById('carico-search-dropdown').classList.remove('open');
+
+  // Veniamo da una scansione che non aveva riconosciuto il prodotto: ora che
+  // l'utente ha scelto, l'app impara e la prossima volta lo trova da sola.
+  if (S.caricoScanTesto) {
+    api('/api/etichette/abbina', {
+      method: 'POST',
+      body: { testo: S.caricoScanTesto, prodotto: p.prodotto, fornitore: p.fornitore || '' },
+    }).catch(() => {});
+    S.caricoScanTesto = '';
+  }
+
   S.caricoData.prodotto  = p.prodotto;
   S.caricoData.fornitore = p.fornitore || '';
   S.caricoData.unita     = p.unita || '';
@@ -907,8 +926,40 @@ async function onCameraCapture(input) {
         filled = true;
       }
     }
+    if (data.quantita != null && data.quantita > 0) {
+      S.caricoData.qty = data.quantita;
+      filled = true;
+    }
     if (filled) S.caricoData._scanPending = true;
-    toast(filled ? '✓ Etichetta letta — ora seleziona il prodotto' : 'Nessun dato trovato', filled ? 'success' : 'error');
+
+    if (data.prodotto) {
+      // Prodotto riconosciuto: si va dritti alla schermata del carico, gia'
+      // compilata con lotto, scadenza e peso letti dall'etichetta.
+      S.caricoScanTesto = '';
+      S.caricoData.prodotto  = data.prodotto;
+      S.caricoData.fornitore = data.fornitore || '';
+      S.caricoData.unita     = data.unita || '';
+      const inListino = (S.prodotti || []).find(
+        p => p.prodotto === data.prodotto && p.fornitore === (data.fornitore || ''));
+      S.caricoData.reparto   = inListino?.reparto || '';
+      S.caricoData.categoria = inListino?.categoria || '';
+      toast(`Etichetta letta: ${data.prodotto}`, 'success');
+      await goToCaricoStep2();
+    } else if (data.nome_letto) {
+      // Nome diverso da quello del listino: si apre la ricerca gia' compilata
+      // col nome letto, e la scelta dell'utente diventa un abbinamento salvato.
+      S.caricoScanTesto = data.nome_letto;
+      const searchEl = document.getElementById('carico-search-input');
+      if (searchEl) {
+        searchEl.value = data.nome_letto;
+        onCaricoSearchInput();
+        searchEl.focus();
+      }
+      toast(`Letto "${data.nome_letto}" — scegli il prodotto nel listino`, 'success');
+    } else {
+      toast(filled ? 'Etichetta letta — ora seleziona il prodotto' : 'Nessun dato trovato',
+            filled ? 'success' : 'error');
+    }
   } else {
     toast(data.error || 'Non riesco a leggere l\'etichetta, inserisci manualmente', 'error');
   }

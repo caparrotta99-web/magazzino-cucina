@@ -96,6 +96,8 @@ from database import (
     acquire_lock, release_lock, get_locks_attivi,
     accoda_sheets, get_coda_sheets, rimuovi_da_coda_sheets, conta_pendenti_sheets,
     giacenze_per_lotto,
+    normalizza_testo_etichetta, get_alias_etichetta, salva_alias_etichetta,
+    get_alias_etichette,
 )
 from sheets import (
     load_listino, load_registro, append_registro, append_listino, aggiorna_tipo_movimento,
@@ -2645,6 +2647,133 @@ def _extract_json_object(text):
     return json.loads(cleaned[start:end + 1])
 
 
+# ─── ABBINAMENTO ETICHETTA -> PRODOTTO DEL LISTINO ───────────────────────────
+# Sull'etichetta il prodotto si chiama quasi sempre in un altro modo rispetto
+# al listino. Si cerca prima tra gli abbinamenti gia' salvati (esatti), poi per
+# somiglianza del nome. Il fornitore, quando c'e', aiuta a scegliere tra
+# prodotti con nomi simili, ma da solo non decide niente: sulle etichette
+# spesso manca o riporta il produttore invece del fornitore.
+
+_SOMIGLIANZA_MINIMA = 0.55
+
+
+def _somiglianza(a, b):
+    from difflib import SequenceMatcher
+    return SequenceMatcher(None, a, b).ratio()
+
+
+def _punteggio_prodotto(nome_letto_norm, prodotto, fornitore_letto_norm):
+    """Quanto questo prodotto del listino somiglia a quello letto sull'etichetta."""
+    nome_norm = normalizza_testo_etichetta(prodotto['prodotto'])
+    if not nome_norm:
+        return 0.0
+
+    punteggio = _somiglianza(nome_letto_norm, nome_norm)
+
+    # Il nome del listino compare per intero dentro quello dell'etichetta
+    # ("filetto" dentro "filetto di manzo irlandese"): conta come somiglianza
+    # alta, perche' le etichette aggiungono sempre parole in piu'.
+    parole_letto = set(nome_letto_norm.split())
+    parole_nome  = set(nome_norm.split())
+    if parole_nome and parole_nome <= parole_letto:
+        punteggio = max(punteggio, 0.9)
+    elif parole_nome & parole_letto:
+        comuni = len(parole_nome & parole_letto) / len(parole_nome)
+        punteggio = max(punteggio, 0.6 * comuni)
+
+    # Il fornitore aiuta solo se l'etichetta lo riporta davvero.
+    if fornitore_letto_norm:
+        forn_norm = normalizza_testo_etichetta(prodotto.get('fornitore', ''))
+        if forn_norm and (forn_norm in fornitore_letto_norm or fornitore_letto_norm in forn_norm):
+            punteggio += 0.15
+
+    return punteggio
+
+
+def _abbina_prodotto(nome_letto, fornitore_letto=''):
+    """Trova il prodotto del listino che corrisponde al nome letto sull'etichetta.
+
+    Ritorna (prodotto_o_None, come) dove `come` vale 'alias' se l'abbinamento
+    era gia' stato insegnato dall'utente, 'somiglianza' se e' stato dedotto dal
+    nome, None se non si e' trovato niente di abbastanza simile."""
+    if not nome_letto:
+        return None, None
+
+    # 1. abbinamento gia' insegnato
+    alias = get_alias_etichetta(nome_letto)
+    if alias:
+        for p in get_all_prodotti():
+            if p['prodotto'] == alias['prodotto'] and (
+                    not alias['fornitore'] or p['fornitore'] == alias['fornitore']):
+                return p, 'alias'
+        # il prodotto abbinato non e' piu' a listino: si riparte dalla somiglianza
+
+    # 2. somiglianza di nome
+    nome_norm = normalizza_testo_etichetta(nome_letto)
+    forn_norm = normalizza_testo_etichetta(fornitore_letto)
+    migliore, punteggio_migliore = None, 0.0
+    for p in get_all_prodotti():
+        punteggio = _punteggio_prodotto(nome_norm, p, forn_norm)
+        if punteggio > punteggio_migliore:
+            migliore, punteggio_migliore = p, punteggio
+
+    if migliore and punteggio_migliore >= _SOMIGLIANZA_MINIMA:
+        return migliore, 'somiglianza'
+    return None, None
+
+
+# Unita' di misura come compaiono sulle etichette, ricondotte a quelle dell'app.
+_CONVERSIONI = {
+    ('g', 'kg'): 0.001, ('kg', 'g'): 1000.0,
+    ('ml', 'lt'): 0.001, ('lt', 'ml'): 1000.0,
+    ('cl', 'lt'): 0.01,  ('lt', 'cl'): 100.0,
+    ('l', 'lt'): 1.0,    ('lt', 'l'): 1.0,
+}
+
+
+def _normalizza_unita(u):
+    u = (u or '').strip().lower().replace('.', '')
+    if u in ('l', 'litri', 'litro'):
+        return 'lt'
+    if u in ('gr', 'grammi', 'grammo'):
+        return 'g'
+    if u in ('chilo', 'chili', 'chilogrammi'):
+        return 'kg'
+    if u in ('pz', 'pezzi', 'pezzo', 'n'):
+        return 'pz'
+    return u
+
+
+def _converti_quantita(qty, unita_letta, unita_prodotto):
+    """Porta la quantita' letta sull'etichetta nell'unita' del prodotto.
+    Ritorna (quantita_convertita, convertita_si_o_no)."""
+    if qty is None:
+        return None, False
+    da = _normalizza_unita(unita_letta)
+    a  = _normalizza_unita(unita_prodotto)
+    if not da or not a or da == a:
+        return round(float(qty), 4), False
+    fattore = _CONVERSIONI.get((da, a))
+    if fattore is None:
+        return round(float(qty), 4), False
+    return round(float(qty) * fattore, 4), True
+
+
+@app.route('/api/etichette/abbina', methods=['POST'])
+@login_required
+def api_etichette_abbina():
+    """Salva l'abbinamento tra il nome letto sull'etichetta e il prodotto che
+    l'utente ha scelto: la prossima volta viene riconosciuto da solo."""
+    d = request.get_json(force=True)
+    testo     = (d.get('testo') or '').strip()
+    prodotto  = (d.get('prodotto') or '').strip()
+    fornitore = (d.get('fornitore') or '').strip()
+    if not testo or not prodotto:
+        return jsonify({'success': False, 'error': 'Testo o prodotto mancante'}), 400
+    salva_alias_etichetta(testo, prodotto, fornitore)
+    return jsonify({'success': True})
+
+
 @app.route('/api/scan-label', methods=['POST'])
 @login_required
 def api_scan_label():
@@ -2684,8 +2813,15 @@ def api_scan_label():
                         'type': 'text',
                         'text': (
                             'Guarda questa etichetta di un prodotto alimentare ed estrai: '
-                            'numero di lotto e data di scadenza. '
-                            'Rispondi SOLO in JSON: {"lotto": "...", "scadenza": "DD/MM/YYYY"}. '
+                            'numero di lotto, data di scadenza, nome del prodotto cosi\' '
+                            'come e\' scritto in etichetta, fornitore o produttore, e '
+                            'peso o quantita\' netta con la sua unita\' di misura. '
+                            'Rispondi SOLO in JSON: {"lotto": "...", "scadenza": "DD/MM/YYYY", '
+                            '"nome": "...", "fornitore": "...", "quantita": 0.0, "unita": "kg"}. '
+                            'Per "nome" riporta il nome del prodotto per esteso, senza il peso. '
+                            'Il fornitore spesso non c\'e\': in quel caso metti null. '
+                            'Per "quantita" usa il peso netto se c\'e\', altrimenti il peso '
+                            'indicato, come numero senza unita\'. '
                             'Se non leggi un campo metti null.'
                         ),
                     },
@@ -2699,9 +2835,39 @@ def api_scan_label():
             result = None
         if not result:
             return jsonify({'success': False, 'error': 'Nessun dato trovato nell\'etichetta'})
-        return jsonify({'success': True,
-                        'lotto':   result.get('lotto'),
-                        'scadenza': result.get('scadenza')})
+
+        nome_letto      = (result.get('nome') or '').strip()
+        fornitore_letto = (result.get('fornitore') or '').strip()
+        unita_letta     = (result.get('unita') or '').strip()
+        try:
+            qty_letta = float(result.get('quantita')) if result.get('quantita') is not None else None
+        except (TypeError, ValueError):
+            qty_letta = None
+
+        prodotto, come = _abbina_prodotto(nome_letto, fornitore_letto)
+
+        # Se il prodotto e' stato riconosciuto, il peso viene proposto gia'
+        # nell'unita' del listino (es. 500 g -> 0.5 kg), comunque modificabile.
+        qty_proposta, convertita = (None, False)
+        if qty_letta is not None:
+            qty_proposta, convertita = _converti_quantita(
+                qty_letta, unita_letta, prodotto['unita'] if prodotto else unita_letta)
+
+        return jsonify({
+            'success':   True,
+            'lotto':     result.get('lotto'),
+            'scadenza':  result.get('scadenza'),
+            'nome_letto':      nome_letto,
+            'fornitore_letto': fornitore_letto,
+            'quantita_letta':  qty_letta,
+            'unita_letta':     unita_letta,
+            'quantita':        qty_proposta,
+            'convertita':      convertita,
+            'prodotto':   prodotto['prodotto'] if prodotto else None,
+            'fornitore':  prodotto['fornitore'] if prodotto else None,
+            'unita':      prodotto['unita'] if prodotto else None,
+            'riconosciuto_come': come,
+        })
     except Exception as e:
         return jsonify({'success': False, 'error': str(e)}), 500
 

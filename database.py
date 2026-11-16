@@ -415,6 +415,23 @@ def db_init():
                 eliminato_da   TEXT NOT NULL DEFAULT '',
                 eliminato_il   TEXT NOT NULL DEFAULT ''
             )""",
+            f"""CREATE TABLE IF NOT EXISTS ricette (
+                id                   {pk},
+                nome                 TEXT NOT NULL,
+                reparto              TEXT NOT NULL DEFAULT 'Cucina',
+                unita                TEXT NOT NULL DEFAULT 'kg',
+                quantita_solita      REAL NOT NULL DEFAULT 0,
+                giorni_conservazione INTEGER NOT NULL DEFAULT 0,
+                creato_da            TEXT NOT NULL DEFAULT '',
+                creato_il            TEXT NOT NULL
+            )""",
+            f"""CREATE TABLE IF NOT EXISTS ricette_ingredienti (
+                id         {pk},
+                ricetta_id INTEGER NOT NULL,
+                prodotto   TEXT NOT NULL,
+                quantita   REAL NOT NULL DEFAULT 0,
+                unita      TEXT NOT NULL DEFAULT ''
+            )""",
             f"""CREATE TABLE IF NOT EXISTS etichette_alias (
                 id            {pk},
                 testo         TEXT NOT NULL UNIQUE,
@@ -827,6 +844,73 @@ def conta_pendenti_sheets():
         b = _row(conn.execute("SELECT COUNT(*) AS n FROM sheets_coda"))['n']
         c = _row(conn.execute("SELECT COUNT(*) AS n FROM temperature WHERE synced = 0"))['n']
     return int(a) + int(b) + int(c)
+
+
+# ─── RICETTE ────────────────────────────────────────────────────────────────
+# Le preparazioni che si rifanno sempre uguali (il ragu', il fondo, la besciamella)
+# si salvano come ricetta: ingredienti e quantita' solite, piu' i giorni di
+# conservazione da cui si calcola la scadenza. Sono roba dell'app: non vanno
+# su Google Sheets e il ricaricamento dai fogli non le tocca.
+
+def insert_ricetta(nome, reparto, unita, quantita_solita, giorni_conservazione,
+                   ingredienti, creato_da=''):
+    """Salva una ricetta con i suoi ingredienti. `ingredienti` e' una lista di
+    dizionari con prodotto, quantita e (facoltativa) unita."""
+    with get_conn() as conn:
+        ricetta_id = conn.execute_insert(
+            """INSERT INTO ricette
+               (nome, reparto, unita, quantita_solita, giorni_conservazione, creato_da, creato_il)
+               VALUES (?, ?, ?, ?, ?, ?, ?)""",
+            (nome, reparto or 'Cucina', unita or 'kg', float(quantita_solita or 0),
+             int(giorni_conservazione or 0), creato_da, now_it().isoformat())
+        )
+        for ing in ingredienti or []:
+            conn.execute(
+                "INSERT INTO ricette_ingredienti (ricetta_id, prodotto, quantita, unita) "
+                "VALUES (?, ?, ?, ?)",
+                (ricetta_id, ing['prodotto'], float(ing.get('quantita') or 0),
+                 ing.get('unita') or '')
+            )
+    return ricetta_id
+
+
+def get_ricette():
+    """Tutte le ricette salvate, ingredienti compresi."""
+    with get_conn() as conn:
+        ricette = _rows(conn.execute("SELECT * FROM ricette ORDER BY LOWER(nome)"))
+        ingredienti = _rows(conn.execute(
+            "SELECT ricetta_id, prodotto, quantita, unita FROM ricette_ingredienti ORDER BY id"))
+    per_ricetta = {}
+    for i in ingredienti:
+        per_ricetta.setdefault(i['ricetta_id'], []).append(i)
+    for r in ricette:
+        r['ingredienti'] = per_ricetta.get(r['id'], [])
+    return ricette
+
+
+def get_ricetta(ricetta_id):
+    with get_conn() as conn:
+        r = _row(conn.execute("SELECT * FROM ricette WHERE id = ?", (ricetta_id,)))
+        if not r:
+            return None
+        r['ingredienti'] = _rows(conn.execute(
+            "SELECT prodotto, quantita, unita FROM ricette_ingredienti "
+            "WHERE ricetta_id = ? ORDER BY id", (ricetta_id,)))
+    return r
+
+
+def get_ricetta_per_nome(nome):
+    """Serve a non salvare due volte la stessa ricetta."""
+    with get_conn() as conn:
+        return _row(conn.execute(
+            "SELECT * FROM ricette WHERE LOWER(nome) = LOWER(?)", (nome or '',)))
+
+
+def delete_ricetta(ricetta_id):
+    with get_conn() as conn:
+        conn.execute("DELETE FROM ricette_ingredienti WHERE ricetta_id = ?", (ricetta_id,))
+        conn.execute("DELETE FROM ricette WHERE id = ?", (ricetta_id,))
+    return True
 
 
 # ─── ABBINAMENTI ETICHETTA -> PRODOTTO ───────────────────────────────────────

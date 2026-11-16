@@ -1510,6 +1510,15 @@
     <div class="modal-title">Nuova preparazione</div>
     <div class="modal-body">
 
+      <div class="fgroup" id="prep-ricetta-group">
+        <label class="flabel">Ricetta salvata</label>
+        <div class="fselect-wrap">
+          <select class="fselect" id="prep-ricetta" onchange="onPrepRicettaChange(this.value)">
+            <option value="">Nessuna, la scrivo adesso</option>
+          </select>
+        </div>
+      </div>
+
       <div class="fgroup">
         <label class="flabel">Nome preparazione *</label>
         <input class="finput" type="text" id="prep-nome" placeholder="es. Insalata di mare" autocomplete="off">
@@ -1569,14 +1578,7 @@
 
       <div class="fgroup" style="margin-bottom:8px">
         <label class="flabel">Ingredienti *</label>
-        <div class="fselect-wrap">
-          <select class="fselect" id="prep-ing-filter-reparto" onchange="onPrepIngRepartoChange(this)">
-            <option value="">Tutti i reparti</option>
-            <option value="Cucina">Cucina</option>
-            <option value="Sala">Sala</option>
-            <option value="Pizzeria">Pizzeria</option>
-          </select>
-        </div>
+        <div class="prep-ing-nota">Il lotto lo sceglie l'app: prima quello gia' aperto, altrimenti quello che scade prima. Puoi cambiarlo.</div>
       </div>
       <div id="prep-ingredienti-list"></div>
       <button type="button" class="btn-scan" style="margin:6px 0 14px" onclick="addIngredienteRow()">
@@ -1584,9 +1586,21 @@
         Aggiungi ingrediente
       </button>
 
-      <div class="fgroup" style="margin-bottom:0">
+      <div class="fgroup">
         <label class="flabel">Note</label>
         <textarea class="ftextarea" id="prep-note" placeholder="Note opzionali…"></textarea>
+      </div>
+
+      <div class="fgroup" style="margin-bottom:0" id="prep-salva-ricetta-group">
+        <label class="prep-check">
+          <input type="checkbox" id="prep-salva-ricetta" onchange="onSalvaRicettaChange()">
+          <span>Salva come ricetta, cosi' la prossima volta si compila da sola</span>
+        </label>
+        <div id="prep-giorni-group" style="display:none;margin-top:10px">
+          <label class="flabel">Giorni di conservazione</label>
+          <input class="finput" type="number" id="prep-giorni" min="0" step="1" placeholder="es. 3"
+                 inputmode="numeric" oninput="onGiorniConservazioneChange()">
+        </div>
       </div>
     </div>
     <div class="modal-actions">
@@ -1761,6 +1775,7 @@ const CAN_GESTIRE_SALA = {{ 'true' if current_user.is_authenticated and current_
 const TUTORIAL_VISTO = {{ 'true' if current_user.is_authenticated and current_user.tutorial_visto else 'false' }};
 const CAN_CHAT = {{ 'true' if current_user.is_authenticated and current_user.puo_accedere_chat else 'false' }};
 const CURRENT_USER_ID = {{ current_user.id if current_user.is_authenticated else 0 }};
+const USER_REPARTO = "{{ current_user.reparto if current_user.is_authenticated else '' }}";
 const IS_ADMIN = {{ 'true' if current_user.is_authenticated and current_user.role == 'admin' else 'false' }};
 const VAPID_PUBLIC_KEY = "{{ vapid_public_key }}";
 const CHAT_MIE_CANALI = {{ (current_user.canali_chat if current_user.is_authenticated else []) | tojson }};

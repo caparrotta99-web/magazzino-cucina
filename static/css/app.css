@@ -2080,3 +2080,18 @@ html.chat-no-scroll { overflow: hidden; }
 .aperto-azioni .az-finito  { border-color: rgba(16,185,129,.5); }
 .aperto-azioni .az-buttato { border-color: rgba(220,38,38,.5); }
 .aperti-vuoto { font-size: 14px; opacity: .7; }
+
+/* ─── PREPARAZIONI: ricette e lotto automatico ──────────────────────────── */
+.prep-ing-nota { font-size: 13px; line-height: 1.45; opacity: .75; margin-top: 2px; }
+.prep-check { display: flex; align-items: flex-start; gap: 9px; font-size: 14px; line-height: 1.45; cursor: pointer; }
+.prep-check input { width: 18px; height: 18px; margin-top: 1px; flex-shrink: 0; }
+.ingr-lotto-riga {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  border: 1px solid var(--border); border-radius: 11px;
+  padding: 9px 11px; margin-bottom: 8px; background: var(--surface-2);
+  font-size: 14px;
+}
+.ingr-lotto-riga.vuota { opacity: .7; }
+.ingr-lotto-testo { font-weight: 600; }
+.ingr-lotto-sub { display: block; font-size: 12px; font-weight: 500; opacity: .75; margin-top: 2px; }
+.ingr-lotto-cambia { font-size: 13px; font-weight: 700; color: var(--accent, #0ea5e9); cursor: pointer; flex-shrink: 0; }

@@ -39,6 +39,7 @@ const S = {
   ultimoFornitore: '',
   inUsoReparto:    '', inUsoCategoria:    '',
   prepIngReparto:  '',
+  ricette:         [],
   apparecchi:            [],
   locks:                 [],
   puoGestireApparecchi:  false,
@@ -3340,27 +3341,105 @@ async function confermaCompletaPreparazione(id) {
   await loadPreparazioni();
 }
 
-function openNuovaPreparazione() {
+async function openNuovaPreparazione() {
   document.getElementById('prep-nome').value     = '';
-  document.getElementById('prep-reparto').value  = '';
   document.getElementById('prep-quantita').value = '';
   document.getElementById('prep-unita').value    = 'kg';
   document.getElementById('prep-scadenza').value = '';
   document.getElementById('prep-note').value     = '';
+  document.getElementById('prep-ricetta').value  = '';
+  document.getElementById('prep-salva-ricetta').checked = false;
+  document.getElementById('prep-giorni').value = '';
+  document.getElementById('prep-giorni-group').style.display = 'none';
+  document.getElementById('prep-salva-ricetta-group').style.display = '';
+
+  // Reparto, data e ora si compilano da soli: chi prepara ha le mani in pasta.
+  document.getElementById('prep-reparto').value = _repartoUtente();
   const { data, ora } = dataOraItaliana();
   document.getElementById('prep-data').value = data;
   document.getElementById('prep-ora').value  = ora;
+
   S.prepIngReparto = '';
-  document.getElementById('prep-ing-filter-reparto').value = '';
   prepIngredienti = [];
   prepIngredienteSeq = 0;
   addIngredienteRow();
   document.getElementById('modal-nuova-preparazione').classList.add('open');
+  await caricaRicette();
 }
 
-function onPrepIngRepartoChange(sel) {
-  S.prepIngReparto = sel.value;
+function _repartoUtente() {
+  const r = (USER_REPARTO || '').toLowerCase();
+  if (r === 'sala')     return 'Sala';
+  if (r === 'pizzeria') return 'Pizzeria';
+  return 'Cucina';
+}
+
+async function caricaRicette() {
+  const data = await api('/api/ricette');
+  S.ricette = data.ricette || [];
+  const sel = document.getElementById('prep-ricetta');
+  const gruppo = document.getElementById('prep-ricetta-group');
+  if (!S.ricette.length) { gruppo.style.display = 'none'; return; }
+  gruppo.style.display = '';
+  sel.innerHTML = '<option value="">Nessuna, la scrivo adesso</option>' +
+    S.ricette.map(r => `<option value="${r.id}">${esc(r.nome)}</option>`).join('');
+}
+
+// Scelta una ricetta: nome, reparto, quantita' solita, unita', ingredienti e
+// scadenza si compilano da soli. Resta tutto modificabile.
+async function onPrepRicettaChange(idStr) {
+  if (!idStr) return;
+  const ricetta = S.ricette.find(r => String(r.id) === String(idStr));
+  if (!ricetta) return;
+
+  document.getElementById('prep-nome').value    = ricetta.nome;
+  document.getElementById('prep-reparto').value = ricetta.reparto || _repartoUtente();
+  document.getElementById('prep-unita').value   = ricetta.unita || 'kg';
+  if (ricetta.quantita_solita) document.getElementById('prep-quantita').value = ricetta.quantita_solita;
+
+  if (ricetta.giorni_conservazione) {
+    document.getElementById('prep-giorni').value = ricetta.giorni_conservazione;
+    _applicaGiorniConservazione(ricetta.giorni_conservazione);
+  }
+
+  // Una ricetta gia' salvata non va risalvata.
+  document.getElementById('prep-salva-ricetta').checked = false;
+  document.getElementById('prep-salva-ricetta-group').style.display = 'none';
+
+  prepIngredienti.forEach(_releaseIngredienteLock);
+  prepIngredienti = [];
+  for (const ing of ricetta.ingredienti || []) {
+    prepIngredienti.push({
+      seq: prepIngredienteSeq++, prodotto: ing.prodotto, selected: null,
+      qty: ing.quantita || '', alternative: [], lockKey: null, caricando: true,
+    });
+  }
+  if (!prepIngredienti.length) addIngredienteRow();
   renderIngredientiRows();
+
+  // Il lotto di ogni ingrediente lo sceglie l'app, uno per uno.
+  for (const r of [...prepIngredienti]) {
+    if (r.prodotto) await _scegliLottoIngrediente(r);
+  }
+  renderIngredientiRows();
+}
+
+function _applicaGiorniConservazione(giorni) {
+  const g = parseInt(giorni, 10);
+  const dataPrep = document.getElementById('prep-data').value;
+  if (!Number.isFinite(g) || !dataPrep) return;
+  const d = new Date(dataPrep + 'T12:00:00');
+  d.setDate(d.getDate() + g);
+  document.getElementById('prep-scadenza').value = d.toISOString().slice(0, 10);
+}
+
+function onGiorniConservazioneChange() {
+  _applicaGiorniConservazione(document.getElementById('prep-giorni').value);
+}
+
+function onSalvaRicettaChange() {
+  const on = document.getElementById('prep-salva-ricetta').checked;
+  document.getElementById('prep-giorni-group').style.display = on ? '' : 'none';
 }
 function _releaseIngredienteLock(r) {
   if (r && r.lockKey) { releaseLock({ tipo: 'prodotto_lotto', ...r.lockKey }); r.lockKey = null; }
@@ -3372,7 +3451,8 @@ function closeNuovaPreparazione() {
 function bgClosePrepForm(e) { if (e.target === document.getElementById('modal-nuova-preparazione')) closeNuovaPreparazione(); }
 
 function addIngredienteRow() {
-  prepIngredienti.push({ seq: prepIngredienteSeq++, prodotto: '', fonte: 'magazzino', selected: null, qty: '', lotti: [], lockKey: null });
+  prepIngredienti.push({ seq: prepIngredienteSeq++, prodotto: '', selected: null,
+                         qty: '', alternative: [], lockKey: null, caricando: false });
   renderIngredientiRows();
 }
 function removeIngredienteRow(seq) {
@@ -3384,31 +3464,25 @@ function removeIngredienteRow(seq) {
 
 function renderIngredientiRows() {
   const container = document.getElementById('prep-ingredienti-list');
-  const prodottiFiltrati = filterProdotti(S.prodotti, S.prepIngReparto, '');
   container.innerHTML = prepIngredienti.map((r, idx) => `
     <div class="ingr-row">
       <div class="ingr-row-top">
         <span class="ingr-row-num">Ingrediente ${idx + 1}</span>
         ${prepIngredienti.length > 1 ? `<button type="button" class="ingr-remove-btn" onclick="removeIngredienteRow(${r.seq})">✕</button>` : ''}
       </div>
-      <div class="fselect-wrap" style="margin-bottom:8px">
-        <select class="fselect" onchange="onIngredienteProdotto(${r.seq}, this.value)">
-          <option value="">Seleziona prodotto…</option>
-          ${prodottiFiltrati.map(p => `<option value="${esc(p.prodotto)}" ${r.prodotto===p.prodotto?'selected':''}>${esc(p.prodotto)}</option>`).join('')}
-        </select>
-      </div>
-      <div class="fselect-wrap" style="margin-bottom:8px">
-        <select class="fselect" onchange="onIngredienteFonte(${r.seq}, this.value)">
-          <option value="magazzino" ${r.fonte==='magazzino'?'selected':''}>In magazzino</option>
-          <option value="in_uso" ${r.fonte==='in_uso'?'selected':''}>In uso</option>
-        </select>
-      </div>
-      <div class="fselect-wrap" style="margin-bottom:8px">
-        <select class="fselect" ${r.lotti.length ? '' : 'disabled'} onchange="onIngredienteLotto(${r.seq}, this.value)">
-          <option value="">${r.prodotto ? 'Seleziona lotto…' : 'Seleziona prima il prodotto'}</option>
-          ${r.lotti.map((l, i) => `<option value="${i}" ${r.selected===l?'selected':''}>${esc(l.lotto)} — ${l.disponibile}&nbsp;${esc(l.unita)}${l.scadenza?` · scade ${fmtDate(l.scadenza)}`:''} · carico ${fmtDate(l.data_carico)}</option>`).join('')}
-        </select>
-      </div>
+      ${r.prodotto
+        ? `<div class="ingr-lotto-riga">
+             <span class="ingr-lotto-testo">${esc(r.prodotto)}</span>
+             <span class="ingr-lotto-cambia" onclick="cambiaProdottoIngrediente(${r.seq})">Cambia</span>
+           </div>`
+        : `<div class="search-wrap spesa-search-wrap" style="margin-bottom:8px">
+             <input class="search-input" type="search" id="ingr-search-${r.seq}"
+                    placeholder="Cerca prodotto…" autocomplete="off"
+                    oninput="onIngredienteSearch(${r.seq}, this.value)"
+                    onfocus="onIngredienteSearch(${r.seq}, this.value)">
+             <div class="spesa-search-dropdown" id="ingr-dd-${r.seq}"></div>
+           </div>`}
+      ${_rigaLottoIngrediente(r)}
       <input class="finput" type="number" min="0.01" step="0.01" inputmode="decimal"
              placeholder="Quantità usata" value="${r.qty}"
              oninput="onIngredienteQty(${r.seq}, this.value)">
@@ -3416,61 +3490,95 @@ function renderIngredientiRows() {
   `).join('');
 }
 
-async function _caricaLottiIngrediente(r) {
-  if (r.fonte === 'in_uso') {
-    const data = await api(`/api/in-uso?prodotto=${encodeURIComponent(r.prodotto)}`);
-    r.lotti = (data.in_uso || []).map(x => ({
-      lotto: x.lotto, disponibile: x.qty, unita: x.unita, scadenza: x.scadenza,
-      data_carico: x.data_carico, in_uso_id: x.id,
-    }));
-  } else {
-    const data = await api(`/api/lotti?prodotto=${encodeURIComponent(r.prodotto)}`);
-    r.lotti = (data.lotti || []).map(x => ({
-      lotto: x.lotto, disponibile: x.rimanenza, unita: x.unita, scadenza: x.scadenza,
-      data_carico: x.data_carico, in_uso_id: null,
-    }));
+// Il lotto non si sceglie più da due menu: lo propone l'app e si legge come
+// una frase ("Macinato · lotto L123 (aperto)"). Cambiarlo resta possibile.
+function _rigaLottoIngrediente(r) {
+  if (!r.prodotto) return '';
+  if (r.caricando) return `<div class="ingr-lotto-riga vuota"><span>Cerco il lotto…</span></div>`;
+  if (!r.selected) {
+    return `<div class="ingr-lotto-riga vuota"><span>Nessun lotto disponibile per questo prodotto</span></div>`;
   }
+  const l = r.selected;
+  const scad = l.scadenza ? `scade ${fmtDate(l.scadenza)}` : 'senza scadenza';
+  return `
+    <div class="ingr-lotto-riga">
+      <span class="ingr-lotto-testo">${esc(r.prodotto)} · ${esc(l.descrizione)}
+        <span class="ingr-lotto-sub">${l.disponibile} ${esc(l.unita)} · ${scad}</span>
+      </span>
+      ${r.alternative.length > 1
+        ? `<span class="ingr-lotto-cambia" onclick="cambiaLottoIngrediente(${r.seq})">Cambia</span>`
+        : ''}
+    </div>`;
+}
+
+function onIngredienteSearch(seq, q) {
+  const dd = document.getElementById('ingr-dd-' + seq);
+  if (!dd) return;
+  const query = (q || '').trim().toLowerCase();
+  const disponibili = S.giacenze || [];
+  const matches = (query
+    ? disponibili.filter(g => g.prodotto.toLowerCase().includes(query))
+    : disponibili).slice(0, 20);
+  dd.innerHTML = matches.length
+    ? matches.map(g => `
+      <div class="spesa-search-item" onclick="onIngredienteProdotto(${seq}, ${esc(JSON.stringify(g.prodotto))})">
+        <span class="spesa-search-item-nome">${esc(g.prodotto)}</span>
+      </div>`).join('')
+    : `<div class="spesa-search-empty">Nessun prodotto in magazzino</div>`;
+  dd.classList.add('open');
+}
+
+function cambiaProdottoIngrediente(seq) {
+  const r = prepIngredienti.find(x => x.seq === seq);
+  if (!r) return;
+  _releaseIngredienteLock(r);
+  r.prodotto = ''; r.selected = null; r.alternative = []; r.qty = '';
+  renderIngredientiRows();
 }
 
 async function onIngredienteProdotto(seq, prodotto) {
   const r = prepIngredienti.find(x => x.seq === seq);
   if (!r) return;
   _releaseIngredienteLock(r);
-  r.prodotto = prodotto; r.selected = null; r.qty = ''; r.lotti = [];
+  r.prodotto = prodotto; r.selected = null; r.alternative = []; r.caricando = true;
   renderIngredientiRows();
-  if (!prodotto) return;
-  await _caricaLottiIngrediente(r);
-  const r2 = prepIngredienti.find(x => x.seq === seq);
-  if (!r2) return; // rimosso nel frattempo
+  await _scegliLottoIngrediente(r);
   renderIngredientiRows();
 }
 
-async function onIngredienteFonte(seq, fonte) {
-  const r = prepIngredienti.find(x => x.seq === seq);
-  if (!r) return;
-  _releaseIngredienteLock(r);
-  r.fonte = fonte; r.selected = null; r.qty = ''; r.lotti = [];
-  renderIngredientiRows();
-  if (!r.prodotto) return;
-  await _caricaLottiIngrediente(r);
-  const r2 = prepIngredienti.find(x => x.seq === seq);
-  if (!r2) return; // rimosso nel frattempo
-  renderIngredientiRows();
+// Prima il lotto già aperto di quel prodotto, altrimenti quello che scade
+// prima: la scelta la fa il server, qui si prende e si blocca.
+async function _scegliLottoIngrediente(r) {
+  const data = await api(`/api/ingrediente-lotto?prodotto=${encodeURIComponent(r.prodotto)}`);
+  if (!prepIngredienti.find(x => x.seq === r.seq)) return;  // riga tolta nel frattempo
+  r.alternative = data.alternative || [];
+  r.caricando = false;
+  const scelto = data.scelto;
+  if (!scelto) { r.selected = null; return; }
+  await _bloccaLottoIngrediente(r, scelto);
 }
 
-async function onIngredienteLotto(seq, idxStr) {
-  const r = prepIngredienti.find(x => x.seq === seq);
-  if (!r) return;
-  _releaseIngredienteLock(r);
-  const idx = idxStr === '' ? -1 : Number(idxStr);
-  const scelto = idx >= 0 ? r.lotti[idx] : null;
-  if (!scelto) { r.selected = null; renderIngredientiRows(); return; }
-
-  const ok = await tryAcquireLock({ tipo: 'prodotto_lotto', prodotto: r.prodotto, lotto: scelto.lotto, form: 'preparazione' });
-  if (!ok) { r.selected = null; renderIngredientiRows(); return; }
-
+async function _bloccaLottoIngrediente(r, scelto) {
+  const ok = await tryAcquireLock({
+    tipo: 'prodotto_lotto', prodotto: r.prodotto, lotto: scelto.lotto, form: 'preparazione' });
+  if (!ok) { r.selected = null; return false; }
   r.selected = scelto;
   r.lockKey  = { prodotto: r.prodotto, lotto: scelto.lotto };
+  return true;
+}
+
+async function cambiaLottoIngrediente(seq) {
+  const r = prepIngredienti.find(x => x.seq === seq);
+  if (!r || r.alternative.length < 2) return;
+  const elenco = r.alternative.map((l, i) =>
+    `${i + 1}) ${l.descrizione} — ${l.disponibile} ${l.unita}${l.scadenza ? ' · scade ' + fmtDate(l.scadenza) : ''}`
+  ).join('\n');
+  const scelta = prompt(`Quale lotto di ${r.prodotto}?\n\n${elenco}\n\nScrivi il numero:`);
+  if (scelta === null) return;
+  const i = parseInt(scelta, 10) - 1;
+  if (!(i >= 0 && i < r.alternative.length)) { toast('Numero non valido', 'error'); return; }
+  _releaseIngredienteLock(r);
+  await _bloccaLottoIngrediente(r, r.alternative[i]);
   renderIngredientiRows();
 }
 
@@ -3495,7 +3603,7 @@ async function submitPreparazione() {
 
   const ingredienti = prepIngredienti
     .filter(r => r.prodotto && r.selected && r.qty)
-    .map(r => r.fonte === 'in_uso'
+    .map(r => r.selected.fonte === 'in_uso'
       ? { prodotto: r.prodotto, fonte: 'in_uso', in_uso_id: r.selected.in_uso_id, quantita: parseFloat(r.qty) }
       : { prodotto: r.prodotto, fonte: 'magazzino', lotto: r.selected.lotto, quantita: parseFloat(r.qty) });
 
@@ -3504,16 +3612,26 @@ async function submitPreparazione() {
   const btn = document.getElementById('btn-prep-salva');
   btn.disabled = true;
 
+  const salvaRicetta = document.getElementById('prep-salva-ricetta').checked;
+  const giorni = parseInt(document.getElementById('prep-giorni').value, 10);
+
   const result = await api('/api/preparazioni', {
     method: 'POST',
-    body: { nome, reparto, quantita, unita, scadenza, note, ingredienti, data: dataVal, ora: oraVal },
+    body: {
+      nome, reparto, quantita, unita, scadenza, note, ingredienti,
+      data: dataVal, ora: oraVal,
+      salva_ricetta: salvaRicetta,
+      giorni_conservazione: Number.isFinite(giorni) ? giorni : 0,
+    },
   });
 
   btn.disabled = false;
 
   if (!result.success) { toast(result.error || 'Errore', 'error'); return; }
   closeNuovaPreparazione();
-  toast('Preparazione registrata', 'success');
+  if (result.ricetta_salvata === true)       toast('Preparazione registrata e ricetta salvata', 'success');
+  else if (result.ricetta_salvata === false) toast('Preparazione registrata. La ricetta esisteva gia\', non l\'ho risalvata.', 'warning');
+  else                                        toast('Preparazione registrata', 'success');
   await Promise.all([loadPreparazioni(), loadGiacenze(), loadAlerts()]);
 }
 

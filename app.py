@@ -98,6 +98,7 @@ from database import (
     giacenze_per_lotto,
     normalizza_testo_etichetta, get_alias_etichetta, salva_alias_etichetta,
     get_alias_etichette,
+    insert_ricetta, get_ricette, get_ricetta, get_ricetta_per_nome, delete_ricetta,
 )
 from sheets import (
     load_listino, load_registro, append_registro, append_listino, aggiorna_tipo_movimento,
@@ -1316,6 +1317,100 @@ def api_lotti():
     return jsonify({'success': True, 'lotti': get_lotti_attivi(prodotto)})
 
 
+@app.route('/api/ingrediente-lotto')
+@login_required
+def api_ingrediente_lotto():
+    """Il lotto da usare per un ingrediente, scelto dall'app.
+
+    Prima quello gia' aperto (in uso) di quel prodotto: se una confezione e'
+    aperta si finisce quella, non se ne apre un'altra. Altrimenti il lotto in
+    magazzino che scade prima. Chi prepara puo' sempre cambiarlo."""
+    prodotto = request.args.get('prodotto', '').strip()
+    if not prodotto:
+        return jsonify({'success': True, 'scelto': None, 'alternative': []})
+
+    aperti = [
+        {'fonte': 'in_uso', 'lotto': r['lotto'], 'in_uso_id': r['id'],
+         'disponibile': r['qty'], 'unita': r['unita'], 'scadenza': r['scadenza'],
+         'data_carico': r['data_carico'],
+         'descrizione': f"lotto {r['lotto']} (aperto)" if r['lotto'] else 'aperto'}
+        for r in get_in_uso_attivi(prodotto)
+    ]
+    magazzino = [
+        {'fonte': 'magazzino', 'lotto': l['lotto'], 'in_uso_id': None,
+         'disponibile': l['rimanenza'], 'unita': l['unita'], 'scadenza': l['scadenza'],
+         'data_carico': l['data_carico'],
+         'descrizione': f"lotto {l['lotto']}" if l['lotto'] else 'senza lotto'}
+        for l in get_lotti_attivi(prodotto)
+    ]
+
+    # Tra gli aperti e tra quelli in magazzino vince comunque chi scade prima.
+    def per_scadenza(x):
+        return (x['scadenza'] == '' or x['scadenza'] is None, x['scadenza'] or '')
+    aperti.sort(key=per_scadenza)
+    magazzino.sort(key=per_scadenza)
+
+    alternative = aperti + magazzino
+    return jsonify({
+        'success': True,
+        'scelto': alternative[0] if alternative else None,
+        'alternative': alternative,
+    })
+
+
+# ─── RICETTE ────────────────────────────────────────────────────────────────
+
+@app.route('/api/ricette', methods=['GET'])
+@login_required
+def api_ricette_list():
+    return jsonify({'success': True, 'ricette': get_ricette()})
+
+
+@app.route('/api/ricette', methods=['POST'])
+@login_required
+def api_ricette_crea():
+    d = request.get_json(force=True)
+    nome = (d.get('nome') or '').strip()
+    if not nome:
+        return jsonify({'success': False, 'error': 'Inserisci il nome della ricetta'}), 400
+    if get_ricetta_per_nome(nome):
+        return jsonify({'success': False, 'error': f"Esiste gia' una ricetta che si chiama {nome}"}), 400
+
+    ingredienti = [
+        {'prodotto': (i.get('prodotto') or '').strip(),
+         'quantita': i.get('quantita') or 0,
+         'unita': (i.get('unita') or '').strip()}
+        for i in (d.get('ingredienti') or [])
+        if (i.get('prodotto') or '').strip()
+    ]
+    if not ingredienti:
+        return jsonify({'success': False, 'error': 'Serve almeno un ingrediente'}), 400
+
+    ricetta_id = insert_ricetta(
+        nome, d.get('reparto') or 'Cucina', d.get('unita') or 'kg',
+        d.get('quantita_solita') or 0, d.get('giorni_conservazione') or 0,
+        ingredienti, creato_da=current_user.nome)
+    return jsonify({'success': True, 'ricetta': get_ricetta(ricetta_id)})
+
+
+@app.route('/api/ricette/<int:ricetta_id>', methods=['GET'])
+@login_required
+def api_ricetta_dettaglio(ricetta_id):
+    r = get_ricetta(ricetta_id)
+    if not r:
+        return jsonify({'success': False, 'error': 'Ricetta non trovata'}), 404
+    return jsonify({'success': True, 'ricetta': r})
+
+
+@app.route('/api/ricette/<int:ricetta_id>', methods=['DELETE'])
+@login_required
+def api_ricetta_elimina(ricetta_id):
+    if not get_ricetta(ricetta_id):
+        return jsonify({'success': False, 'error': 'Ricetta non trovata'}), 404
+    delete_ricetta(ricetta_id)
+    return jsonify({'success': True})
+
+
 @app.route('/api/giacenze')
 @login_required
 def api_giacenze():
@@ -2099,9 +2194,25 @@ def api_preparazione_crea():
     for ing in ingredienti:
         insert_preparazione_ingrediente(prep_id, ing['prodotto'], ing['lotto'], ing['qty'], ing['unita'])
 
+    # "Salva come ricetta": la prossima volta ingredienti e quantita' si
+    # compilano da soli. Se il nome e' gia' preso non e' un errore della
+    # preparazione, che e' stata registrata comunque: si avvisa e basta.
+    ricetta_salvata = None
+    if d.get('salva_ricetta'):
+        if get_ricetta_per_nome(nome):
+            ricetta_salvata = False
+        else:
+            insert_ricetta(
+                nome, reparto, unita, quantita, d.get('giorni_conservazione') or 0,
+                [{'prodotto': i['prodotto'], 'quantita': i['qty'], 'unita': i['unita']}
+                 for i in ingredienti],
+                creato_da=current_user.nome)
+            ricetta_salvata = True
+
     return jsonify({
         'success':           True,
         'id':                prep_id,
+        'ricetta_salvata':   ricetta_salvata,
         'nome':              nome,
         'reparto':           reparto,
         'data_preparazione': data_prep,

@@ -115,6 +115,14 @@ from pdf_export import (
 # ANTHROPIC_MODEL (utile per tornare indietro se un modello legge peggio).
 AI_MODEL = os.environ.get('ANTHROPIC_MODEL', 'claude-sonnet-5-5')
 
+def _testo_risposta(resp):
+    """Testo della risposta di Claude. I modelli recenti possono mettere prima
+    un blocco di ragionamento ('thinking') senza testo: si prendono solo i
+    blocchi di tipo testo, invece del primo blocco qualunque."""
+    return ''.join(getattr(b, 'text', '') for b in resp.content
+                   if getattr(b, 'type', '') == 'text')
+
+
 app = Flask(__name__)
 # La chiave che firma i login deve venire da Render (SECRET_KEY). Se manca
 # non si usa più un valore fisso scritto nel codice (chiunque lo leggesse
@@ -2662,7 +2670,7 @@ def api_sala_scan():
                 ],
             }],
         )
-        text = resp.content[0].text
+        text = _testo_risposta(resp)
         try:
             dati = _extract_json_object(text)
         except json.JSONDecodeError:
@@ -2945,7 +2953,7 @@ def api_scan_label():
                 ],
             }],
         )
-        text = resp.content[0].text
+        text = _testo_risposta(resp)
         try:
             result = _extract_json_object(text)
         except json.JSONDecodeError:
@@ -3040,7 +3048,7 @@ def api_scan_apparecchio():
                 ],
             }],
         )
-        text = resp.content[0].text
+        text = _testo_risposta(resp)
         try:
             result = _extract_json_object(text)
         except json.JSONDecodeError:

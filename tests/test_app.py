@@ -211,3 +211,10 @@ def test_niente_raffica_di_notifiche(app_mod, db, monkeypatch):
     for _ in range(3):
         app_mod.app.test_client().post('/forgot-password', data={'nome': 'Mario Rossi'})
     assert len(notifiche) == 1
+
+
+def test_risposta_ai_con_blocco_di_ragionamento(app_mod):
+    from types import SimpleNamespace as NS
+    resp = NS(content=[NS(type='thinking', thinking='...'),
+                       NS(type='text', text='{"lotto": "L1", "scadenza": "01/12/2026"}')])
+    assert app_mod._testo_risposta(resp) == '{"lotto": "L1", "scadenza": "01/12/2026"}'

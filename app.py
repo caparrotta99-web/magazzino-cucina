@@ -25,7 +25,7 @@ from timezone_utils import now_it, today_it, TZ_ITALIA
 
 from flask import (
     Flask, render_template, request, jsonify,
-    send_from_directory, send_file, redirect, url_for, abort,
+    send_from_directory, send_file, redirect, url_for, abort, session,
 )
 from flask_login import (
     LoginManager, UserMixin,
@@ -532,59 +532,112 @@ def logout():
 
 # ─── RECUPERO PASSWORD ───────────────────────────────────────────────────────
 
+# ─── PASSWORD DIMENTICATA ────────────────────────────────────────────────────
+# Nessun codice da leggere o digitare: chi non ricorda la password scrive il
+# suo nome, gli admin ricevono una notifica, uno tocca "Fallo entrare" e sul
+# telefono della persona compare subito la schermata per scegliere la nuova
+# password. La richiesta è legata al telefono che l'ha fatta (un segreto
+# casuale salvato nella sua sessione), quindi la conferma dell'admin vale
+# solo lì e non per chiunque scriva lo stesso nome altrove.
+RESET_DURATA_MINUTI = 15
+RESET_ATTESA_TRA_RICHIESTE_MINUTI = 2
+
+
+def _richiesta_reset_corrente():
+    """La richiesta di questo telefono, se esiste ed è ancora valida."""
+    token = session.get('reset_token')
+    if not token:
+        return None
+    t = get_reset_token(token)
+    if not t or datetime.fromisoformat(t['expires_at']) < now_it():
+        session.pop('reset_token', None)
+        return None
+    return t
+
+
 @app.route('/forgot-password', methods=['GET', 'POST'])
 def forgot_password():
     if current_user.is_authenticated:
         return redirect(url_for('index'))
-    code  = None
+
+    if request.args.get('annulla'):
+        t = _richiesta_reset_corrente()
+        if t:
+            use_reset_token(t['id'])
+        session.pop('reset_token', None)
+        return redirect(url_for('login_page'))
+
     error = None
     if request.method == 'POST':
         nome      = (request.form.get('nome') or '').strip()
         user_data = get_user_by_nome(nome)
         if not user_data:
             error = 'Nessun account trovato con questo nome e cognome'
+        elif user_data.get('stato') != 'attivo':
+            error = 'Il tuo account non è ancora attivo: chiedi all\'amministratore.'
         else:
-            code       = str(random.randint(100000, 999999))
-            expires_at = (now_it() + timedelta(minutes=15)).isoformat()
-            create_reset_token(user_data['id'], code, expires_at)
-            print(f"[Reset] codice generato per utente {user_data['id']} ({user_data['nome']}), scade {expires_at}")
-    return render_template('forgot.html', code=code, error=error)
+            limite = (now_it() - timedelta(minutes=RESET_ATTESA_TRA_RICHIESTE_MINUTI)).isoformat()
+            recenti = [t for t in get_active_reset_tokens()
+                       if t['user_id'] == user_data['id'] and (t['created_at'] or '') > limite]
+            if recenti:
+                error = 'Richiesta già inviata pochi minuti fa: aspetta che l\'amministratore ti faccia entrare.'
+            else:
+                import secrets as _secrets
+                token = _secrets.token_urlsafe(24)
+                expires_at = (now_it() + timedelta(minutes=RESET_DURATA_MINUTI)).isoformat()
+                create_reset_token(user_data['id'], token, expires_at)
+                session['reset_token'] = token
+                admin_ids = [u['id'] for u in get_all_users()
+                             if u['role'] == 'admin' and u['stato'] == 'attivo' and u['id'] != user_data['id']]
+                push_to_users(admin_ids, 'Password dimenticata',
+                              f"{user_data['nome']} non ricorda la password. Tocca per farlo entrare.",
+                              url='/admin', tag=f"reset-{user_data['id']}")
+                print(f"[Reset] richiesta di accesso da {user_data['nome']} (utente {user_data['id']})")
+                return redirect(url_for('forgot_password'))
+
+    t = _richiesta_reset_corrente()
+    if t and t['confermato']:
+        return redirect(url_for('reset_password'))
+    if t:
+        utente = get_user_by_id(t['user_id'])
+        return render_template('forgot.html', attesa=True, nome=(utente or {}).get('nome', ''),
+                               minuti=RESET_DURATA_MINUTI)
+    return render_template('forgot.html', error=error)
+
+
+@app.route('/api/reset-stato')
+def api_reset_stato():
+    """Interrogata ogni pochi secondi dalla pagina di attesa."""
+    t = _richiesta_reset_corrente()
+    if not t:
+        return jsonify({'stato': 'nessuna'})
+    return jsonify({'stato': 'confermata' if t['confermato'] else 'attesa'})
 
 
 @app.route('/reset-password', methods=['GET', 'POST'])
 def reset_password():
     if current_user.is_authenticated:
         return redirect(url_for('index'))
-    error   = None
-    success = False
+    t = _richiesta_reset_corrente()
+    if not t or not t['confermato']:
+        return redirect(url_for('forgot_password'))
+    utente = get_user_by_id(t['user_id'])
+    error = None
     if request.method == 'POST':
-        token     = (request.form.get('token') or '').strip()
         password  = request.form.get('password') or ''
         password2 = request.form.get('password2') or ''
-        if not token:
-            error = 'Inserisci il codice di recupero'
-        elif len(password) < 6:
+        if len(password) < 6:
             error = 'Password troppo corta (minimo 6 caratteri)'
         elif password != password2:
             error = 'Le password non coincidono'
         else:
-            token_data = get_reset_token(token)
-            if not token_data:
-                error = 'Codice non valido o già utilizzato'
-            elif datetime.fromisoformat(token_data['expires_at']) < now_it():
-                use_reset_token(token_data['id'])
-                error = 'Codice scaduto — richiedine uno nuovo'
-            elif not token_data['confermato']:
-                error = 'Il codice non è ancora stato confermato da un amministratore. Mostra il codice a un amministratore e riprova.'
-            else:
-                update_user_password(
-                    token_data['user_id'],
-                    generate_password_hash(password, method='pbkdf2:sha256'),
-                )
-                use_reset_token(token_data['id'])
-                print(f"[Reset] password reimpostata per utente {token_data['user_id']} (codice invalidato)")
-                success = True
-    return render_template('reset.html', error=error, success=success)
+            update_user_password(t['user_id'], generate_password_hash(password, method='pbkdf2:sha256'))
+            use_reset_token(t['id'])
+            session.pop('reset_token', None)
+            print(f"[Reset] password reimpostata e accesso eseguito per utente {t['user_id']}")
+            login_user(User(get_user_by_id(t['user_id'])), remember=True)
+            return redirect(url_for('index'))
+    return render_template('reset.html', error=error, nome=(utente or {}).get('nome', ''))
 
 
 # ─── PROFILO ─────────────────────────────────────────────────────────────────

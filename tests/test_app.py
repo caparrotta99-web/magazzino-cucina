@@ -147,3 +147,63 @@ def test_promemoria_rifiuti_per_zona(app_mod, db, monkeypatch):
     per_utente = {ids[0]: testo for ids, testo in inviati}
     assert 'Carta' in per_utente[aiuto] and 'Vetro' not in per_utente[aiuto]
     assert 'Vetro' in per_utente[admin]
+
+
+# ─── PASSWORD DIMENTICATA (notifica all'admin, niente codici) ────────────────
+
+def test_password_dimenticata_flusso_completo(app_mod, db, monkeypatch):
+    from werkzeug.security import generate_password_hash
+    db.create_user('Mario Rossi', 'mario', generate_password_hash('vecchia1', method='pbkdf2:sha256'), 'sala')
+    admin_id = db.get_user_by_login('admin')['id']
+    notifiche = []
+    monkeypatch.setattr(app_mod, 'push_to_users',
+                        lambda ids, titolo, testo, **k: notifiche.append((list(ids), testo)) or (1, 0))
+
+    mario = app_mod.app.test_client()
+    mario.post('/forgot-password', data={'nome': 'Mario Rossi'})
+    # all'admin arriva la notifica
+    assert notifiche == [([admin_id], 'Mario Rossi non ricorda la password. Tocca per farlo entrare.')]
+    # Mario vede la pagina di attesa, non può ancora cambiare password
+    assert 'Richiesta inviata' in mario.get('/forgot-password').get_data(as_text=True)
+    assert mario.get('/api/reset-stato').get_json()['stato'] == 'attesa'
+    assert mario.get('/reset-password').status_code == 302
+
+    # l'admin tocca "Fallo entrare"
+    admin = _login(app_mod)
+    t = db.get_active_reset_tokens()[0]
+    assert 'Fallo entrare' in admin.get('/admin').get_data(as_text=True)
+    admin.post('/admin/reset-conferma', data={'token_id': t['id']})
+
+    # Mario sceglie la nuova password ed è subito dentro
+    assert mario.get('/api/reset-stato').get_json()['stato'] == 'confermata'
+    r = mario.post('/reset-password', data={'password': 'nuova123', 'password2': 'nuova123'})
+    assert r.status_code == 302
+    assert mario.get('/api/alerts').status_code == 200
+    # la richiesta è chiusa e la nuova password funziona
+    assert db.get_active_reset_tokens() == []
+    altro = app_mod.app.test_client()
+    altro.post('/login', data={'nome': 'Mario Rossi', 'password': 'nuova123'})
+    assert altro.get('/api/alerts').status_code == 200
+
+
+def test_conferma_admin_vale_solo_sul_telefono_che_ha_chiesto(app_mod, db, monkeypatch):
+    from werkzeug.security import generate_password_hash
+    db.create_user('Mario Rossi', 'mario', generate_password_hash('vecchia1', method='pbkdf2:sha256'), 'sala')
+    monkeypatch.setattr(app_mod, 'push_to_users', lambda *a, **k: (1, 0))
+    mario = app_mod.app.test_client()
+    mario.post('/forgot-password', data={'nome': 'Mario Rossi'})
+    _login(app_mod).post('/admin/reset-conferma', data={'token_id': db.get_active_reset_tokens()[0]['id']})
+    estraneo = app_mod.app.test_client()
+    assert estraneo.get('/reset-password').status_code == 302
+    estraneo.post('/reset-password', data={'password': 'hackerata', 'password2': 'hackerata'})
+    assert estraneo.get('/api/alerts').status_code != 200
+
+
+def test_niente_raffica_di_notifiche(app_mod, db, monkeypatch):
+    from werkzeug.security import generate_password_hash
+    db.create_user('Mario Rossi', 'mario', generate_password_hash('vecchia1', method='pbkdf2:sha256'), 'sala')
+    notifiche = []
+    monkeypatch.setattr(app_mod, 'push_to_users', lambda *a, **k: notifiche.append(1) or (1, 0))
+    for _ in range(3):
+        app_mod.app.test_client().post('/forgot-password', data={'nome': 'Mario Rossi'})
+    assert len(notifiche) == 1

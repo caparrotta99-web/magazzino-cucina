@@ -244,7 +244,8 @@
   {% endif %}
 
   {% if reset_tokens %}
-  <div class="section-label">Codici di reset password ({{ reset_tokens|length }})</div>
+  <div class="section-label">Password dimenticate ({{ reset_tokens|length }})</div>
+  <div class="user-contact" style="margin:-4px 0 10px">Conferma solo se la persona ti ha davvero chiesto di entrare.</div>
   <div class="user-list">
     {% for t in reset_tokens %}
     <div class="user-card {% if not t.confermato %}pending-card{% endif %}">
@@ -252,12 +253,12 @@
         <div class="user-avatar">{{ t.utente_nome[0]|upper }}</div>
         <div class="user-details">
           <div class="user-nome">{{ t.utente_nome }}</div>
-          <div class="user-contact">Codice <span class="reset-code">{{ t.token }}</span> · richiesto alle {{ t.richiesto_alle }} · scade alle {{ t.scade_alle }}</div>
+          <div class="user-contact">Chiede di entrare · richiesto alle {{ t.richiesto_alle }} · scade alle {{ t.scade_alle }}</div>
           <div class="user-badges">
             {% if t.confermato %}
-              <span class="badge badge-confermato">Confermato</span>
+              <span class="badge badge-confermato">Fatto entrare</span>
             {% else %}
-              <span class="badge badge-pending">Da confermare</span>
+              <span class="badge badge-pending">In attesa</span>
             {% endif %}
           </div>
         </div>
@@ -266,10 +267,10 @@
         {% if not t.confermato %}
         <form method="post" action="/admin/reset-conferma">
           <input type="hidden" name="token_id" value="{{ t.id }}">
-          <button type="submit" class="btn-action approve">✓ Conferma reset</button>
+          <button type="submit" class="btn-action approve">✓ Fallo entrare</button>
         </form>
         {% else %}
-        <span class="you-label">In attesa che l'utente completi il reset</span>
+        <span class="you-label">Sta scegliendo la nuova password</span>
         {% endif %}
       </div>
     </div>

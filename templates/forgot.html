@@ -15,21 +15,18 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/theme.css">
 <style>
-.code-box {
+.attesa-box {
   background: var(--surface-3); border: 1.5px solid var(--border);
   border-radius: 16px; padding: 26px 20px 22px; text-align: center; margin-bottom: 22px;
 }
-.code-label {
-  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .8px;
-  color: var(--muted); margin-bottom: 14px;
+.attesa-spinner {
+  width: 34px; height: 34px; margin: 0 auto 16px; border-radius: 50%;
+  border: 3px solid var(--border); border-top-color: var(--action);
+  animation: giro 1s linear infinite;
 }
-.code-digits {
-  font-family: 'Inter', sans-serif; font-size: 42px; font-weight: 700;
-  letter-spacing: 9px; color: var(--text); line-height: 1; margin-bottom: 16px;
-  user-select: all; -webkit-user-select: all;
-}
-.code-admin-msg { font-size: 14px; font-weight: 600; color: var(--text); line-height: 1.5; margin-bottom: 8px; }
-.code-expiry { font-size: 12.5px; color: var(--muted); }
+@keyframes giro { to { transform: rotate(360deg); } }
+.attesa-msg { font-size: 15px; font-weight: 600; color: var(--text); line-height: 1.5; margin-bottom: 8px; }
+.attesa-sub { font-size: 12.5px; color: var(--muted); line-height: 1.5; }
 </style>
 </head>
 <body>
@@ -40,26 +37,30 @@
   <div class="card auth-card">
     <div class="auth-logo"><img src="/static/icon.svg" alt="Brigade">Brigade</div>
 
-    {% if code %}
-      <h1>Codice generato</h1>
-      <p class="sub">Mostra questo codice all'amministratore, poi usalo per impostare la nuova password.</p>
-
-      <div class="code-box">
-        <div class="code-label">Il tuo codice di recupero</div>
-        <div class="code-digits">{{ code }}</div>
-        <div class="code-admin-msg">Mostra questo codice all'amministratore.</div>
-        <div class="code-expiry">Il codice scade tra 15 minuti.</div>
+    {% if attesa %}
+      <h1>Richiesta inviata</h1>
+      <p class="sub">Ciao {{ nome }}, abbiamo avvisato l'amministratore.</p>
+      <div class="attesa-box">
+        <div class="attesa-spinner"></div>
+        <div class="attesa-msg">Aspetta che ti faccia entrare.</div>
+        <div class="attesa-sub">Tieni aperta questa pagina: appena conferma, potrai scegliere una nuova password. La richiesta vale {{ minuti }} minuti.</div>
       </div>
-
-      <a href="/reset-password" class="btn-primary" style="display:block;text-align:center;text-decoration:none;line-height:54px">Reimposta la password →</a>
-
       <div class="footer-link">
-        <a href="/forgot-password">Genera un nuovo codice</a>
+        <a href="/forgot-password?annulla=1">Annulla richiesta</a>
       </div>
-
+      <script>
+        setInterval(async () => {
+          try {
+            const r = await fetch('/api/reset-stato', { cache: 'no-store' });
+            const d = await r.json();
+            if (d.stato === 'confermata') location.href = '/reset-password';
+            else if (d.stato === 'nessuna') location.href = '/forgot-password';
+          } catch (e) { /* rete assente: riprova al prossimo giro */ }
+        }, 3000);
+      </script>
     {% else %}
       <h1>Password dimenticata?</h1>
-      <p class="sub">Inserisci il tuo nome e cognome. Riceverai un codice temporaneo da mostrare all'amministratore.</p>
+      <p class="sub">Scrivi il tuo nome e cognome: avviseremo l'amministratore, che ti farà entrare.</p>
 
       {% if error %}
       <div class="msg-error">{{ error }}</div>
@@ -71,7 +72,7 @@
           <input type="text" name="nome" placeholder="es. Mario Rossi" required
                  autocomplete="name" autofocus autocapitalize="words">
         </div>
-        <button type="submit" class="btn-primary">Genera codice</button>
+        <button type="submit" class="btn-primary">Chiedi di entrare</button>
       </form>
 
       <div class="footer-link">

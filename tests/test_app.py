@@ -218,3 +218,14 @@ def test_risposta_ai_con_blocco_di_ragionamento(app_mod):
     resp = NS(content=[NS(type='thinking', thinking='...'),
                        NS(type='text', text='{"lotto": "L1", "scadenza": "01/12/2026"}')])
     assert app_mod._testo_risposta(resp) == '{"lotto": "L1", "scadenza": "01/12/2026"}'
+
+
+def test_carico_senza_lotto_e_senza_scadenza(app_mod, db):
+    db.insert_listino_row('Zucchine', 'Ortofrutta Rossi', 'kg', 0, 'Verdura')
+    c = _login(app_mod)
+    r = c.post('/api/carico', json={'prodotto': 'Zucchine', 'fornitore': 'Ortofrutta Rossi',
+                                    'lotto': 'SENZA LOTTO 16/11/2026', 'scadenza': '',
+                                    'qty': 3.5, 'unita': 'kg'}).get_json()
+    assert r['success']
+    lotti = db.get_lotti_attivi('Zucchine')
+    assert lotti[0]['lotto'] == 'SENZA LOTTO 16/11/2026' and lotti[0]['scadenza'] == ''

@@ -818,10 +818,12 @@
           <label class="flabel">Numero Lotto *</label>
           <input class="finput" type="text" id="c2-lotto"
                  placeholder="es. L2026001" autocomplete="off" autocapitalize="characters">
+            <button type="button" class="carico-toggle" id="c2-lotto-toggle" onclick="toggleCaricoSenzaLotto()">Lotto mancante o illeggibile</button>
         </div>
         <div class="fgroup" style="margin-bottom:0">
           <label class="flabel">Data di scadenza</label>
           <input class="finput" type="date" id="c2-scadenza">
+            <button type="button" class="carico-toggle" id="c2-scad-toggle" onclick="toggleCaricoSenzaScadenza()">Senza scadenza in etichetta</button>
         </div>
       </div>
 

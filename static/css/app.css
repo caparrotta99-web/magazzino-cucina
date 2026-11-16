@@ -2095,3 +2095,13 @@ html.chat-no-scroll { overflow: hidden; }
 .ingr-lotto-testo { font-weight: 600; }
 .ingr-lotto-sub { display: block; font-size: 12px; font-weight: 500; opacity: .75; margin-top: 2px; }
 .ingr-lotto-cambia { font-size: 13px; font-weight: 700; color: var(--accent, #0ea5e9); cursor: pointer; flex-shrink: 0; }
+
+/* Carico: lotto mancante / senza scadenza */
+.carico-toggle {
+  display: inline-block; margin-top: 8px; padding: 7px 12px;
+  font: inherit; font-size: 13px; font-weight: 600;
+  color: var(--text-soft, var(--text)); background: transparent;
+  border: 1.5px dashed var(--border-2, var(--border)); border-radius: 10px; cursor: pointer;
+}
+.carico-toggle.active { border-style: solid; border-color: var(--action, #3b82f6); color: var(--action, #3b82f6); }
+.finput[readonly], .finput:disabled { opacity: .75; }

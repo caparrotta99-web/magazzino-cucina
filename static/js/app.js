@@ -776,10 +776,53 @@ async function goToCaricoStep2() {
     scadEl.value  = S.caricoData.scadenza || '';
   }
   document.getElementById('c2-qty').value = S.caricoData.qty ?? '';
+  _setCaricoSenzaLotto(false);
+  _setCaricoSenzaScadenza(false);
 
   document.getElementById('carico-step-1').style.display = 'none';
   document.getElementById('carico-step-2').style.display = '';
 }
+
+// ── Lotto mancante / senza scadenza ──────────────────────────────────────
+// Se in etichetta il lotto manca o non si legge, si assegna un lotto interno
+// con la data del carico: il prodotto resta tracciabile (anche sui fogli
+// Google) invece di avere un lotto inventato o vuoto. La scadenza assente va
+// dichiarata esplicitamente, così nel registro non resta un vuoto ambiguo.
+function _lottoInterno() {
+  const d = new Date();
+  const p = n => String(n).padStart(2, '0');
+  return `SENZA LOTTO ${p(d.getDate())}/${p(d.getMonth() + 1)}/${d.getFullYear()}`;
+}
+function _setCaricoSenzaLotto(attivo) {
+  S.caricoSenzaLotto = attivo;
+  const el  = document.getElementById('c2-lotto');
+  const btn = document.getElementById('c2-lotto-toggle');
+  if (!el || !btn) return;
+  if (attivo) {
+    S._lottoPrimaDelToggle = el.value;
+    el.value = _lottoInterno();
+    el.readOnly = true;
+    btn.textContent = 'Inserisci il lotto a mano';
+  } else {
+    if (el.readOnly) el.value = S._lottoPrimaDelToggle || '';
+    el.readOnly = false;
+    btn.textContent = 'Lotto mancante o illeggibile';
+  }
+  btn.classList.toggle('active', attivo);
+}
+function toggleCaricoSenzaLotto() { _setCaricoSenzaLotto(!S.caricoSenzaLotto); }
+
+function _setCaricoSenzaScadenza(attivo) {
+  S.caricoSenzaScadenza = attivo;
+  const el  = document.getElementById('c2-scadenza');
+  const btn = document.getElementById('c2-scad-toggle');
+  if (!el || !btn) return;
+  if (attivo) { el.value = ''; }
+  el.disabled = attivo;
+  btn.textContent = attivo ? 'Inserisci la scadenza' : 'Senza scadenza in etichetta';
+  btn.classList.toggle('active', attivo);
+}
+function toggleCaricoSenzaScadenza() { _setCaricoSenzaScadenza(!S.caricoSenzaScadenza); }
 
 function adjustCaricoQty(delta) {
   const el = document.getElementById('c2-qty');
@@ -803,8 +846,13 @@ async function confermaCarico() {
     return;
   }
   if (!lotto) {
-    toast('Inserisci il numero di lotto', 'error');
+    toast('Inserisci il lotto, oppure tocca "Lotto mancante o illeggibile"', 'error');
     document.getElementById('c2-lotto').focus();
+    return;
+  }
+  if (!scadenza && !S.caricoSenzaScadenza) {
+    toast('Inserisci la scadenza, oppure tocca "Senza scadenza in etichetta"', 'error');
+    document.getElementById('c2-scadenza').focus();
     return;
   }
 

@@ -487,12 +487,6 @@ def db_init():
                 last_seen TEXT NOT NULL DEFAULT '',
                 PRIMARY KEY (utente_id, canale)
             )""",
-            f"""CREATE TABLE IF NOT EXISTS log_meteo (
-                id           {pk},
-                quando       TEXT NOT NULL DEFAULT '',
-                temperatura  REAL NOT NULL DEFAULT 0,
-                weather_code INTEGER NOT NULL DEFAULT 0
-            )""",
             f"""CREATE TABLE IF NOT EXISTS log_chat_messaggi (
                 id               {pk},
                 azione           TEXT NOT NULL DEFAULT '',
@@ -983,13 +977,6 @@ def salva_alias_etichetta(testo, prodotto, fornitore=''):
     return True
 
 
-def get_alias_etichette():
-    """Tutti gli abbinamenti salvati (per il pannello Admin)."""
-    with get_conn() as conn:
-        return _rows(conn.execute(
-            "SELECT testo, prodotto, fornitore, creato_il FROM etichette_alias ORDER BY prodotto"))
-
-
 def giacenze_per_lotto():
     """Giacenza (carico - scarico) per ogni prodotto+lotto, calcolata dal
     registro locale. Serve al controllo di allineamento con Google Sheets:
@@ -1273,7 +1260,10 @@ def get_alerts():
     return {
         'scadenze': scadenze,
         'scorte':   scorte_rows,
-        'count':    len(scadenze) + len(scorte_rows),
+        # Il numero rosso conta solo scaduti e in scadenza: i prodotti sotto
+        # scorta restano nell'elenco ma non lo gonfiano (si ordinano dalla
+        # Lista spesa, non sono un'emergenza).
+        'count':    len(scadenze),
     }
 
 
@@ -1918,26 +1908,6 @@ def get_push_subscriptions_by_users(utente_ids):
 def get_all_push_subscriptions():
     with get_conn() as conn:
         cur = conn.execute("SELECT id, utente_id, subscription_json, endpoint FROM push_subscriptions")
-        return _rows(cur)
-
-
-# ─── METEO ────────────────────────────────────────────────────────────────
-# Log diagnostico temporaneo: ad ogni aggiornamento reale (non da cache) del
-# meteo in dashboard salviamo temperatura e weather_code ricevuti dall'API,
-# per confrontarli nei prossimi giorni con il meteo reale di Vigevano e
-# decidere se serve una correzione (vedi conversazione con l'utente).
-
-def log_meteo_lettura(temperatura, weather_code):
-    with get_conn() as conn:
-        conn.execute(
-            "INSERT INTO log_meteo (quando, temperatura, weather_code) VALUES (?, ?, ?)",
-            (now_it().isoformat(), temperatura, weather_code)
-        )
-
-
-def get_log_meteo(limit=500):
-    with get_conn() as conn:
-        cur = conn.execute("SELECT * FROM log_meteo ORDER BY id DESC LIMIT ?", (limit,))
         return _rows(cur)
 
 

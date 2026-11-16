@@ -62,7 +62,6 @@ from database import (
     zona_rifiuti_da_coordinate, update_user_rifiuti_posizione, get_user_rifiuti_posizione,
     get_or_create_vapid_keys, save_push_subscription, delete_push_subscription,
     get_push_subscriptions_by_users, get_all_push_subscriptions,
-    log_meteo_lettura,
     get_lista_spesa, add_lista_spesa_item, update_lista_spesa_completato,
     update_lista_spesa_fornitore, delete_lista_spesa_item, clear_lista_spesa,
     get_lista_spesa_item_by_id,
@@ -98,7 +97,6 @@ from database import (
     registra_comprato, get_comprati_da_registrare, get_comprato, segna_comprato,
     giacenze_per_lotto,
     normalizza_testo_etichetta, get_alias_etichetta, salva_alias_etichetta,
-    get_alias_etichette,
     insert_ricetta, get_ricette, get_ricetta, get_ricetta_per_nome, delete_ricetta,
 )
 from sheets import (
@@ -426,14 +424,6 @@ def push_per_tipo(tipo, title, body, url='/', tag=''):
         print(f"[Push] nessun utente vuole notifiche '{tipo}', '{title}' non inviata")
         return 0, 0
     return push_to_users(utenti, title, body, url, tag)
-
-
-def push_to_all(title, body, url='/', tag=''):
-    subs = get_all_push_subscriptions()
-    if not subs:
-        print(f"[Push] nessuna subscription salvata nel database, notifica '{title}' non inviata")
-        return 0, 0
-    return _invia_push(subs, title, body, url, tag)
 
 
 # ─── INVIO A GOOGLE SHEETS IN SOTTOFONDO ─────────────────────────────────────
@@ -3440,20 +3430,6 @@ def api_push_unsubscribe():
     return jsonify({'success': True})
 
 
-# ─── METEO ──────────────────────────────────────────────────────────────────
-
-@app.route('/api/meteo/log', methods=['POST'])
-@login_required
-def api_meteo_log():
-    d = request.get_json(force=True)
-    print(f"[Meteo] valore grezzo ricevuto dal client: {d}")
-    try:
-        temperatura  = float(d.get('temperatura'))
-        weather_code = int(d.get('weather_code'))
-    except (TypeError, ValueError):
-        return jsonify({'success': False, 'error': 'Dati non validi'}), 400
-    log_meteo_lettura(temperatura, weather_code)
-    return jsonify({'success': True})
 
 
 # ─── NOTIFICHE AUTOMATICHE GIORNALIERE ──────────────────────────────────────

@@ -341,15 +341,6 @@ async function loadMeteoVigevano() {
     });
     const t = Date.now();
     sessionStorage.setItem('meteoVigevanoV3', JSON.stringify({ t, data }));
-    // Log lato server (solo sulle letture fresche, non su quelle da cache):
-    // serve a confrontare nei prossimi giorni la temperatura mostrata con
-    // quella reale di Vigevano e decidere se applicare una correzione.
-    if (data.current) {
-      api('/api/meteo/log', {
-        method: 'POST',
-        body: { temperatura: data.current.temperature_2m, weather_code: data.current.weather_code },
-      }).catch(() => {});
-    }
     _renderMeteo(data, t);
   } catch (e) {
     const cond = document.getElementById('home-dash-meteo-cond');

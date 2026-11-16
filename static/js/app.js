@@ -199,14 +199,24 @@ function startHomeDashClock() {
   setTimeout(() => { tick(); setInterval(tick, 60000); }, msAlProssimoMinuto);
 }
 
+// La card della lista spesa va ridisegnata anche quando la lista arriva dal
+// server: all'apertura dell'app la dashboard si disegna prima che la lista
+// sia caricata, e prima restava ferma a 0 finché non si cambiava pagina.
+function _renderDashDocks() {
+  const num = document.getElementById('home-dash-docks-num');
+  const list = document.getElementById('home-dash-docks-list');
+  if (!num || !list) return;
+  const docks = S.listaSpesa.filter(i => i.fornitore === 'DOCKS' && !i.completato);
+  num.textContent = docks.length;
+  list.innerHTML = docks.length
+    ? docks.slice(0, 8).map(i => `<li>${esc(i.prodotto)}</li>`).join('')
+    : '<li class="home-dash-simple-empty">Nessun prodotto da ordinare</li>';
+}
+
 function renderHomeDashboard() {
   if (!document.getElementById('home-dash-meteo')) return;
 
-  const docks = S.listaSpesa.filter(i => i.fornitore === 'DOCKS' && !i.completato);
-  document.getElementById('home-dash-docks-num').textContent = docks.length;
-  document.getElementById('home-dash-docks-list').innerHTML = docks.length
-    ? docks.slice(0, 8).map(i => `<li>${esc(i.prodotto)}</li>`).join('')
-    : '<li class="home-dash-simple-empty">Nessun prodotto da ordinare</li>';
+  _renderDashDocks();
 
   loadMeteoVigevano();
   loadRifiutiRaccolta();
@@ -2273,6 +2283,7 @@ async function loadListaSpesa() {
   const data = await api('/api/lista-spesa');
   S.listaSpesa = (data.items || []).map(_enrichItem);
   _updateSpesaBadge();
+  _renderDashDocks();
   if (S.activePage === 'lista-spesa') renderListaSpesa();
 }
 

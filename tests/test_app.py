@@ -229,3 +229,37 @@ def test_carico_senza_lotto_e_senza_scadenza(app_mod, db):
     assert r['success']
     lotti = db.get_lotti_attivi('Zucchine')
     assert lotti[0]['lotto'] == 'SENZA LOTTO 16/11/2026' and lotti[0]['scadenza'] == ''
+
+
+# ─── COMPRATI DALLA LISTA SPESA ──────────────────────────────────────────────
+
+def test_spuntato_dalla_lista_finisce_tra_i_comprati(app_mod, db):
+    c = _login(app_mod)
+    a = c.post('/api/lista-spesa', json={'prodotto': 'Mele', 'fornitore': 'DOCKS', 'quantita': 2, 'unita': 'kg'}).get_json()['id']
+    b = c.post('/api/lista-spesa', json={'prodotto': 'Pere', 'fornitore': 'DOCKS'}).get_json()['id']
+    c.delete(f'/api/lista-spesa/{a}?comprato=1')   # messo nel carrello
+    c.delete(f'/api/lista-spesa/{b}')              # cestino: aggiunto per errore
+    comprati = c.get('/api/spesa-comprati').get_json()['comprati']
+    assert [x['prodotto'] for x in comprati] == ['Mele']
+    # registrato come carico: sparisce dal riquadro
+    c.post(f"/api/spesa-comprati/{comprati[0]['id']}/registrato")
+    assert c.get('/api/spesa-comprati').get_json()['comprati'] == []
+
+
+def test_non_trovato_torna_nella_lista(app_mod, db):
+    c = _login(app_mod)
+    a = c.post('/api/lista-spesa', json={'prodotto': 'Burrata', 'fornitore': 'DOCKS', 'quantita': 3, 'unita': 'pz', 'reparto': 'Cucina'}).get_json()['id']
+    c.delete(f'/api/lista-spesa/{a}?comprato=1')
+    cid = c.get('/api/spesa-comprati').get_json()['comprati'][0]['id']
+    assert c.post(f'/api/spesa-comprati/{cid}/non-trovato').get_json()['success']
+    lista = c.get('/api/lista-spesa').get_json()['items']
+    assert [(i['prodotto'], i['quantita'], i['unita'], i['reparto']) for i in lista] == [('Burrata', 3.0, 'pz', 'Cucina')]
+    assert c.get('/api/spesa-comprati').get_json()['comprati'] == []
+
+
+def test_comprati_vecchi_spariscono_da_soli(app_mod, db):
+    from datetime import timedelta
+    from timezone_utils import today_it
+    db.registra_comprato({'prodotto': 'Mele', 'fornitore': 'DOCKS'}, 'Simone')
+    assert len(db.get_comprati_da_registrare()) == 1
+    assert db.get_comprati_da_registrare(today_it() + timedelta(days=5)) == []

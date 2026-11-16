@@ -95,6 +95,7 @@ from database import (
     get_carico_recente,
     acquire_lock, release_lock, get_locks_attivi,
     accoda_sheets, get_coda_sheets, rimuovi_da_coda_sheets, conta_pendenti_sheets,
+    registra_comprato, get_comprati_da_registrare, get_comprato, segna_comprato,
     giacenze_per_lotto,
     normalizza_testo_etichetta, get_alias_etichetta, salva_alias_etichetta,
     get_alias_etichette,
@@ -1481,6 +1482,37 @@ def api_lista_spesa_delete_one(item_id):
     delete_lista_spesa_item(item_id)
     if item:
         log_lista_spesa_azione('eliminato', item['prodotto'], item['fornitore'], current_user.nome)
+        # spuntato dalla lista = messo nel carrello: va registrato come carico.
+        # La cancellazione col cestino (prodotto aggiunto per errore) no.
+        if request.args.get('comprato') == '1':
+            registra_comprato(item, current_user.nome)
+    return jsonify({'success': True})
+
+
+@app.route('/api/spesa-comprati')
+@login_required
+def api_spesa_comprati():
+    return jsonify({'success': True, 'comprati': get_comprati_da_registrare()})
+
+
+@app.route('/api/spesa-comprati/<int:comprato_id>/registrato', methods=['POST'])
+@login_required
+def api_spesa_comprato_registrato(comprato_id):
+    segna_comprato(comprato_id, 'registrato')
+    return jsonify({'success': True})
+
+
+@app.route('/api/spesa-comprati/<int:comprato_id>/non-trovato', methods=['POST'])
+@login_required
+def api_spesa_comprato_non_trovato(comprato_id):
+    """Il prodotto non è stato trovato in negozio: torna nella lista spesa
+    com'era, così la prossima volta si compra."""
+    c = get_comprato(comprato_id)
+    if not c or c['stato'] != 'da_registrare':
+        return jsonify({'success': False, 'error': 'Prodotto non trovato'}), 404
+    add_lista_spesa_item(c['prodotto'], c['fornitore'], c['categoria'], c['quantita'], c['unita'], c['reparto'])
+    log_lista_spesa_azione('aggiunto', c['prodotto'], c['fornitore'], current_user.nome)
+    segna_comprato(comprato_id, 'non_trovato')
     return jsonify({'success': True})
 
 

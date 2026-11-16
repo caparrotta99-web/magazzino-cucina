@@ -290,6 +290,16 @@
               <ul class="home-dash-simple-list" id="home-dash-docks-list"></ul>
             </div>
 
+            <!-- Comprati dalla lista spesa e non ancora registrati come carico -->
+            <div class="home-dash-card home-dash-comprati" id="home-dash-comprati" style="display:none">
+              <div class="home-dash-card-top">
+                <div class="home-dash-card-title">Comprati, da registrare</div>
+                <div class="home-dash-card-num" id="home-dash-comprati-num">0</div>
+              </div>
+              <div class="home-dash-comprati-sub">Tocca un prodotto per registrarlo con la foto dell'etichetta</div>
+              <div id="home-dash-comprati-list"></div>
+            </div>
+
             {% if current_user.puo_accedere_chat %}
             <div id="home-dash-chat-wrap"></div>
             {% endif %}

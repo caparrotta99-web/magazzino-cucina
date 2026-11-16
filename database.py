@@ -439,6 +439,18 @@ def db_init():
                 fornitore     TEXT NOT NULL DEFAULT '',
                 creato_il     TEXT NOT NULL
             )""",
+            f"""CREATE TABLE IF NOT EXISTS spesa_comprati (
+                id          {pk},
+                prodotto    TEXT NOT NULL,
+                fornitore   TEXT NOT NULL DEFAULT '',
+                categoria   TEXT NOT NULL DEFAULT '',
+                reparto     TEXT NOT NULL DEFAULT '',
+                quantita    REAL NOT NULL DEFAULT 0,
+                unita       TEXT NOT NULL DEFAULT '',
+                comprato_il TEXT NOT NULL,
+                utente      TEXT NOT NULL DEFAULT '',
+                stato       TEXT NOT NULL DEFAULT 'da_registrare'
+            )""",
             f"""CREATE TABLE IF NOT EXISTS sheets_coda (
                 id        {pk},
                 azione    TEXT NOT NULL,
@@ -1516,6 +1528,47 @@ def update_lista_spesa_fornitore(item_id, fornitore):
             "UPDATE lista_spesa SET fornitore = ? WHERE id = ?",
             (fornitore.strip(), item_id)
         )
+
+
+# ─── COMPRATI DALLA LISTA SPESA, DA REGISTRARE ───────────────────────────────
+# Chi fa la spesa cancella il prodotto dalla lista quando lo mette nel
+# carrello. Quel gesto resta annotato qui: tornati al ristorante, la home
+# mostra cosa è stato comprato e va ancora registrato come carico (HACCP).
+COMPRATI_GIORNI_VISIBILI = 3
+
+
+def registra_comprato(item, utente):
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO spesa_comprati (prodotto, fornitore, categoria, reparto, quantita, unita, "
+            "comprato_il, utente, stato) VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'da_registrare')",
+            (item.get('prodotto', ''), item.get('fornitore') or '', item.get('categoria') or '',
+             item.get('reparto') or '', float(item.get('quantita') or 0), item.get('unita') or '',
+             now_it().isoformat(), utente)
+        )
+
+
+def get_comprati_da_registrare(oggi=None):
+    """Comprati negli ultimi giorni e non ancora registrati: dopo qualche
+    giorno spariscono da soli, così il riquadro non resta pieno di vecchi."""
+    oggi = oggi or today_it()
+    dal = (oggi - timedelta(days=COMPRATI_GIORNI_VISIBILI - 1)).isoformat()
+    with get_conn() as conn:
+        return _rows(conn.execute(
+            "SELECT * FROM spesa_comprati WHERE stato = 'da_registrare' AND comprato_il >= ? "
+            "ORDER BY comprato_il DESC, id DESC",
+            (dal,)
+        ))
+
+
+def get_comprato(comprato_id):
+    with get_conn() as conn:
+        return _row(conn.execute("SELECT * FROM spesa_comprati WHERE id = ?", (comprato_id,)))
+
+
+def segna_comprato(comprato_id, stato):
+    with get_conn() as conn:
+        conn.execute("UPDATE spesa_comprati SET stato = ? WHERE id = ?", (stato, comprato_id))
 
 
 def get_lista_spesa_item_by_id(item_id):

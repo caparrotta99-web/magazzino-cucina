@@ -131,6 +131,7 @@ async function init() {
   setInterval(loadLocks, 20000);
   renderInUsoProdotti();
   if (CAN_CHAT) loadChatUnreadBadge();
+  loadComprati();
 
   // Al primo login apri automaticamente il tutorial (menu principale) e
   // segna subito come visto, così non si ripresenta ai login successivi.
@@ -213,10 +214,77 @@ function _renderDashDocks() {
     : '<li class="home-dash-simple-empty">Nessun prodotto da ordinare</li>';
 }
 
+// ── COMPRATI DALLA LISTA SPESA, DA REGISTRARE ───────────────────────────
+// Chi fa la spesa cancella il prodotto dalla lista quando lo mette nel
+// carrello; tornati al ristorante qui si registra il carico con la foto
+// dell'etichetta, oppure "Non trovato" lo rimette nella lista.
+S.comprati = [];
+S.caricoDaSpesaId = null;
+
+async function loadComprati() {
+  const box = document.getElementById('home-dash-comprati');
+  if (!box) return;
+  const data = await api('/api/spesa-comprati');
+  S.comprati = (data && data.comprati) || [];
+  _renderComprati();
+}
+
+function _renderComprati() {
+  const box = document.getElementById('home-dash-comprati');
+  if (!box) return;
+  box.style.display = S.comprati.length ? '' : 'none';
+  document.getElementById('home-dash-comprati-num').textContent = S.comprati.length;
+  document.getElementById('home-dash-comprati-list').innerHTML = S.comprati.map(c => {
+    const qta = c.quantita ? ` · ${c.quantita} ${esc(c.unita || '')}` : '';
+    return `
+    <div class="comprato-row" onclick="registraComprato(${c.id})">
+      <div class="comprato-nome">${esc(c.prodotto)}<small>${esc(c.fornitore || '—')}${qta}</small></div>
+      <button type="button" class="comprato-btn" onclick="event.stopPropagation(); compratoNonTrovato(${c.id})">Non trovato</button>
+      <button type="button" class="comprato-btn registra" onclick="event.stopPropagation(); registraComprato(${c.id})">Registra</button>
+    </div>`;
+  }).join('');
+}
+
+async function registraComprato(id) {
+  const c = S.comprati.find(x => x.id === id);
+  if (!c) return;
+  const nome = (c.prodotto || '').toLowerCase();
+  const p = S.prodotti.find(x => x.prodotto.toLowerCase() === nome && (x.fornitore || '') === (c.fornitore || ''))
+         || S.prodotti.find(x => x.prodotto.toLowerCase() === nome);
+  navTo('carico');               // azzera il carico precedente
+  S.caricoDaSpesaId = id;
+  if (p) {
+    await pickCaricoSearchResult(p);
+  } else {
+    // nel listino ha un nome diverso: ricerca già scritta, si sceglie a mano
+    const el = document.getElementById('carico-search-input');
+    el.value = c.prodotto;
+    onCaricoSearchInput();
+  }
+}
+
+async function compratoNonTrovato(id) {
+  const r = await api(`/api/spesa-comprati/${id}/non-trovato`, { method: 'POST' });
+  if (!r || !r.success) { toast((r && r.error) || 'Errore', 'error'); return; }
+  toast('Rimesso nella lista della spesa', 'success');
+  await Promise.all([loadComprati(), loadListaSpesa()]);
+}
+
+async function _compratoRegistrato() {
+  const id = S.caricoDaSpesaId;
+  S.caricoDaSpesaId = null;
+  if (!id) return false;
+  await api(`/api/spesa-comprati/${id}/registrato`, { method: 'POST' });
+  S.comprati = S.comprati.filter(x => x.id !== id);
+  _renderComprati();
+  return true;
+}
+
 function renderHomeDashboard() {
   if (!document.getElementById('home-dash-meteo')) return;
 
   _renderDashDocks();
+  loadComprati();
 
   loadMeteoVigevano();
   loadRifiutiRaccolta();
@@ -670,6 +738,7 @@ function resetCaricoWizard() {
 
 function closeCaricoWizard() {
   resetCaricoWizard();
+  S.caricoDaSpesaId = null;
   S.ultimoFornitore = '';   // la consegna in corso finisce qui
   navTo('home');
 }
@@ -894,10 +963,13 @@ async function confermaCarico() {
   if (!data.success) { toast(data.error || 'Errore durante il carico', 'error'); return; }
 
   releaseCaricoLock();
+  const daSpesa = await _compratoRegistrato();
   await Promise.all([loadGiacenze(), loadAlerts()]);
   renderInUsoProdotti();
   if (data.warning) toast(data.warning, 'warning');
   showCaricoSuccess();
+  // registrato un prodotto della spesa: si torna alla home per il prossimo
+  if (daSpesa) setTimeout(() => { navTo('home'); _setHomePage(0, false); }, 1400);
 }
 
 function showCaricoSuccess() {
@@ -2550,7 +2622,9 @@ function _startSpesaCountdown(id) {
     S.listaSpesa = S.listaSpesa.filter(i => i.id !== id);
     _updateSpesaBadge();
     renderListaSpesa();
-    api(`/api/lista-spesa/${id}`, { method: 'DELETE' });
+    // spuntato = messo nel carrello: il server lo annota tra i comprati da
+    // registrare (la cancellazione con il cestino invece no)
+    api(`/api/lista-spesa/${id}?comprato=1`, { method: 'DELETE' });
   }, _SPESA_COUNTDOWN_MS);
 
   S.spesaTimers[id] = { timeout, interval, startTime };

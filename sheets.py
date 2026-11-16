@@ -186,6 +186,27 @@ def _to_float(val):
         return 0.0
 
 
+def _righe_con_numeri_esatti(ws, colonne_numeriche):
+    """Come ws.get_all_values(), ma per le colonne numeriche indicate usa il
+    valore vero della cella invece di quello mostrato. get_all_values()
+    restituisce il testo formattato: se una colonna mostra un solo decimale,
+    0,75 viene letto come "0,8" e il ricaricamento arrotonderebbe giacenze e
+    temperature. colonne_numeriche: indici (0-based) delle colonne da leggere
+    con il valore esatto."""
+    righe = ws.get_all_values()
+    colonne = [c for c in colonne_numeriche if c is not None]
+    if not colonne or len(righe) < 2:
+        return righe
+    esatte = ws.get_all_values(value_render_option='UNFORMATTED_VALUE')
+    for i in range(1, min(len(righe), len(esatte))):
+        for c in colonne:
+            if c < len(righe[i]) and c < len(esatte[i]):
+                val = esatte[i][c]
+                if isinstance(val, (int, float)) and not isinstance(val, bool):
+                    righe[i][c] = repr(float(val))
+    return righe
+
+
 def normalize_date(raw):
     """Normalizza date in formato ISO yyyy-mm-dd."""
     if not raw:
@@ -219,6 +240,9 @@ def load_listino():
     gc = _get_client()
     ws = gc.open_by_key(SPREADSHEET_ID).worksheet(SHEET_LISTINO)
     all_rows = ws.get_all_values()
+    if len(all_rows) >= 2:
+        _h = [h.strip() for h in all_rows[0]]
+        all_rows = _righe_con_numeri_esatti(ws, [_detect(_h, k) for k in ('scorta_min',)])
     if len(all_rows) < 2:
         return []
 
@@ -259,6 +283,9 @@ def load_registro():
     gc = _get_client()
     ws = gc.open_by_key(SPREADSHEET_ID).worksheet(SHEET_REGISTRO)
     all_rows = ws.get_all_values()
+    if len(all_rows) >= 2:
+        _h = [h.strip() for h in all_rows[0]]
+        all_rows = _righe_con_numeri_esatti(ws, [_detect(_h, k) for k in ('carico', 'scarico', 'rimanenza')])
     if len(all_rows) < 2:
         return []
 
@@ -623,6 +650,9 @@ def load_temperatura():
     gc = _get_client()
     ws = gc.open_by_key(SPREADSHEET_ID).worksheet(SHEET_TEMPERATURE)
     all_rows = ws.get_all_values()
+    if len(all_rows) >= 2:
+        _h = [h.strip() for h in all_rows[0]]
+        all_rows = _righe_con_numeri_esatti(ws, [_detect(_h, k) for k in ('temp_rilevata',)])
     if len(all_rows) < 2:
         return []
 

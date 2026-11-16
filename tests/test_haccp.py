@@ -104,3 +104,31 @@ def test_preparazione_completata(db):
     pid = db.insert_preparazione('Besciamella', 'Primi', giorni(0), giorni(2), 2, 'lt', 1, '')
     db.completa_preparazione(pid)
     assert db.get_preparazione_by_id(pid)['completata']
+
+
+# ─── LETTURA DAI FOGLI: decimali esatti ──────────────────────────────────────
+
+def test_ricaricamento_non_arrotonda_i_decimali(monkeypatch):
+    """Se la colonna del foglio mostra un solo decimale, 0,75 appare come
+    0,8: il ricaricamento deve leggere comunque 0,75."""
+    import sheets
+    header = ['Data', 'Fornitore', 'Prodotto', 'Lotto', 'Scadenza', 'Carico', 'Scarico',
+              'Unità', 'Etichetta', 'ID', 'Rimanenza', 'Operatore', 'Reparto', 'Tipo movimento']
+    mostrato = [header, ['16/11/2026', 'Ortofrutta', 'Mele', 'L1', '', '0,8', '', 'kg', '', 'm1', '0,8', 'Simone', 'Cucina', 'CARICO']]
+    esatto   = [header, ['16/11/2026', 'Ortofrutta', 'Mele', 'L1', '', 0.75, '', 'kg', '', 'm1', 0.75, 'Simone', 'Cucina', 'CARICO']]
+
+    class FintoFoglio:
+        def get_all_values(self, value_render_option=None):
+            import copy
+            return copy.deepcopy(esatto if value_render_option == 'UNFORMATTED_VALUE' else mostrato)
+
+    class FintoClient:
+        def open_by_key(self, _):
+            return self
+        def worksheet(self, _):
+            return FintoFoglio()
+
+    monkeypatch.setattr(sheets, '_get_client', lambda: FintoClient())
+    righe = sheets.load_registro()
+    assert righe[0]['carico'] == 0.75
+    assert righe[0]['rimanenza'] == 0.75

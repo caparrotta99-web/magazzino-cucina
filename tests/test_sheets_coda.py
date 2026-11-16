@@ -288,3 +288,58 @@ def test_scarico_parziale_di_un_buttato_lascia_il_residuo_in_uso(app_mod, db, mo
     assert righe[1]['Scarico'] == 1
     assert righe[2]['Tipo movimento'] == 'IN USO'   # il resto e' ancora aperto
     assert righe[2]['Scarico'] == 3
+
+
+# ─── RILETTURA DAL FOGLIO: I DECIMALI NON SI ARROTONDANO ─────────────────────
+
+def test_rilettura_non_arrotonda_le_quantita(app_mod, db, monkeypatch):
+    """Il foglio mostra i numeri arrotondati dal formato della colonna (0.75
+    si legge "0.8"). Rileggendo il REGISTRO si devono prendere i valori veri,
+    altrimenti ogni ricaricamento sposterebbe le giacenze."""
+    import sheets
+    foglio = finto_foglio.installa(monkeypatch, sheets)
+
+    _prodotto(db)
+    c = _login(app_mod)
+    c.post('/api/carico', json={
+        'prodotto': 'Macinato', 'fornitore': 'Fornitore Test', 'lotto': 'L1',
+        'scadenza': '2026-12-31', 'qty': 0.75, 'unita': 'kg',
+    })
+    app_mod._invia_pendenti()
+
+    ws = foglio.worksheet('REGISTRO')
+    # com'e' scritto davvero nella cella, e come si vedrebbe sul foglio
+    assert ws.righe_dati[0][5] == 0.75
+    assert ws.get_all_values()[1][5] == '0.8'
+
+    righe = sheets.load_registro()
+    assert len(righe) == 1
+    assert righe[0]['carico'] == 0.75          # non 0.8
+    assert righe[0]['rimanenza'] == 0.75
+    assert righe[0]['prodotto'] == 'Macinato'
+    assert righe[0]['tipo'] == 'CARICO'
+
+
+def test_ricaricamento_completo_non_sposta_le_giacenze(app_mod, db, monkeypatch):
+    """Giro intero: carico, invio al foglio, ricaricamento dal foglio. La
+    giacenza deve restare identica, e il controllo di allineamento non deve
+    trovare differenze."""
+    import sheets
+    finto_foglio.installa(monkeypatch, sheets)
+
+    _prodotto(db)
+    c = _login(app_mod)
+    c.post('/api/carico', json={
+        'prodotto': 'Macinato', 'fornitore': 'Fornitore Test', 'lotto': 'L1',
+        'scadenza': '2026-12-31', 'qty': 0.75, 'unita': 'kg',
+    })
+    app_mod._invia_pendenti()
+    assert db.giacenze_per_lotto()[('Macinato', 'L1')] == 0.75
+
+    monkeypatch.setattr(app_mod, 'load_listino', lambda: [])
+    monkeypatch.setattr(app_mod, 'load_temperatura', lambda: [])
+    esito = app_mod._ricarica_da_sheets()
+
+    assert esito['ricaricato'] is True
+    assert db.giacenze_per_lotto()[('Macinato', 'L1')] == 0.75
+    assert app_mod._STATO_SHEETS['differenze'] == []

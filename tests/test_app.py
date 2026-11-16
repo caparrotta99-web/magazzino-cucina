@@ -100,7 +100,7 @@ def test_profilo_mostra_gli_interruttori(app_mod):
 
 def test_notifica_arriva_solo_a_chi_la_vuole(app_mod, db, monkeypatch):
     from werkzeug.security import generate_password_hash
-    db.create_user('Aiuto', 'aiuto', generate_password_hash('xxxxxx'), 'cucina')
+    db.create_user('Aiuto', 'aiuto', generate_password_hash('xxxxxx', method='pbkdf2:sha256'), 'cucina')
     aiuto = db.get_user_by_login('aiuto')['id']
     admin = db.get_user_by_login('admin')['id']
     db.update_user_notifica(aiuto, 'scadenze', False)
@@ -117,7 +117,7 @@ def test_notifica_arriva_solo_a_chi_la_vuole(app_mod, db, monkeypatch):
 def test_ognuno_ha_la_sua_zona_rifiuti(app_mod, db):
     from werkzeug.security import generate_password_hash
     db.set_impostazione('zona_rifiuti', 'centro_ristoranti')
-    db.create_user('Aiuto', 'aiuto', generate_password_hash('aiuto123'), 'cucina')
+    db.create_user('Aiuto', 'aiuto', generate_password_hash('aiuto123', method='pbkdf2:sha256'), 'cucina')
     aiuto = app_mod.app.test_client()
     aiuto.post('/login', data={'nome': 'Aiuto', 'password': 'aiuto123'})
     admin = _login(app_mod)
@@ -133,7 +133,7 @@ def test_ognuno_ha_la_sua_zona_rifiuti(app_mod, db):
 
 def test_promemoria_rifiuti_per_zona(app_mod, db, monkeypatch):
     from werkzeug.security import generate_password_hash
-    db.create_user('Aiuto', 'aiuto', generate_password_hash('aiuto123'), 'cucina')
+    db.create_user('Aiuto', 'aiuto', generate_password_hash('aiuto123', method='pbkdf2:sha256'), 'cucina')
     aiuto = db.get_user_by_login('aiuto')['id']
     admin = db.get_user_by_login('admin')['id']
     db.update_user_rifiuti_zona(admin, 'centro_ristoranti')

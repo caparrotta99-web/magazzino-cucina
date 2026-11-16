@@ -1014,6 +1014,60 @@ def admin_conferma_reset():
     return redirect(url_for('admin_page'))
 
 
+@app.route('/api/admin/riordino-magazzino', methods=['POST'])
+@login_required
+@admin_required
+def api_admin_riordino_magazzino():
+    """Riordino del magazzino (solo admin): chiude i lotti e i prodotti aperti
+    che non ci sono più fisicamente. Non cancella niente: nel registro (e sui
+    fogli Google) resta una riga di scarico con la nota "Riordino magazzino",
+    così la storia HACCP resta completa e si capisce cosa è successo.
+    Body: {"lotti": [{"prodotto": ..., "lotto": ...}], "in_uso": [id, ...]}"""
+    d = request.get_json(force=True) or {}
+    oggi_dt = now_it()
+    oggi = oggi_dt.strftime('%Y-%m-%d')
+    nota = f"Riordino magazzino {oggi_dt.strftime('%d/%m/%Y')}: non più presente"
+    chiusi_in_uso, chiusi_lotti = [], []
+
+    for row_id in d.get('in_uso') or []:
+        try:
+            row_id = int(row_id)
+        except (TypeError, ValueError):
+            continue
+        row = get_movimento_by_id(row_id)
+        if not row or row.get('tipo') != 'IN_USO':
+            continue
+        finalizza_in_uso(row_id, oggi, None, None, tipo_finale='SCARICO')
+        accoda_sheets('aggiorna_tipo', {'movimento_id': row['movimento_id'], 'nuovo_tipo': 'SCARICO',
+                                        'nuovo_scarico': row['scarico']})
+        log_modifica_registro(row['prodotto'], row['lotto'], f"{nota} (era aperto dal {_fmt_data_it(row['data'])})",
+                              current_user.nome)
+        chiusi_in_uso.append(row['prodotto'])
+
+    for item in d.get('lotti') or []:
+        prodotto = (item.get('prodotto') or '').strip()
+        lotto    = (item.get('lotto') or '').strip()
+        if not prodotto:
+            continue
+        rimanenza = get_ultima_rimanenza(prodotto, lotto)
+        if rimanenza <= 0:
+            continue
+        info = next((l for l in get_lotti_attivi(prodotto) if l['lotto'] == lotto), {})
+        insert_movimento({
+            'data': oggi, 'fornitore': info.get('fornitore', ''), 'prodotto': prodotto,
+            'lotto': lotto, 'scadenza': info.get('scadenza', ''), 'carico': 0,
+            'scarico': rimanenza, 'unita': info.get('unita', ''), 'etichetta': nota,
+            'movimento_id': _gen_id(), 'rimanenza': 0, 'operatore': current_user.nome,
+            'reparto': info.get('reparto', 'Cucina'), 'tipo': 'SCARICO', 'synced': False,
+        })
+        log_modifica_registro(prodotto, lotto, f"{nota} ({rimanenza} {info.get('unita', '')})", current_user.nome)
+        chiusi_lotti.append(f'{prodotto} ({lotto})')
+
+    _sveglia_worker_sheets()
+    print(f"[Riordino] {current_user.nome}: chiusi {len(chiusi_lotti)} lotti e {len(chiusi_in_uso)} aperti")
+    return jsonify({'success': True, 'lotti': chiusi_lotti, 'in_uso': chiusi_in_uso})
+
+
 @app.route('/admin/test-notifica', methods=['POST'])
 @login_required
 @admin_required

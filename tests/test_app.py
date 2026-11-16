@@ -266,3 +266,51 @@ def test_comprati_vecchi_spariscono_da_soli(app_mod, db):
     db.registra_comprato({'prodotto': 'Mele', 'fornitore': 'DOCKS'}, 'Simone')
     assert len(db.get_comprati_da_registrare()) == 1
     assert db.get_comprati_da_registrare(today_it() + timedelta(days=5)) == []
+
+
+# ─── RIORDINO MAGAZZINO ──────────────────────────────────────────────────────
+
+def test_riordino_chiude_lotti_e_aperti_senza_cancellare(app_mod, db):
+    from timezone_utils import today_it
+    carico(db, 'Ricotta', 'R1', 2, '2026-07-01')
+    carico(db, 'Tonno', 'T1', 5, '2027-09-17')
+    carico(db, 'Tonno', 'T1', 0, '2027-09-17', tipo='IN_USO', scarico=1, rimanenza=4)
+    in_uso_id = db.get_in_uso_attivi()[0]['id']
+    c = _login(app_mod)
+    r = c.post('/api/admin/riordino-magazzino',
+               json={'lotti': [{'prodotto': 'Ricotta', 'lotto': 'R1'}], 'in_uso': [in_uso_id]}).get_json()
+    assert r['success'] and r['lotti'] == ['Ricotta (R1)'] and r['in_uso'] == ['Tonno']
+    giac = {g['prodotto']: g for g in db.get_giacenze()}
+    assert 'Ricotta' not in giac                  # lotto chiuso
+    assert giac['Tonno']['in_uso'] == 0           # aperto chiuso
+    assert giac['Tonno']['totale'] == 4           # il resto del tonno non si tocca
+    # nel registro resta la riga con la nota
+    with db.get_conn() as conn:
+        righe = db._rows(conn.execute("SELECT etichetta, tipo, synced FROM registro WHERE prodotto = 'Ricotta' ORDER BY id"))
+    assert righe[-1]['tipo'] == 'SCARICO' and 'Riordino magazzino' in righe[-1]['etichetta'] and righe[-1]['synced'] == 0
+
+
+def test_riordino_solo_admin(app_mod, db):
+    from werkzeug.security import generate_password_hash
+    db.create_user('Aiuto', 'aiuto', generate_password_hash('aiuto123', method='pbkdf2:sha256'), 'cucina')
+    c = app_mod.app.test_client()
+    c.post('/login', data={'nome': 'Aiuto', 'password': 'aiuto123'})
+    assert c.post('/api/admin/riordino-magazzino', json={'lotti': []}).status_code == 403
+
+
+def test_riordino_coda_sheets_nel_formato_del_worker(app_mod, db):
+    """La modifica in coda deve avere le chiavi che il worker si aspetta,
+    altrimenti blocca l'invio a Sheets di tutto quello che viene dopo."""
+    carico(db, 'Tonno', 'T1', 5, '2027-09-17')
+    carico(db, 'Tonno', 'T1', 0, '2027-09-17', tipo='IN_USO', scarico=1, rimanenza=4)
+    _login(app_mod).post('/api/admin/riordino-magazzino', json={'in_uso': [db.get_in_uso_attivi()[0]['id']]})
+    chiamate = []
+    import app as modulo
+    orig = modulo.aggiorna_tipo_movimento
+    modulo.aggiorna_tipo_movimento = lambda mid, tipo, nuovo_scarico=None: chiamate.append((tipo, nuovo_scarico))
+    try:
+        for item in db.get_coda_sheets():
+            modulo._esegui_azione_coda(item['azione'], item['payload'])
+    finally:
+        modulo.aggiorna_tipo_movimento = orig
+    assert chiamate == [('SCARICO', 1.0)]

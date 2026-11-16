@@ -132,3 +132,12 @@ def test_ricaricamento_non_arrotonda_i_decimali(monkeypatch):
     righe = sheets.load_registro()
     assert righe[0]['carico'] == 0.75
     assert righe[0]['rimanenza'] == 0.75
+
+
+def test_migrazione_spegne_scadenze_e_temperature_una_volta(db):
+    from werkzeug.security import generate_password_hash
+    db.create_user('Mario', 'mario', generate_password_hash('x', method='pbkdf2:sha256'), 'sala')
+    uid = db.get_user_by_login('mario')['id']
+    db.update_user_notifica(uid, 'scadenze', True)      # scelta fatta dopo la migrazione
+    db.db_init()                                        # riavvio dell'app
+    assert db.get_user_notifiche(uid)['scadenze'] is True

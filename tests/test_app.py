@@ -83,15 +83,18 @@ def _login(app_mod):
     return c
 
 
-def test_notifiche_tutte_attive_di_default(app_mod):
+def test_notifiche_di_default(app_mod):
+    # scadenze e temperature partono spente, rifiuti e chat accese
     r = _login(app_mod).get('/api/notifiche-preferenze').get_json()
-    assert r['notifiche'] == {'scadenze': True, 'temperature': True, 'rifiuti': True, 'chat': True}
+    assert r['notifiche'] == {'scadenze': False, 'temperature': False, 'rifiuti': True, 'chat': True}
 
 
 def test_spegnere_una_notifica(app_mod):
     c = _login(app_mod)
     r = c.post('/api/notifiche-preferenze', json={'tipo': 'rifiuti', 'attiva': False}).get_json()
     assert r['notifiche']['rifiuti'] is False
+    assert r['notifiche']['chat'] is True
+    r = c.post('/api/notifiche-preferenze', json={'tipo': 'scadenze', 'attiva': True}).get_json()
     assert r['notifiche']['scadenze'] is True
     assert c.post('/api/notifiche-preferenze', json={'tipo': 'boh', 'attiva': False}).status_code == 400
 
@@ -107,7 +110,7 @@ def test_notifica_arriva_solo_a_chi_la_vuole(app_mod, db, monkeypatch):
     db.create_user('Aiuto', 'aiuto', generate_password_hash('xxxxxx', method='pbkdf2:sha256'), 'cucina')
     aiuto = db.get_user_by_login('aiuto')['id']
     admin = db.get_user_by_login('admin')['id']
-    db.update_user_notifica(aiuto, 'scadenze', False)
+    db.update_user_notifica(admin, 'scadenze', True)   # l'admin l'ha accesa dal Profilo
 
     inviati = {}
     monkeypatch.setattr(app_mod, 'push_to_users',

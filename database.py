@@ -582,8 +582,8 @@ def db_init():
         ('users',        'dash_card2', "TEXT NOT NULL DEFAULT 'temperature'"),
         ('users',        'dash_card3', "TEXT NOT NULL DEFAULT 'scadenza'"),
         ('users',        'tutorial_visto', "INTEGER NOT NULL DEFAULT 0"),
-        ('users',        'notif_scadenze',    "INTEGER NOT NULL DEFAULT 1"),
-        ('users',        'notif_temperature', "INTEGER NOT NULL DEFAULT 1"),
+        ('users',        'notif_scadenze',    "INTEGER NOT NULL DEFAULT 0"),
+        ('users',        'notif_temperature', "INTEGER NOT NULL DEFAULT 0"),
         ('users',        'notif_rifiuti',     "INTEGER NOT NULL DEFAULT 1"),
         ('users',        'notif_chat',        "INTEGER NOT NULL DEFAULT 1"),
         ('users',        'puo_chat', "INTEGER NOT NULL DEFAULT 0"),
@@ -609,6 +609,15 @@ def db_init():
                     conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {defn}")
             except Exception:
                 pass  # Column already exists
+
+    # Una tantum: le notifiche Scadenze e Temperature partono spente per tutti
+    # (finché magazzino e temperature non tornano in uso manderebbero ogni
+    # giorno avvisi su dati vecchi). Chi le vuole le accende dal Profilo; le
+    # scelte fatte dopo questa migrazione non vengono più toccate.
+    if get_impostazione('notif_scadenze_temp_spente', '') != '1':
+        with get_conn() as conn:
+            conn.execute("UPDATE users SET notif_scadenze = 0, notif_temperature = 0")
+        set_impostazione('notif_scadenze_temp_spente', '1')
 
     # Backfill: le righe storiche (pre-esistenti alla colonna 'tipo') hanno
     # 'CARICO' come default; quelle con scarico > 0 sono in realtà SCARICO.

@@ -3,8 +3,11 @@
   "configurations": [
     {
       "name": "haccp",
-      "runtimeExecutable": "python3",
-      "runtimeArgs": ["app.py"],
+      "runtimeExecutable": "sh",
+      "runtimeArgs": [
+        "-c",
+        "BRIGADE_SHEETS_OFF=1 python3 app.py"
+      ],
       "port": 10000
     },
     {
@@ -12,7 +15,7 @@
       "runtimeExecutable": "sh",
       "runtimeArgs": [
         "-c",
-        "BRIGADE_SHEETS_OFF=1 BRIGADE_DB_PATH='/private/tmp/claude-501/-Users-simonecaparrotta-magazzino-cucina/365ac2b0-3410-42d7-b840-95c861a9f32a/scratchpad/prova.db' SECRET_KEY=prova-locale ADMIN_PASSWORD=prova-test-123 PORT=10001 python3 app.py"
+        "BRIGADE_SHEETS_OFF=1 BRIGADE_DB_PATH=prova-locale.db SECRET_KEY=prova-locale ADMIN_PASSWORD=prova-test-123 PORT=10001 python3 app.py"
       ],
       "port": 10001
     }

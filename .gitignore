@@ -12,3 +12,6 @@ __pycache__/
 .DS_Store
 static/chat_uploads/
 .pytest_cache/
+prova-locale.db
+prova-locale.db-shm
+prova-locale.db-wal

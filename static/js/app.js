@@ -982,6 +982,79 @@ function showCaricoSuccess() {
 }
 
 function triggerCamera() { document.getElementById('camera-input').click(); }
+function triggerCameraDati() { document.getElementById('camera-input-dati').click(); }
+
+// Scansione fatta quando il prodotto e' GIA' scelto: si arriva qui dal
+// riquadro "Comprati, da registrare" della home, o semplicemente perche' si e'
+// cercato il prodotto prima di tirare fuori la confezione. Dell'etichetta
+// servono solo lotto, scadenza e peso: il prodotto non si tocca.
+async function onCameraCaptureDati(input) {
+  const file = input.files[0];
+  if (!file) return;
+
+  const btn = document.getElementById('btn-scan-dati');
+  const testoOriginale = btn.innerHTML;
+  btn.disabled = true;
+  btn.classList.add('scanning');
+  btn.innerHTML = '<div class="btn-scan-spinner"></div> Analisi in corso...';
+
+  let image, mediaType = 'image/jpeg';
+  try {
+    image = await compressImage(file, 1200, 0.8);
+  } catch {
+    image = await readFileAsDataURL(file);
+    mediaType = file.type || 'image/jpeg';
+  }
+
+  const data = await api('/api/scan-label', {
+    method: 'POST',
+    body: { image, media_type: mediaType, unita_prodotto: S.caricoData.unita || '' },
+  });
+
+  btn.disabled = false;
+  btn.classList.remove('scanning');
+  btn.innerHTML = testoOriginale;
+  input.value = '';
+
+  if (!data.success) {
+    toast(data.error || 'Non riesco a leggere l\'etichetta, scrivi a mano', 'error');
+    return;
+  }
+
+  const letti = [];
+
+  if (data.lotto) {
+    _setCaricoSenzaLotto(false);          // il lotto c'e': niente lotto interno
+    document.getElementById('c2-lotto').value = data.lotto;
+    S.caricoData.lotto = data.lotto;
+    letti.push('lotto');
+  }
+
+  if (data.scadenza) {
+    const parti = String(data.scadenza).split('/');
+    if (parti.length === 3) {
+      _setCaricoSenzaScadenza(false);     // la scadenza c'e': riabilita il campo
+      const iso = `${parti[2]}-${parti[1].padStart(2, '0')}-${parti[0].padStart(2, '0')}`;
+      document.getElementById('c2-scadenza').value = iso;
+      S.caricoData.scadenza = iso;
+      letti.push('scadenza');
+    }
+  }
+
+  if (data.quantita != null && data.quantita > 0) {
+    document.getElementById('c2-qty').value = data.quantita;
+    S.caricoData.qty = data.quantita;
+    letti.push('peso');
+    const nota = document.getElementById('c2-qty-nota');
+    if (data.convertita) {
+      nota.textContent = `In etichetta ${data.quantita_letta} ${data.unita_letta}, convertito in ${data.quantita} ${S.caricoData.unita}. Puoi correggerlo.`;
+      nota.classList.add('show');
+    }
+  }
+
+  toast(letti.length ? `Letti dall'etichetta: ${letti.join(', ')}` : 'Nessun dato trovato',
+        letti.length ? 'success' : 'error');
+}
 
 function _typeIntoField(el, value) {
   // Effetto "scrittura" progressiva: popola il campo carattere per carattere

@@ -3045,14 +3045,25 @@ def api_scan_label():
         except (TypeError, ValueError):
             qty_letta = None
 
-        prodotto, come = _abbina_prodotto(nome_letto, fornitore_letto)
+        # Scansione fatta quando il prodotto e' gia' stato scelto (per esempio
+        # arrivando dalla lista della spesa): dell'etichetta servono solo lotto,
+        # scadenza e peso, e il peso va convertito nell'unita' di QUEL prodotto,
+        # non di quello che l'etichetta somiglierebbe di piu'.
+        unita_prodotto = (d.get('unita_prodotto') or '').strip()
 
-        # Se il prodotto e' stato riconosciuto, il peso viene proposto gia'
-        # nell'unita' del listino (es. 500 g -> 0.5 kg), comunque modificabile.
+        if unita_prodotto:
+            prodotto, come = None, None
+            unita_destinazione = unita_prodotto
+        else:
+            prodotto, come = _abbina_prodotto(nome_letto, fornitore_letto)
+            unita_destinazione = prodotto['unita'] if prodotto else unita_letta
+
+        # Il peso viene proposto gia' nell'unita' giusta (es. 500 g -> 0.5 kg),
+        # comunque modificabile.
         qty_proposta, convertita = (None, False)
         if qty_letta is not None:
             qty_proposta, convertita = _converti_quantita(
-                qty_letta, unita_letta, prodotto['unita'] if prodotto else unita_letta)
+                qty_letta, unita_letta, unita_destinazione)
 
         return jsonify({
             'success':   True,
@@ -3066,7 +3077,7 @@ def api_scan_label():
             'convertita':      convertita,
             'prodotto':   prodotto['prodotto'] if prodotto else None,
             'fornitore':  prodotto['fornitore'] if prodotto else None,
-            'unita':      prodotto['unita'] if prodotto else None,
+            'unita':      prodotto['unita'] if prodotto else (unita_prodotto or None),
             'riconosciuto_come': come,
         })
     except Exception as e:

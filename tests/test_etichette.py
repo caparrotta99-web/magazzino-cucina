@@ -127,3 +127,102 @@ def test_gli_abbinamenti_sopravvivono_al_ricaricamento_da_sheets(app_mod, listin
 
     assert app_mod._ricarica_da_sheets()['ricaricato'] is True
     assert db.get_alias_etichetta('ORO ROSSO 2500')['prodotto'] == 'Pomodoro pelato'
+
+
+# ─── SCANSIONE A PRODOTTO GIA' SCELTO ────────────────────────────────────────
+# Si arriva qui dal riquadro "Comprati, da registrare" o quando si e' cercato
+# il prodotto prima di tirare fuori la confezione: dell'etichetta servono solo
+# lotto, scadenza e peso.
+
+class _FintaRisposta:
+    def __init__(self, testo):
+        from types import SimpleNamespace as NS
+        self.content = [NS(type='text', text=testo)]
+
+
+def _finto_anthropic(monkeypatch, testo_risposta):
+    """Sostituisce il client Anthropic con uno che risponde sempre uguale, e
+    restituisce la lista dei corpi inviati, per controllarli."""
+    import anthropic
+    inviati = []
+
+    class FintoMessages:
+        def create(self, **kwargs):
+            inviati.append(kwargs)
+            return _FintaRisposta(testo_risposta)
+
+    class FintoClient:
+        def __init__(self, **kwargs):
+            self.messages = FintoMessages()
+
+    monkeypatch.setattr(anthropic, 'Anthropic', FintoClient)
+    monkeypatch.setenv('ANTHROPIC_API_KEY', 'prova')
+    return inviati
+
+
+ETICHETTA = ('{"lotto": "L99", "scadenza": "31/12/2026", "nome": "PELATI ORO ROSSO", '
+             '"fornitore": null, "quantita": 2500, "unita": "g"}')
+
+
+def test_scansione_a_prodotto_scelto_converte_nella_sua_unita(app_mod, listino, monkeypatch):
+    _finto_anthropic(monkeypatch, ETICHETTA)
+    c = _login(app_mod)
+    r = c.post('/api/scan-label', json={
+        'image': 'xxx', 'unita_prodotto': 'kg',
+    }).get_json()
+
+    assert r['success'] is True
+    assert r['lotto'] == 'L99'
+    assert r['scadenza'] == '31/12/2026'
+    assert r['quantita'] == 2.5          # 2500 g diventano 2.5 kg
+    assert r['convertita'] is True
+    assert r['unita'] == 'kg'
+    # il prodotto era gia' scelto: l'app non deve proporne un altro
+    assert r['prodotto'] is None
+    assert r['riconosciuto_come'] is None
+
+
+# Etichetta che il listino riesce a riconoscere da sola.
+ETICHETTA_RICONOSCIBILE = (
+    '{"lotto": "L99", "scadenza": "31/12/2026", "nome": "POMODORO PELATO IN SUCCO", '
+    '"fornitore": null, "quantita": 2500, "unita": "g"}')
+
+
+def test_senza_unita_prodotto_la_scansione_abbina_come_prima(app_mod, listino, monkeypatch):
+    """Il comportamento della scansione dalla schermata di ricerca non cambia."""
+    _finto_anthropic(monkeypatch, ETICHETTA_RICONOSCIBILE)
+    c = _login(app_mod)
+    r = c.post('/api/scan-label', json={'image': 'xxx'}).get_json()
+
+    assert r['prodotto'] == 'Pomodoro pelato'
+    assert r['riconosciuto_come'] == 'somiglianza'
+    assert r['quantita'] == 2.5          # convertito nell'unita' del listino
+
+
+def test_nome_commerciale_senza_parole_in_comune_non_si_abbina(app_mod, listino, monkeypatch):
+    """"PELATI ORO ROSSO" non ha nessuna parola in comune con "Pomodoro
+    pelato": l'app non tira a indovinare, restituisce il nome letto e lascia
+    scegliere all'utente. Da quella scelta impara l'abbinamento."""
+    _finto_anthropic(monkeypatch, ETICHETTA)
+    c = _login(app_mod)
+    r = c.post('/api/scan-label', json={'image': 'xxx'}).get_json()
+
+    assert r['prodotto'] is None
+    assert r['nome_letto'] == 'PELATI ORO ROSSO'
+
+    # l'utente sceglie, e la volta dopo si riconosce da solo
+    c.post('/api/etichette/abbina', json={
+        'testo': 'PELATI ORO ROSSO', 'prodotto': 'Pomodoro pelato', 'fornitore': ''})
+    r2 = c.post('/api/scan-label', json={'image': 'xxx'}).get_json()
+    assert r2['prodotto'] == 'Pomodoro pelato'
+    assert r2['riconosciuto_come'] == 'alias'
+
+
+def test_scansione_a_prodotto_scelto_con_unita_strana(app_mod, listino, monkeypatch):
+    """Unita' che non si sanno convertire: il numero resta com'e' letto,
+    senza inventare conversioni."""
+    _finto_anthropic(monkeypatch, ETICHETTA.replace('"unita": "g"', '"unita": "pz"'))
+    c = _login(app_mod)
+    r = c.post('/api/scan-label', json={'image': 'xxx', 'unita_prodotto': 'kg'}).get_json()
+    assert r['quantita'] == 2500
+    assert r['convertita'] is False

@@ -859,31 +859,36 @@
       </select>
     </div>
 
-    <div class="pg-sub">Seleziona il prodotto e il lotto da prelevare per l'uso</div>
+    <div class="pg-sub">Cerca il prodotto, poi scegli il lotto da prelevare</div>
 
     <div class="form-card">
       <div class="fgroup">
         <label class="flabel">Prodotto *</label>
-        <div class="fselect-wrap">
-          <select class="fselect" id="u-prodotto" onchange="onProdottoInUso()">
-            <option value="">Seleziona prodotto…</option>
-          </select>
+        <div class="search-wrap spesa-search-wrap" style="margin-bottom:0">
+          <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          <input class="search-input" type="search" id="u-search-input"
+                 placeholder="Cerca prodotto…" autocomplete="off"
+                 oninput="onInUsoSearchInput()" onfocus="onInUsoSearchInput()" onblur="_closeInUsoDropdownDelayed()">
+          <div class="spesa-search-dropdown" id="u-search-dropdown"></div>
         </div>
+        <div class="u-prodotto-scelto" id="u-prodotto-scelto"></div>
+        <input type="hidden" id="u-prodotto">
+        <input type="hidden" id="u-lotto">
       </div>
-      <div class="fgroup">
+
+      <div class="fgroup" id="u-lotti-group" style="display:none">
         <label class="flabel">Lotto *</label>
-        <div class="fselect-wrap">
-          <select class="fselect" id="u-lotto" disabled onchange="onLottoInUso()">
-            <option value="">Seleziona prima il prodotto</option>
-          </select>
-        </div>
+        <div class="lotto-cards" id="u-lotti-cards"></div>
       </div>
-      <div class="lot-info-box" id="u-lot-info"></div>
+
       <div class="fgroup" style="margin-bottom:0">
         <label class="flabel">Quantità da prelevare *</label>
-        <input class="finput" type="number" id="u-qty"
-               placeholder="0" min="0.01" step="0.01" inputmode="decimal"
-               oninput="validateQtyInUso()">
+        <div class="u-qty-row">
+          <input class="finput" type="number" id="u-qty"
+                 placeholder="0" min="0.01" step="0.01" inputmode="decimal"
+                 oninput="validateQtyInUso()">
+          <button type="button" class="btn-tutto" id="u-btn-tutto" onclick="inUsoTutto()">Tutto</button>
+        </div>
         <div class="ferror" id="u-qty-error"></div>
       </div>
 

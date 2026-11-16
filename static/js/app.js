@@ -85,11 +85,7 @@ function onInUsoFilterChange(sel) {
   sel.classList.toggle('active', !!sel.value);
   S.inUsoReparto   = document.getElementById('u-filter-reparto').value;
   S.inUsoCategoria = document.getElementById('u-filter-categoria').value;
-  renderInUsoProdotti();
-  const lottoSel = document.getElementById('u-lotto');
-  lottoSel.innerHTML = '<option value="">Seleziona prima il prodotto</option>';
-  lottoSel.disabled = true;
-  document.getElementById('u-lot-info').classList.remove('show');
+  resetInUsoProdotto();
 }
 
 // ── CATEGORIE ────────────────────────────────────────────────────────────
@@ -996,72 +992,156 @@ async function onCameraCapture(input) {
 }
 
 // ── IN USO ───────────────────────────────────────────────────────────────
+// Il prodotto si cerca invece di scorrere un menu lungo come il listino.
 function renderInUsoProdotti() {
-  const sel = document.getElementById('u-prodotto');
-  const cur = sel.value;
+  const scelto = document.getElementById('u-prodotto')?.value;
+  if (!scelto) return;
+  // Se il prodotto scelto non ha piu' giacenza, si riparte dalla ricerca.
   const filtered = filterProdotti(S.giacenze, S.inUsoReparto, S.inUsoCategoria);
-  sel.innerHTML = '<option value="">Seleziona prodotto…</option>' +
-    filtered.map(g => `<option value="${esc(g.prodotto)}">${esc(g.prodotto)}</option>`).join('');
-  if (cur && filtered.find(g => g.prodotto === cur)) {
-    sel.value = cur;
-  } else {
-    document.getElementById('u-lotto').innerHTML = '<option value="">Seleziona prima il prodotto</option>';
-    document.getElementById('u-lotto').disabled = true;
-    document.getElementById('u-lot-info').classList.remove('show');
-  }
+  if (!filtered.find(g => g.prodotto === scelto)) resetInUsoProdotto();
+}
+
+function resetInUsoProdotto() {
+  document.getElementById('u-prodotto').value = '';
+  document.getElementById('u-lotto').value = '';
+  S.lottiInUso = [];
+  const scelto = document.getElementById('u-prodotto-scelto');
+  scelto.classList.remove('show');
+  scelto.innerHTML = '';
+  document.getElementById('u-lotti-group').style.display = 'none';
+  document.getElementById('u-lotti-cards').innerHTML = '';
+  document.getElementById('u-qty').value = '';
+  const searchEl = document.getElementById('u-search-input');
+  if (searchEl) { searchEl.value = ''; searchEl.style.display = ''; }
+  document.getElementById('u-qty-error').classList.remove('show');
+}
+
+function onInUsoSearchInput() {
+  const q  = document.getElementById('u-search-input').value.trim().toLowerCase();
+  const dd = document.getElementById('u-search-dropdown');
+  const disponibili = filterProdotti(S.giacenze, S.inUsoReparto, S.inUsoCategoria);
+
+  const matches = (q
+    ? disponibili.filter(g => g.prodotto.toLowerCase().includes(q)
+        || (g.fornitore || '').toLowerCase().includes(q))
+    : disponibili).slice(0, 30);
+
+  dd.innerHTML = matches.length
+    ? matches.map(g => `
+      <div class="spesa-search-item" onclick="pickInUsoProdotto(${esc(JSON.stringify(g.prodotto))})">
+        <span class="spesa-search-item-nome">${esc(g.prodotto)}</span>
+        <span class="spesa-search-item-forn">${g.totale != null ? g.totale + ' ' + esc(g.unita || '') : ''}</span>
+      </div>`).join('')
+    : `<div class="spesa-search-empty">Nessun prodotto in magazzino con questo nome</div>`;
+  dd.classList.add('open');
+}
+
+function _closeInUsoDropdownDelayed() {
+  setTimeout(() => {
+    document.getElementById('u-search-dropdown')?.classList.remove('open');
+  }, 150);
+}
+
+async function pickInUsoProdotto(prodotto) {
+  document.getElementById('u-search-dropdown').classList.remove('open');
+  document.getElementById('u-prodotto').value = prodotto;
+
+  const scelto = document.getElementById('u-prodotto-scelto');
+  scelto.innerHTML = `<span>${esc(prodotto)}</span>`
+    + `<span class="u-cambia" onclick="resetInUsoProdotto()">Cambia</span>`;
+  scelto.classList.add('show');
+  document.getElementById('u-search-input').style.display = 'none';
+
+  await onProdottoInUso();
 }
 
 async function onProdottoInUso() {
   const prodotto = document.getElementById('u-prodotto').value;
-  const lottoSel = document.getElementById('u-lotto');
-  document.getElementById('u-lot-info').classList.remove('show');
-  if (!prodotto) {
-    lottoSel.innerHTML = '<option value="">Seleziona prima il prodotto</option>';
-    lottoSel.disabled = true; return;
-  }
-  lottoSel.disabled = true;
+  const gruppo   = document.getElementById('u-lotti-group');
+  document.getElementById('u-lotto').value = '';
+  if (!prodotto) { gruppo.style.display = 'none'; return; }
+
   const data = await api(`/api/lotti?prodotto=${encodeURIComponent(prodotto)}`);
-  S.lottiInUso = data.lotti || [];
-  lottoSel.innerHTML = '<option value="">Seleziona lotto…</option>' +
-    S.lottiInUso.map(l => {
-      const sc = l.scadenza ? ` · scade ${fmtDate(l.scadenza)}` : '';
-      return `<option value="${esc(l.lotto)}">${esc(l.lotto)} — ${l.rimanenza} ${l.unita}${sc} · carico ${fmtDate(l.data_carico)}</option>`;
-    }).join('');
-  lottoSel.disabled = false;
+  // Primo chi scade prima: e' l'ordine in cui vanno consumati.
+  S.lottiInUso = (data.lotti || []).slice().sort((a, b) => {
+    if (!a.scadenza && !b.scadenza) return 0;
+    if (!a.scadenza) return 1;
+    if (!b.scadenza) return -1;
+    return a.scadenza < b.scadenza ? -1 : a.scadenza > b.scadenza ? 1 : 0;
+  });
+
+  renderLottiInUso();
+  gruppo.style.display = S.lottiInUso.length ? '' : 'none';
+
+  // Il primo lotto buono e' gia' scelto: quasi sempre e' quello giusto e non
+  // serve nemmeno toccarlo. Un lotto scaduto invece non si sceglie mai da
+  // solo, altrimenti si userebbe roba scaduta senza accorgersene: va toccato
+  // a mano, e l'app chiede conferma.
+  const i = _primoLottoNonScaduto();
+  if (i !== -1) await selezionaLottoInUso(S.lottiInUso[i].lotto, true);
+}
+
+function _primoLottoNonScaduto() {
+  return S.lottiInUso.findIndex(l => !(l.scadenza && daysTo(l.scadenza) < 0));
+}
+
+function renderLottiInUso() {
+  const cont     = document.getElementById('u-lotti-cards');
+  const scelto   = document.getElementById('u-lotto').value;
+  const primoBuono = _primoLottoNonScaduto();
+  cont.innerHTML = S.lottiInUso.map((l, i) => {
+    const giorni  = l.scadenza ? daysTo(l.scadenza) : null;
+    const scaduto = giorni !== null && giorni < 0;
+    const scadTxt = l.scadenza
+      ? `scade ${fmtDate(l.scadenza)}${giorni !== null ? ` (${giorni}gg)` : ''}`
+      : 'senza scadenza';
+    const badge = scaduto
+      ? '<div class="lotto-card-badge scaduto">Scaduto</div>'
+      : (i === primoBuono ? '<div class="lotto-card-badge">Usa prima questo</div>' : '');
+    return `
+      <div class="lotto-card ${l.lotto === scelto ? 'selected' : ''} ${scaduto ? 'scaduto' : ''}"
+           onclick="selezionaLottoInUso(${esc(JSON.stringify(l.lotto))})">
+        <div class="lotto-card-top">
+          <span class="lotto-card-nome">${esc(l.lotto)}</span>
+          <span class="lotto-card-qty">${l.rimanenza} ${esc(l.unita)}</span>
+        </div>
+        <div class="lotto-card-sub">${scadTxt} · carico ${fmtDate(l.data_carico)}${l.fornitore ? ' · ' + esc(l.fornitore) : ''}</div>
+        ${badge}
+      </div>`;
+  }).join('');
+}
+
+async function selezionaLottoInUso(lotto, automatico = false) {
+  const prodotto = document.getElementById('u-prodotto').value;
+  const l = S.lottiInUso.find(x => x.lotto === lotto);
+  if (!l) return;
+
+  // Un lotto scaduto si puo' ancora usare (succede), ma mai per sbaglio.
+  const giorni = l.scadenza ? daysTo(l.scadenza) : null;
+  if (!automatico && giorni !== null && giorni < 0) {
+    if (!confirm(`Il lotto ${l.lotto} è scaduto il ${fmtDate(l.scadenza)}. Vuoi usarlo lo stesso?`)) return;
+  }
+
+  if (_inUsoLockKey) { releaseLock({ tipo: 'prodotto_lotto', ..._inUsoLockKey }); _inUsoLockKey = null; }
+  const ok = await tryAcquireLock({ tipo: 'prodotto_lotto', prodotto, lotto, form: 'in_uso' });
+  if (!ok) return;
+  _inUsoLockKey = { prodotto, lotto };
+
+  document.getElementById('u-lotto').value = lotto;
+  document.getElementById('u-qty-error').classList.remove('show');
+  document.getElementById('u-qty').classList.remove('error');
+  renderLottiInUso();
+}
+
+function inUsoTutto() {
+  const lotto = document.getElementById('u-lotto').value;
+  const l = S.lottiInUso.find(x => x.lotto === lotto);
+  if (!l) { toast('Scegli prima il lotto', 'error'); return; }
+  document.getElementById('u-qty').value = l.rimanenza;
+  validateQtyInUso();
 }
 
 let _inUsoLockKey = null;
-
-async function onLottoInUso() {
-  const lotto    = document.getElementById('u-lotto').value;
-  const prodotto = document.getElementById('u-prodotto').value;
-  const info     = document.getElementById('u-lot-info');
-  document.getElementById('u-qty-error').textContent = '';
-  document.getElementById('u-qty-error').classList.remove('show');
-  document.getElementById('u-qty').classList.remove('error');
-
-  if (_inUsoLockKey) { releaseLock({ tipo: 'prodotto_lotto', ..._inUsoLockKey }); _inUsoLockKey = null; }
-
-  if (!lotto) { info.classList.remove('show'); return; }
-
-  const ok = await tryAcquireLock({ tipo: 'prodotto_lotto', prodotto, lotto, form: 'in_uso' });
-  if (!ok) { document.getElementById('u-lotto').value = ''; info.classList.remove('show'); return; }
-  _inUsoLockKey = { prodotto, lotto };
-
-  const l = S.lottiInUso.find(x => x.lotto === lotto);
-  if (!l)    { info.classList.remove('show'); return; }
-  const giorni  = l.scadenza ? daysTo(l.scadenza) : null;
-  const scadTxt = l.scadenza
-    ? `${fmtDate(l.scadenza)}${giorni !== null ? ` (${giorni}gg)` : ''}` : '—';
-  const scadCls = giorni === null ? '' : giorni < 0 ? 'c-red' : giorni <= 7 ? 'c-orange' : 'c-green';
-  info.innerHTML = `
-    <div class="lot-info-row"><span>Disponibile</span><strong>${l.rimanenza} ${l.unita}</strong></div>
-    <div class="lot-info-row"><span>Data carico</span><strong>${fmtDate(l.data_carico)}</strong></div>
-    <div class="lot-info-row"><span>Scadenza</span><strong class="${scadCls}">${scadTxt}</strong></div>
-    ${l.fornitore ? `<div class="lot-info-row"><span>Fornitore</span><strong>${esc(l.fornitore)}</strong></div>` : ''}
-  `;
-  info.classList.add('show');
-}
 
 function validateQtyInUso() {
   const lotto = document.getElementById('u-lotto').value;
@@ -1093,16 +1173,18 @@ async function submitInUso() {
 
   btn.classList.remove('loading'); btn.disabled = false;
 
+  // Il lotto appena prelevato va liberato PRIMA di ricaricare: subito dopo
+  // onProdottoInUso() riseleziona il primo lotto e ne prende uno nuovo.
+  if (_inUsoLockKey) { releaseLock({ tipo: 'prodotto_lotto', ..._inUsoLockKey }); _inUsoLockKey = null; }
+
   if (data.success) {
     toast(`Messo in uso — rimasto in magazzino: ${data.rimanenza}`, 'success');
     document.getElementById('u-qty').value = '';
     await Promise.all([loadGiacenze(), loadAlerts(), loadInUso()]);
     renderInUsoProdotti();
-    await onProdottoInUso();
+    if (document.getElementById('u-prodotto').value) await onProdottoInUso();
     if (data.warning) setTimeout(() => toast(data.warning, 'warning'), 1800);
   } else { toast(data.error || 'Errore durante il prelievo', 'error'); }
-
-  if (_inUsoLockKey) { releaseLock({ tipo: 'prodotto_lotto', ..._inUsoLockKey }); _inUsoLockKey = null; }
 }
 
 // ── SCARICO (finalizza un elemento IN USO, dal pulsante "Scarica" in Giacenze) ─

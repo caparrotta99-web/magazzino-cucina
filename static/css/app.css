@@ -2013,3 +2013,43 @@ html.chat-no-scroll { overflow: hidden; }
 @media (prefers-reduced-motion: reduce) {
   #splash-screen, #splash-screen.splash-hide { animation: none; opacity: 1; }
 }
+
+/* ─── IN USO: ricerca prodotto e schede lotto ───────────────────────────── */
+.u-prodotto-scelto {
+  display: none; margin-top: 10px; padding: 10px 12px;
+  border: 1px solid var(--border); border-radius: 12px; background: var(--surface-2);
+  font-size: 15px; font-weight: 600;
+}
+.u-prodotto-scelto.show { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.u-prodotto-scelto .u-cambia {
+  font-size: 13px; font-weight: 600; color: var(--accent, #0ea5e9);
+  cursor: pointer; flex-shrink: 0;
+}
+.lotto-cards { display: flex; flex-direction: column; gap: 8px; }
+.lotto-card {
+  border: 1.5px solid var(--border); border-radius: 14px; padding: 11px 13px;
+  background: var(--card); cursor: pointer; transition: border-color .15s, background .15s;
+}
+.lotto-card.selected { border-color: var(--accent, #0ea5e9); background: var(--surface-2); }
+.lotto-card.scaduto  { border-color: rgba(220,38,38,.55); }
+.lotto-card-top {
+  display: flex; align-items: baseline; justify-content: space-between; gap: 10px;
+}
+.lotto-card-nome { font-size: 15px; font-weight: 700; }
+.lotto-card-qty  { font-size: 14px; font-weight: 600; white-space: nowrap; }
+.lotto-card-sub  { margin-top: 3px; font-size: 13px; line-height: 1.45; opacity: .85; }
+.lotto-card-badge {
+  display: inline-block; margin-top: 6px; padding: 2px 8px; border-radius: 999px;
+  font-size: 12px; font-weight: 700;
+  background: rgba(16,185,129,.15); color: #047857;
+}
+.lotto-card-badge.scaduto { background: rgba(220,38,38,.15); color: #b91c1c; }
+.u-qty-row { display: flex; gap: 8px; align-items: flex-start; }
+.u-qty-row .finput { flex: 1; }
+.btn-tutto {
+  flex-shrink: 0; padding: 0 16px; height: 46px; border-radius: 12px;
+  border: 1.5px solid var(--border); background: var(--surface-2); color: var(--text);
+  font-family: 'Inter', sans-serif; font-size: 14px; font-weight: 700; cursor: pointer;
+}
+.btn-tutto:active { background: var(--border); }
+.btn-tutto:disabled { opacity: .45; cursor: default; }

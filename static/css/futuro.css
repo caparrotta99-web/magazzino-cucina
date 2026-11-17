@@ -400,3 +400,238 @@
   background: rgba(var(--f-cy-rgb), .12) !important;
   color: var(--f-cy) !important;
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   LAYOUT BRIGADE 3000 — non solo colori: cambia la disposizione della home,
+   della Dashboard e della Lista spesa come nella bozza approvata.
+   Stessi elementi, stessi pulsanti, stesse funzioni: cambia solo come sono
+   messi sullo schermo.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Saluto: data piccola in alto, nome grande su due righe ─────────────── */
+:root[data-stile="futuro"] .home-menu-topbar { align-items: flex-start; margin-bottom: 18px; }
+:root[data-stile="futuro"] .home-menu-greeting-col { display: flex; flex-direction: column-reverse; }
+:root[data-stile="futuro"] .home-menu-datetime,
+:root[data-stile="futuro"] .home-dash-datetime {
+  font-family: var(--f-mono); font-size: 10px; font-weight: 700;
+  letter-spacing: .18em; text-transform: uppercase;
+  color: var(--f-mu) !important; margin: 0 0 10px;
+}
+:root[data-stile="futuro"] .home-menu-hello,
+:root[data-stile="futuro"] .home-dash-hello {
+  font-size: 32px; font-weight: 700; letter-spacing: -.03em; line-height: 1.02;
+  white-space: normal; color: var(--text) !important;
+}
+:root[data-stile="futuro"] .home-dash-greeting { display: flex; flex-direction: column-reverse; }
+
+/* ── Lista spesa in home: niente riquadro, anello grande a sinistra ─────── */
+:root[data-stile="futuro"] .hcard-spesa {
+  background: transparent !important;
+  border: 0 !important;
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+  padding: 4px 0 !important;
+  min-height: 0;
+  display: grid !important;
+  grid-template-columns: 188px 1fr;
+  align-items: center;
+  gap: 18px;
+}
+:root[data-stile="futuro"] .hcard-spesa > div:first-child { order: 2; flex-direction: column; align-items: flex-start !important; gap: 12px !important; }
+:root[data-stile="futuro"] .hcard-spesa > div:last-child { order: 1; position: relative; width: 188px; height: 188px; }
+:root[data-stile="futuro"] .hcard-spesa .hcard-label {
+  font-family: var(--f-mono); font-size: 11px; font-weight: 700; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--f-cy) !important;
+}
+:root[data-stile="futuro"] .hcard-spesa .hcard-sub { font-size: 13px; color: var(--f-mu) !important; margin-top: 4px; }
+:root[data-stile="futuro"] .hcard-spesa .hcard-icon { width: 44px; height: 44px; }
+:root[data-stile="futuro"] .hcard-spesa-num {
+  width: 188px; height: 188px; margin: 0;
+  font-size: 64px;
+  background:
+    radial-gradient(circle, var(--f-bg) 0 62%, transparent 63%),
+    radial-gradient(circle, transparent 0 66%, rgba(var(--f-cy-rgb), .25) 66.5%, transparent 67.5%),
+    conic-gradient(var(--f-cy) 0 72%, rgba(var(--f-cy-rgb), .12) 72% 100%) !important;
+  box-shadow: 0 0 40px rgba(var(--f-cy-rgb), .28) !important;
+  padding-bottom: 18px; box-sizing: border-box;
+}
+:root[data-stile="futuro"][data-theme="light"] .hcard-spesa-num {
+  background:
+    radial-gradient(circle, var(--f-bg) 0 62%, transparent 63%),
+    conic-gradient(var(--f-cy) 0 72%, rgba(var(--f-cy-rgb), .14) 72% 100%) !important;
+}
+:root[data-stile="futuro"] .hcard-spesa-lbl {
+  position: absolute; left: 0; right: 0; top: 122px; text-align: center; margin: 0;
+}
+
+/* ── Movimenti: capsule orizzontali (Carico intera, poi In uso + Giacenze) ─ */
+:root[data-stile="futuro"] .home-grid:has(.hcard-carico),
+:root[data-stile="futuro"] .home-grid:has(.hcard-prenotazioni) {
+  grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px;
+}
+:root[data-stile="futuro"] .home-grid:has(.hcard-carico) .hcard-carico { grid-column: 1 / -1; }
+:root[data-stile="futuro"] .hcard-carico,
+:root[data-stile="futuro"] .hcard-in-uso,
+:root[data-stile="futuro"] .hcard-giacenze,
+:root[data-stile="futuro"] .hcard-prenotazioni {
+  flex-direction: row !important; align-items: center; gap: 12px;
+  min-height: 0; padding: 8px 16px 8px 8px !important;
+  clip-path: none !important;
+  border-radius: 999px !important;
+  border: 1px solid var(--f-ln) !important;
+}
+:root[data-stile="futuro"] .hcard-carico .hcard-icon,
+:root[data-stile="futuro"] .hcard-in-uso .hcard-icon,
+:root[data-stile="futuro"] .hcard-giacenze .hcard-icon,
+:root[data-stile="futuro"] .hcard-prenotazioni .hcard-icon { width: 44px; height: 44px; }
+:root[data-stile="futuro"] .hcard-carico .hcard-label,
+:root[data-stile="futuro"] .hcard-in-uso .hcard-label,
+:root[data-stile="futuro"] .hcard-giacenze .hcard-label,
+:root[data-stile="futuro"] .hcard-prenotazioni .hcard-label { font-size: 15px; font-weight: 600; }
+:root[data-stile="futuro"] .hcard-carico .hcard-sub,
+:root[data-stile="futuro"] .hcard-in-uso .hcard-sub,
+:root[data-stile="futuro"] .hcard-giacenze .hcard-sub,
+:root[data-stile="futuro"] .hcard-prenotazioni .hcard-sub { font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+:root[data-stile="futuro"] .hcard-carico > div:last-child,
+:root[data-stile="futuro"] .hcard-in-uso > div:last-child,
+:root[data-stile="futuro"] .hcard-giacenze > div:last-child,
+:root[data-stile="futuro"] .hcard-prenotazioni > div:last-child { min-width: 0; }
+/* Carico è l'azione principale: capsula più alta con la freccia dentro */
+:root[data-stile="futuro"] .hcard-carico { padding: 10px 18px 10px 10px !important; }
+:root[data-stile="futuro"] .hcard-carico::after {
+  content: "›"; margin-left: auto; font-size: 26px; line-height: 1; color: var(--f-li);
+}
+
+/* ── HACCP: piastrelle ad angoli tagliati, più alte, numero in alto a destra ─ */
+:root[data-stile="futuro"] .home-grid:has(.hcard-alert) .hcard {
+  min-height: 118px; justify-content: space-between; padding: 14px !important;
+}
+:root[data-stile="futuro"] .hcard-alert { flex-direction: column-reverse !important; }
+:root[data-stile="futuro"] .hcard-alert > div:first-child { display: flex; flex-direction: column-reverse; }
+:root[data-stile="futuro"] .hcard-alert-num {
+  position: absolute; top: 12px; right: 14px;
+  font-size: 28px; font-weight: 700; line-height: 1; color: var(--f-rd) !important;
+}
+:root[data-stile="futuro"] .hcard-alert-lbl { font-size: 15px !important; font-weight: 600; color: var(--text) !important; }
+:root[data-stile="futuro"] .home-grid:has(.hcard-alert) .hcard-label { font-size: 15px; font-weight: 600; }
+
+/* ── Dashboard: Meteo e Rifiuti affiancati, testi leggibili in chiaro e scuro ─ */
+:root[data-stile="futuro"] .home-dash { background: transparent !important; }
+:root[data-stile="futuro"] .home-dash,
+:root[data-stile="futuro"] .home-dash-meteo-temp,
+:root[data-stile="futuro"] .home-dash-rifiuti-label,
+:root[data-stile="futuro"] .home-dash-rifiuti-oggi-row,
+:root[data-stile="futuro"] .home-dash-chat-link,
+:root[data-stile="futuro"] .home-dash-meteo-icon,
+:root[data-stile="futuro"] .home-dash-card-title { color: var(--text) !important; }
+:root[data-stile="futuro"] .home-dash-meteo-cond,
+:root[data-stile="futuro"] .home-dash-simple-list li { color: color-mix(in srgb, var(--text) 82%, transparent) !important; }
+:root[data-stile="futuro"] .home-dash-meteo-minmax,
+:root[data-stile="futuro"] .home-dash-meteo-loc,
+:root[data-stile="futuro"] .home-dash-rifiuti-zona,
+:root[data-stile="futuro"] .home-dash-rifiuti-orario,
+:root[data-stile="futuro"] .home-dash-rifiuti-section-title,
+:root[data-stile="futuro"] .home-dash-rifiuti-prossimo-giorno,
+:root[data-stile="futuro"] .home-dash-rifiuti-chevron,
+:root[data-stile="futuro"] .home-dash-comprati-sub,
+:root[data-stile="futuro"] .home-dash-simple-list li.home-dash-simple-empty { color: var(--f-mu) !important; }
+:root[data-stile="futuro"] .home-dash-rifiuti-change { color: var(--f-cy) !important; font-family: var(--f-mono); letter-spacing: .06em; }
+:root[data-stile="futuro"] .home-dash-simple-list li::before { background: var(--f-cy); box-shadow: 0 0 6px var(--f-cy); }
+:root[data-stile="futuro"] .home-dash-rifiuti-prossimo-row { border-bottom-color: var(--f-ln); }
+:root[data-stile="futuro"] .home-dash-rifiuti-prossimo-badge { color: var(--text); }
+
+:root[data-stile="futuro"] .home-dash {
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  column-gap: 10px; align-content: start;
+}
+:root[data-stile="futuro"] .home-dash > * { grid-column: 1 / -1; }
+:root[data-stile="futuro"] .home-dash > .home-dash-meteo { grid-column: 1; }
+:root[data-stile="futuro"] .home-dash > #home-dash-rifiuti-card { grid-column: 2; }
+:root[data-stile="futuro"] .home-dash-meteo {
+  flex-direction: column; align-items: flex-start; gap: 8px;
+  background: var(--f-panel) !important;
+  border: 1px solid var(--f-ln) !important;
+  border-radius: 22px 22px 22px 6px !important;
+  box-shadow: none !important;
+  margin-bottom: 14px;
+}
+:root[data-stile="futuro"] .home-dash-meteo-temp { font-size: 30px; font-weight: 700; }
+:root[data-stile="futuro"] #home-dash-rifiuti-card { border-radius: 6px 22px 22px 22px !important; margin-bottom: 14px; }
+:root[data-stile="futuro"] #home-dash-rifiuti-card .home-dash-card-top { flex-direction: column; align-items: flex-start; gap: 2px; }
+:root[data-stile="futuro"] #home-dash-rifiuti-card .home-dash-card-title {
+  font-family: var(--f-mono); font-size: 10px; font-weight: 700; letter-spacing: .18em;
+  text-transform: uppercase; color: var(--f-li) !important;
+}
+:root[data-stile="futuro"] .home-dash-pdf-btn {
+  border-radius: 999px !important;
+  background: transparent !important;
+  border: 1px solid rgba(var(--f-cy-rgb), .6) !important;
+  color: var(--f-cy) !important;
+}
+:root[data-stile="futuro"] .home-dash-comprati {
+  border-radius: 999px 999px 24px 24px !important;
+  border-color: color-mix(in srgb, var(--f-am) 45%, transparent) !important;
+}
+:root[data-stile="futuro"] .home-dash-comprati .home-dash-card-num { color: var(--f-am) !important; text-shadow: 0 0 14px color-mix(in srgb, var(--f-am) 55%, transparent); }
+:root[data-stile="futuro"] .notif-banner,
+:root[data-stile="futuro"] .notif-banner-dash {
+  background: var(--f-panel) !important; border: 1px solid var(--f-ln) !important;
+  border-radius: 22px !important; color: var(--text) !important; box-shadow: none !important;
+}
+:root[data-stile="futuro"] .notif-banner-text { color: var(--text) !important; }
+:root[data-stile="futuro"] .notif-banner-close { color: var(--f-mu) !important; }
+
+/* ── Lista spesa: numero grande a destra, pulsanti ridisegnati, categorie numerate ─ */
+:root[data-stile="futuro"] .back-label { font-size: 26px; font-weight: 700; letter-spacing: -.03em; }
+:root[data-stile="futuro"] .spesa-topbar { position: relative; flex-direction: column; align-items: stretch; gap: 14px; }
+:root[data-stile="futuro"] .spesa-counter { font-size: 13px; color: var(--f-mu) !important; padding-right: 90px; min-height: 40px; display: flex; align-items: flex-end; }
+:root[data-stile="futuro"] .spesa-counter strong {
+  position: absolute; right: 2px; top: -52px;
+  font-size: 56px; font-weight: 700; letter-spacing: -.05em; line-height: 1;
+  color: var(--f-cy) !important; text-shadow: 0 0 24px rgba(var(--f-cy-rgb), .5);
+}
+:root[data-stile="futuro"] .spesa-topbar > div:last-child { flex-wrap: nowrap !important; }
+:root[data-stile="futuro"] .btn-whatsapp {
+  flex: 1; height: 46px; justify-content: center;
+  border-radius: 999px !important; border: 0 !important;
+  background: linear-gradient(90deg, var(--f-li), #7CF2A8) !important;
+  color: #05070B !important; font-size: 14px; font-weight: 700;
+}
+:root[data-stile="futuro"] .btn-svuota {
+  height: 46px; border-radius: 999px !important;
+  border: 1px solid color-mix(in srgb, var(--f-rd) 45%, transparent) !important;
+  color: var(--f-rd) !important; background: transparent !important;
+}
+:root[data-stile="futuro"] .btn-spesa-add {
+  width: 46px; height: 46px; padding: 0 !important; justify-content: center;
+  border-radius: 50% !important; font-size: 0 !important; gap: 0 !important;
+  border: 1px solid var(--f-cy) !important;
+  background: rgba(var(--f-cy-rgb), .12) !important; color: var(--f-cy) !important;
+}
+:root[data-stile="futuro"] .btn-spesa-add svg { width: 20px; height: 20px; }
+:root[data-stile="futuro"] #spesa-filter-pills {
+  display: inline-flex; width: auto; max-width: 100%; gap: 4px; padding: 4px;
+  border: 1px solid var(--f-ln); border-radius: 999px; overflow-x: auto;
+}
+:root[data-stile="futuro"] #spesa-filter-pills .fpill { border: 0 !important; height: 32px; }
+:root[data-stile="futuro"] #spesa-list,
+:root[data-stile="futuro"] .spesa-list { counter-reset: fcat; }
+:root[data-stile="futuro"] .spesa-group { counter-increment: fcat; }
+:root[data-stile="futuro"] .spesa-group-hdr {
+  font-family: var(--f-mono); font-size: 10px; font-weight: 700; letter-spacing: .18em;
+  margin: 22px 4px 10px !important;
+}
+:root[data-stile="futuro"] .spesa-group > .spesa-group-hdr::before {
+  content: counter(fcat, decimal-leading-zero); color: var(--f-cy);
+}
+:root[data-stile="futuro"] .spesa-group-hdr::after { background: var(--f-ln) !important; order: 9; }
+:root[data-stile="futuro"] .spesa-cat-count {
+  background: transparent !important; color: var(--f-mu) !important; font-family: var(--f-mono); padding: 0 !important;
+}
+:root[data-stile="futuro"] .spesa-cat-count::before { content: "["; }
+:root[data-stile="futuro"] .spesa-cat-count::after { content: "]"; }
+:root[data-stile="futuro"][data-theme="light"] .btn-whatsapp { color: #FFFFFF !important; }
+:root[data-stile="futuro"] .notif-banner-btn {
+  color: var(--f-cy) !important; background: rgba(var(--f-cy-rgb), .12) !important;
+  border: 1px solid rgba(var(--f-cy-rgb), .5) !important; border-radius: 999px !important;
+}
+:root[data-stile="futuro"] .home-dash-chat-link svg { color: var(--f-cy) !important; stroke: currentColor; }

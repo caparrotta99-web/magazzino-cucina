@@ -6,8 +6,8 @@ Come funziona, in parole semplici:
   carrello) l'app si segna il giorno e il fornitore scelto su quella riga;
 - per ogni prodotto guarda ogni quanti giorni lo comprate di solito
   (la "mediana" degli intervalli, così una settimana strana non sballa tutto);
-- se il prossimo acquisto previsto è oggi, domani o dopodomani (o è già
-  passato), il prodotto finisce nella lista "Da ricomprare";
+- se il prossimo acquisto previsto è oggi o domani (o era ieri), il
+  prodotto finisce nella lista "Da ricomprare";
 - il fornitore proposto è quello dell'ultimo acquisto.
 
 Non aggiunge niente alla lista spesa da solo: propone, e decidete voi.
@@ -17,9 +17,11 @@ gli acquisti già letti e restituisce i suggerimenti.
 from datetime import date, datetime, timedelta
 from statistics import median
 
-ACQUISTI_MINIMI = 3        # servono almeno 3 giorni di acquisto per capire il ritmo
-GIORNI_ANTICIPO = 2        # propone i prodotti che servono entro 2 giorni
-ABBANDONATO_DOPO = 30      # se non lo comprate da tanto (e oltre 3 giri), non lo propone più
+ACQUISTI_MINIMI = 4        # servono almeno 4 giorni di acquisto per capire il ritmo
+GIORNI_ANTICIPO = 1        # propone i prodotti che servono oggi o domani
+RITARDO_MASSIMO = 1        # in ritardo di più di 1 giorno: probabilmente comprato senza
+                           # spuntarlo, o non si compra più → non lo propone
+STORICO_GIORNI = 90        # il ritmo si calcola sugli ultimi 3 mesi
 GIORNI_SETTIMANA = ['lun', 'mar', 'mer', 'gio', 'ven', 'sab', 'dom']
 
 
@@ -78,7 +80,7 @@ def calcola_suggeriti(acquisti, gia_in_lista=(), oggi=None):
     for a in acquisti:
         k = _chiave(a.get('prodotto'))
         g = _giorno(a.get('data'))
-        if not k or not g or g > oggi:
+        if not k or not g or g > oggi or (oggi - g).days > STORICO_GIORNI:
             continue
         per_prodotto.setdefault(k, []).append((g, a))
 
@@ -96,10 +98,7 @@ def calcola_suggeriti(acquisti, gia_in_lista=(), oggi=None):
         ultimo = giorni[-1]
         prossimo = ultimo + timedelta(days=ogni)
         mancano = (prossimo - oggi).days
-        da_quanto = (oggi - ultimo).days
-        if mancano > GIORNI_ANTICIPO:
-            continue
-        if da_quanto > max(3 * ogni, ABBANDONATO_DOPO):
+        if mancano > GIORNI_ANTICIPO or -mancano > RITARDO_MASSIMO:
             continue
 
         # l'ultima riga con un fornitore decide il fornitore proposto

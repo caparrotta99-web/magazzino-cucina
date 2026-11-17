@@ -27,8 +27,8 @@ def test_non_propone_se_manca_ancora_tempo():
     assert calcola_suggeriti(acquisti, oggi=OGGI) == []
 
 
-def test_servono_almeno_tre_acquisti():
-    acquisti = [compra('Basilico', d) for d in (10, 5)]
+def test_servono_almeno_quattro_acquisti():
+    acquisti = [compra('Basilico', d) for d in (15, 10, 5)]
     assert calcola_suggeriti(acquisti, oggi=OGGI) == []
 
 
@@ -37,22 +37,34 @@ def test_non_ripropone_quello_gia_in_lista():
     assert calcola_suggeriti(acquisti, gia_in_lista=['mozzarella '], oggi=OGGI) == []
 
 
-def test_fornitore_dell_ultimo_acquisto_e_ritardo():
-    acquisti = [compra('Limoni', 15, 'DOCKS'), compra('Limoni', 12, 'DOCKS'),
-                compra('Limoni', 9, 'GLOBAL')]
+def test_fornitore_dell_ultimo_acquisto_e_ritardo_di_un_giorno():
+    acquisti = [compra('Limoni', 13, 'DOCKS'), compra('Limoni', 10, 'DOCKS'),
+                compra('Limoni', 7, 'DOCKS'), compra('Limoni', 4, 'GLOBAL')]
     s = calcola_suggeriti(acquisti, oggi=OGGI)
     assert s[0]['fornitore'] == 'GLOBAL'
-    assert s[0]['mancano'] == -6          # ogni 3 giorni, ultimo 9 giorni fa
+    assert s[0]['mancano'] == -1          # ogni 3 giorni, ultimo 4 giorni fa
+
+
+def test_troppo_in_ritardo_non_viene_proposto():
+    # ogni 3 giorni ma l'ultimo è di 9 giorni fa: comprato senza spuntarlo
+    # o non si compra più
+    acquisti = [compra('Limoni', d) for d in (18, 15, 12, 9)]
+    assert calcola_suggeriti(acquisti, oggi=OGGI) == []
+
+
+def test_dopodomani_ancora_no():
+    acquisti = [compra('Farina', d) for d in (14, 10, 6, 2)]  # ogni 4, serve tra 2 giorni
+    assert calcola_suggeriti(acquisti, oggi=OGGI) == []
 
 
 def test_stesso_giorno_conta_una_volta_e_nomi_uguali_senza_maiuscole():
-    acquisti = [compra('Cozze', 9), compra('cozze', 9), compra('COZZE ', 6), compra('Cozze', 3)]
+    acquisti = [compra('Cozze', 12), compra('Cozze', 9), compra('cozze', 9), compra('COZZE ', 6), compra('Cozze', 3)]
     s = calcola_suggeriti(acquisti, oggi=OGGI)
-    assert s[0]['acquisti'] == 3 and s[0]['ogni_giorni'] == 3
+    assert s[0]['acquisti'] == 4 and s[0]['ogni_giorni'] == 3
 
 
 def test_prodotto_abbandonato_non_viene_proposto():
-    acquisti = [compra('Panettone', d) for d in (80, 77, 74)]
+    acquisti = [compra('Panettone', d) for d in (83, 80, 77, 74)]
     assert calcola_suggeriti(acquisti, oggi=OGGI) == []
 
 
@@ -65,7 +77,7 @@ def test_giorni_abituali_del_fornitore():
 def test_endpoint_usa_comprati_e_registro(db, monkeypatch):
     import app as A
     oggi = date.today()
-    for giorni_fa in (9, 6, 3):
+    for giorni_fa in (12, 9, 6, 3):
         g = (oggi - timedelta(days=giorni_fa)).isoformat()
         with db.get_conn() as conn:
             conn.execute(

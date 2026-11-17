@@ -1555,11 +1555,8 @@ def api_spesa_comprati():
 @app.route('/api/spesa-suggeriti')
 @login_required
 def api_spesa_suggeriti():
-    """Spesa programmata (solo admin): impara dagli ordini ogni quanti giorni
-    si ordina ogni prodotto e lo consiglia il giorno prima. Non aggiunge
-    niente da solo."""
-    if current_user.role != 'admin':
-        return jsonify({'success': False, 'error': 'Solo per amministratori'}), 403
+    """Spesa programmata: impara dagli ordini ogni quanti giorni si ordina
+    ogni prodotto e lo consiglia il giorno prima. Non aggiunge niente da solo."""
     from programma_spesa import calcola_suggeriti
     import database as _db
     suggeriti = calcola_suggeriti(_db.get_storico_ordini(),

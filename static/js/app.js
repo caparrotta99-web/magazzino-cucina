@@ -2676,7 +2676,7 @@ function renderListaSpesa() {
   _restoreCountdownBars();
 }
 
-// ── SPESA PROGRAMMATA (solo admin, in Dashboard) ─────────────────────────
+// ── SPESA PROGRAMMATA (in Dashboard, per tutti) ──────────────────────────
 // Il server impara dagli ordini (prodotti spuntati) ogni quanti giorni si
 // ordina ogni prodotto e lo consiglia il giorno prima che serva.
 // Sta in Dashboard e non nella lista spesa, così chi va a comprare non lo
@@ -2685,7 +2685,7 @@ S.suggeriti = [];
 
 async function loadSuggeriti() {
   const box = document.getElementById('home-dash-programmata');
-  if (!box) return;                       // non admin
+  if (!box) return;
   const data = await api('/api/spesa-suggeriti');
   S.suggeriti = (data && data.suggeriti) || [];
   box.style.display = S.suggeriti.length ? '' : 'none';

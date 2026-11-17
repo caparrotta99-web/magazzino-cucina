@@ -2147,7 +2147,7 @@ body.comprati-aperto .btn-help { display: none !important; }
 }
 .comprato-btn.registra { background: var(--green, #22c55e); border-color: transparent; }
 
-/* Dashboard (solo admin): capsula "Spesa programmata" e la sua finestra */
+/* Dashboard: capsula "Spesa programmata" e la sua finestra */
 .home-dash-programmata { border-radius: 100px; padding: 12px 18px; border-color: rgba(0,229,255,.45); }
 .home-dash-programmata .home-dash-card-title::before {
   content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 10px; vertical-align: middle;

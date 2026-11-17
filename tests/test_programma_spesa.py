@@ -66,7 +66,7 @@ def test_ora_utc_di_notte_conta_come_giorno_italiano():
     assert [(x['prodotto'], x['quando']) for x in s] == [('Uova', 'domani')]
 
 
-def test_solo_admin_e_non_guarda_i_carichi(db):
+def test_tutti_la_vedono_e_non_guarda_i_carichi(db):
     import app as A
     from werkzeug.security import generate_password_hash
     oggi = A.today_it()
@@ -85,7 +85,8 @@ def test_solo_admin_e_non_guarda_i_carichi(db):
 
     staff = A.app.test_client()
     staff.post('/login', data={'nome': 'Aiuto Cuoco', 'password': 'pw123456'})
-    assert staff.get('/api/spesa-suggeriti').status_code == 403
+    r = staff.get('/api/spesa-suggeriti').get_json()
+    assert [s['prodotto'] for s in r['suggeriti']] == ['Vongole']
 
     admin = A.app.test_client()
     admin.post('/login', data={'nome': 'Capo Cucina', 'password': 'pw123456'})

@@ -308,8 +308,8 @@
             </div>
 
             {% if current_user.puo_accedere_chat %}
-            {% if current_user.is_authenticated and current_user.role == 'admin' %}
-            <!-- Spesa programmata: solo per chi fa gli ordini, non nella lista spesa -->
+            {% if current_user.is_authenticated %}
+            <!-- Spesa programmata: per tutti, in Dashboard (non nella lista spesa) -->
             <div class="home-dash-card home-dash-programmata" id="home-dash-programmata" style="display:none" onclick="apriSuggeriti()">
               <div class="home-dash-card-top">
                 <div class="home-dash-card-title">Spesa programmata</div>

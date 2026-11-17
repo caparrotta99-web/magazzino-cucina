@@ -1,22 +1,29 @@
-"""Spesa programmata: impara dagli ordini (i prodotti spuntati nella lista
-spesa) e, quando un prodotto viene comprato lo stesso giorno della
-settimana per 4 settimane di fila, lo suggerisce per quel giorno.
+"""Spesa programmata: impara il ritmo con cui ordinate ogni prodotto e ve lo
+consiglia il giorno prima che serva.
 
-Esempio: se l'orata è stata spuntata martedì 27/10, 3/11, 10/11 e 17/11,
-martedì 24/11 (e già lunedì, come "domani") viene suggerita.
+Come funziona, in parole semplici:
+- guarda solo gli ordini: i prodotti spuntati nella lista spesa, con il
+  giorno e il fornitore della riga (non il magazzino, non i carichi);
+- per ogni prodotto misura i giorni tra un ordine e l'altro e prende il
+  valore tipico (la mediana: una volta strana non sballa il ritmo).
+  Mele 2 volte al mese → ogni ~15 giorni; roast-beef 4 volte → ogni ~7;
+- prossimo ordine previsto = ultimo ordine + ritmo;
+- il giorno prima ve lo consiglia ("domani"); se il giorno è arrivato e non
+  è ancora stato ordinato, resta consigliato anche quel giorno ("oggi");
+- se il giorno è passato da più di un giorno, smette di proporlo: vuol dire
+  che il ritmo è cambiato. Riprende da solo al prossimo ordine.
 
-Guarda solo gli ordini: non guarda il magazzino né i carichi registrati.
 Non aggiunge niente alla lista spesa da solo.
 Questo file non tocca il database e non parla con i fogli Google: riceve
-gli ordini già letti e restituisce i suggerimenti.
+gli ordini già letti e restituisce i consigli.
 """
 from datetime import date, datetime, timedelta
 from statistics import median
 
 from timezone_utils import TZ_ITALIA
 
-SETTIMANE = 4   # quante settimane di fila, stesso giorno, servono
-GIORNI_SETTIMANA = ['lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato', 'domenica']
+ORDINI_MINIMI = 3      # servono almeno 3 ordini (2 intervalli) per capire il ritmo
+STORICO_GIORNI = 120   # il ritmo si calcola sugli ultimi 4 mesi
 
 
 def _giorno(valore):
@@ -50,8 +57,7 @@ def _chiave(prodotto):
 def calcola_suggeriti(ordini, gia_in_lista=(), oggi=None):
     """ordini: dizionari con prodotto, fornitore, data, e se ci sono
     quantita, unita, categoria, reparto.
-    gia_in_lista: prodotti già in lista spesa o già spuntati oggi.
-    Restituisce i suggerimenti per oggi e per domani."""
+    gia_in_lista: prodotti già nella lista spesa (non vanno riproposti)."""
     oggi = oggi or date.today()
     esclusi = {_chiave(p) for p in gia_in_lista}
 
@@ -59,45 +65,51 @@ def calcola_suggeriti(ordini, gia_in_lista=(), oggi=None):
     for o in ordini:
         k = _chiave(o.get('prodotto'))
         g = _giorno(o.get('data'))
-        if k and g and g <= oggi:
+        if k and g and g <= oggi and (oggi - g).days <= STORICO_GIORNI:
             per_prodotto.setdefault(k, []).append((g, o))
 
     suggeriti = []
-    for quando, giorno in (('oggi', oggi), ('domani', oggi + timedelta(days=1))):
-        settimane_prima = [giorno - timedelta(days=7 * i) for i in range(1, SETTIMANE + 1)]
-        for k, righe in per_prodotto.items():
-            if k in esclusi:
-                continue
-            giorni = {g for g, _ in righe}
-            if giorno in giorni:          # già comprato quel giorno
-                continue
-            if not all(g in giorni for g in settimane_prima):
-                continue
-            righe.sort(key=lambda r: r[0])
-            con_fornitore = [o for _, o in righe if (o.get('fornitore') or '').strip()]
-            quantita = [float(o.get('quantita') or 0) for g, o in righe
-                        if g in settimane_prima and float(o.get('quantita') or 0) > 0]
+    for k, righe in per_prodotto.items():
+        if k in esclusi:
+            continue
+        righe.sort(key=lambda r: r[0])
+        giorni = sorted({g for g, _ in righe})
+        if len(giorni) < ORDINI_MINIMI:
+            continue
+        intervalli = [(b - a).days for a, b in zip(giorni, giorni[1:])]
+        ogni = max(1, round(median(intervalli)))
+        ultimo = giorni[-1]
+        prossimo = ultimo + timedelta(days=ogni)
+        mancano = (prossimo - oggi).days
+        if mancano == 1:
+            quando = 'domani'
+        elif mancano == 0:
+            quando = 'oggi'
+        else:
+            continue
 
-            def ultimo_valore(campo):
-                for _, o in reversed(righe):
-                    if (o.get(campo) or '').strip():
-                        return o[campo].strip()
-                return ''
+        con_fornitore = [o for _, o in righe if (o.get('fornitore') or '').strip()]
+        quantita = [float(o.get('quantita') or 0) for _, o in righe if float(o.get('quantita') or 0) > 0]
 
-            suggeriti.append({
-                'quando':    quando,
-                'giorno':    giorno.isoformat(),
-                'giorno_settimana': GIORNI_SETTIMANA[giorno.weekday()],
-                'prodotto':  (righe[-1][1].get('prodotto') or '').strip(),
-                'fornitore': (con_fornitore[-1].get('fornitore') or '').strip() if con_fornitore else '',
-                'categoria': ultimo_valore('categoria'),
-                'reparto':   ultimo_valore('reparto'),
-                'unita':     ultimo_valore('unita'),
-                'quantita':  round(median(quantita), 2) if quantita else 0,
-                'settimane': SETTIMANE,
-            })
-        # un prodotto suggerito per oggi non si ripete per domani
-        esclusi |= {_chiave(s['prodotto']) for s in suggeriti}
+        def ultimo_valore(campo):
+            for _, o in reversed(righe):
+                if (o.get(campo) or '').strip():
+                    return o[campo].strip()
+            return ''
+
+        suggeriti.append({
+            'quando':      quando,
+            'giorno':      prossimo.isoformat(),
+            'prodotto':    (righe[-1][1].get('prodotto') or '').strip(),
+            'fornitore':   (con_fornitore[-1].get('fornitore') or '').strip() if con_fornitore else '',
+            'categoria':   ultimo_valore('categoria'),
+            'reparto':     ultimo_valore('reparto'),
+            'unita':       ultimo_valore('unita'),
+            'quantita':    round(median(quantita), 2) if quantita else 0,
+            'ogni_giorni': ogni,
+            'ordini':      len(giorni),
+            'ultimo':      ultimo.isoformat(),
+        })
 
     suggeriti.sort(key=lambda s: (s['quando'] != 'oggi', s['fornitore'].lower(), s['prodotto'].lower()))
     return suggeriti

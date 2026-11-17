@@ -2677,8 +2677,8 @@ function renderListaSpesa() {
 }
 
 // ── SPESA PROGRAMMATA (solo admin, in Dashboard) ─────────────────────────
-// Il server guarda gli ordini: un prodotto spuntato lo stesso giorno della
-// settimana per 4 settimane di fila viene suggerito per quel giorno.
+// Il server impara dagli ordini (prodotti spuntati) ogni quanti giorni si
+// ordina ogni prodotto e lo consiglia il giorno prima che serva.
 // Sta in Dashboard e non nella lista spesa, così chi va a comprare non lo
 // confonde con la lista vera. Niente viene aggiunto da solo.
 S.suggeriti = [];
@@ -2692,10 +2692,15 @@ async function loadSuggeriti() {
   document.getElementById('home-dash-programmata-num').textContent = S.suggeriti.length;
 }
 
+function _fmtGiorno(iso) {
+  const [y, m, d] = (iso || '').split('-');
+  return d ? `${d}/${m}` : '';
+}
+
 function apriSuggeriti() {
   const gruppi = {};
   S.suggeriti.forEach((s, i) => {
-    const titolo = `${s.quando === 'oggi' ? 'Oggi' : 'Domani'}, ${s.giorno_settimana} · ${s.fornitore || 'senza fornitore'}`;
+    const titolo = `${s.quando === 'oggi' ? 'Serve oggi' : 'Serve domani'} · ${s.fornitore || 'senza fornitore'}`;
     (gruppi[titolo] = gruppi[titolo] || []).push({ s, i });
   });
   document.getElementById('suggeriti-list').innerHTML = Object.keys(gruppi).map(t => `
@@ -2706,7 +2711,7 @@ function apriSuggeriti() {
             <input type="checkbox" class="suggerito-check" data-idx="${i}" onchange="_aggiornaBtnSuggeriti()">
             <span class="suggerito-info">
               <span class="suggerito-nome">${esc(s.prodotto)}</span>
-              <span class="suggerito-sub">ogni ${esc(s.giorno_settimana)} da ${s.settimane} settimane</span>
+              <span class="suggerito-sub">ordinato ogni ~${s.ogni_giorni} ${s.ogni_giorni === 1 ? 'giorno' : 'giorni'} · ultimo ${_fmtGiorno(s.ultimo)}</span>
             </span>
             ${s.quantita ? `<span class="suggerito-qty">${s.quantita} ${esc(s.unita || '')}</span>` : ''}
           </label>`).join('')}

@@ -61,14 +61,30 @@ def test_il_ritmo_si_adegua_agli_ordini_recenti():
     assert s and s[0]['ogni_giorni'] == 4 and s[0]['quando'] == 'domani'
 
 
+def _vecchie_righe(prodotti, giorni_fa, secondi):
+    return [{'prodotto': p, 'fornitore': 'DOCKS', 'utente': 'Simone', 'fonte': 'log',
+             'data': (OGGI - timedelta(days=giorni_fa)).isoformat() + f'T21:04:{sec:02d}+00:00'}
+            for p, sec in zip(prodotti, secondi)]
+
+
 def test_svuota_lista_non_conta_come_acquisto():
-    # ogni 7 giorni, più un vecchio "svuota" serale con 10 prodotti nello stesso minuto
+    # ogni 7 giorni, più un vecchio "svuota": 10 prodotti tolti nello stesso secondo
     ordini = [ordine('Orata', d) for d in (27, 20, 13, 6)]
-    svuota = [{'prodotto': p, 'fornitore': 'DOCKS', 'utente': 'Antonella', 'fonte': 'log',
-               'data': (OGGI - timedelta(days=10)).isoformat() + 'T21:04:3' + str(i) + '+00:00'}
-              for i, p in enumerate(['Orata'] + [f'altro {n}' for n in range(9)])]
+    svuota = _vecchie_righe(['Orata'] + [f'altro {n}' for n in range(9)], 10, [5] * 10)
     s = calcola_suggeriti(ordini + svuota, oggi=OGGI)
     assert [(x['prodotto'], x['ogni_giorni'], x['quando']) for x in s] == [('Orata', 7, 'domani')]
+
+
+def test_tutta_la_lista_spuntata_insieme_conta_come_ordine():
+    # ordine su WhatsApp: 10 prodotti spuntati uno dopo l'altro in pochi secondi,
+    # ogni 7 giorni → è un ordine vero
+    prodotti = ['Orata'] + [f'altro {n}' for n in range(9)]
+    ordini = []
+    for d in (27, 20, 13, 6):
+        ordini += _vecchie_righe(prodotti, d, range(0, 50, 5))
+    s = calcola_suggeriti(ordini, oggi=OGGI)
+    assert 'Orata' in [x['prodotto'] for x in s]
+    assert all(x['ogni_giorni'] == 7 and x['quando'] == 'domani' for x in s)
 
 
 def test_gia_in_lista_e_nomi_senza_maiuscole():

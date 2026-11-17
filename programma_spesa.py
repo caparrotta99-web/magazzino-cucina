@@ -17,8 +17,9 @@ Come funziona, in parole semplici:
   volta dopo 2 giorni, poi dopo 10, poi dopo 4) non viene consigliato;
 - il ritmo si misura sugli ordini più recenti, così se cambia l'app si adegua;
 - nelle righe vecchie (prima che esistesse "comprati") ignora gli "svuota
-  lista": tanti prodotti tolti dalla stessa persona nello stesso minuto non
-  sono acquisti.
+  lista": il pulsante toglie tutto nello stesso secondo. Spuntare tutta la
+  lista insieme (ordine su WhatsApp) invece prende qualche secondo per
+  prodotto, e conta come ordine.
 
 Non aggiunge niente alla lista spesa da solo.
 Questo file non tocca il database e non parla con i fogli Google: riceve
@@ -33,7 +34,7 @@ ORDINI_MINIMI = 4      # servono almeno 4 ordini (3 intervalli) per capire il ri
 STORICO_GIORNI = 120   # si guardano gli ultimi 4 mesi...
 INTERVALLI_RECENTI = 8 # ...ma il ritmo si misura sugli ultimi 8 intervalli
 REGOLARITA_MINIMA = 2 / 3   # quota di intervalli vicini al ritmo tipico
-SVUOTA_MINIMO = 8      # 8+ prodotti tolti dalla stessa persona nello stesso minuto = svuota
+SVUOTA_MINIMO = 3      # 3+ prodotti tolti dalla stessa persona nello stesso SECONDO = svuota
 
 
 def _giorno(valore):
@@ -75,11 +76,11 @@ def calcola_suggeriti(ordini, gia_in_lista=(), oggi=None):
     blocchi = {}
     for o in ordini:
         if o.get('fonte') == 'log':
-            chiave_min = (o.get('utente') or '', str(o.get('data') or '')[:16])
-            blocchi[chiave_min] = blocchi.get(chiave_min, 0) + 1
+            chiave_sec = (o.get('utente') or '', str(o.get('data') or '')[:19])
+            blocchi[chiave_sec] = blocchi.get(chiave_sec, 0) + 1
     ordini = [o for o in ordini if not (
         o.get('fonte') == 'log'
-        and blocchi[(o.get('utente') or '', str(o.get('data') or '')[:16])] >= SVUOTA_MINIMO)]
+        and blocchi[(o.get('utente') or '', str(o.get('data') or '')[:19])] >= SVUOTA_MINIMO)]
 
     per_prodotto = {}
     for o in ordini:

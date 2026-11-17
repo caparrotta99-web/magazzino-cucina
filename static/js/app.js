@@ -661,7 +661,12 @@ function navTo(page) {
   if (page === 'carico')     resetCaricoWizard();
   if (page === 'giacenze')   { updateFornitoriFilter(); renderGiacenze(); _setGiacPage(0, false); }
   if (page === 'alert')      renderAlerts();
-  if (page === 'lista-spesa') loadListaSpesa();
+  if (page === 'lista-spesa') {
+    // Mostra subito la lista che il telefono ha già, poi la aggiorna dal
+    // server: la pagina non resta vuota ad aspettare la risposta.
+    if (S.listaSpesa && S.listaSpesa.length) renderListaSpesa();
+    loadListaSpesa();
+  }
   if (page === 'temperature') { loadApparecchi(); loadStoricoTemperature(); }
   if (page === 'controllo')  loadControlloLogs();
   if (page === 'export')    initExportPage();

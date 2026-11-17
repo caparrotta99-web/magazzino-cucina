@@ -666,6 +666,7 @@ function navTo(page) {
     // server: la pagina non resta vuota ad aspettare la risposta.
     if (S.listaSpesa && S.listaSpesa.length) renderListaSpesa();
     loadListaSpesa();
+    loadSuggeriti();
   }
   if (page === 'temperature') { loadApparecchi(); loadStoricoTemperature(); }
   if (page === 'controllo')  loadControlloLogs();
@@ -2672,6 +2673,94 @@ function renderListaSpesa() {
 
   // Riallinea le barre dei countdown attivi dopo il re-render DOM
   _restoreCountdownBars();
+}
+
+// ── LISTA SPESA — DA RICOMPRARE (programma della spesa) ──────────────────
+// Il server guarda ogni quanti giorni comprate ogni prodotto e propone quelli
+// che stanno per servire. Qui si sceglie quali mettere in lista: niente
+// viene aggiunto da solo.
+S.suggeriti = [];
+
+async function loadSuggeriti() {
+  const data = await api('/api/spesa-suggeriti');
+  S.suggeriti = (data && data.suggeriti) || [];
+  const btn = document.getElementById('spesa-suggeriti-btn');
+  if (btn) btn.style.display = S.suggeriti.length ? '' : 'none';
+  const num = document.getElementById('spesa-suggeriti-num');
+  if (num) num.textContent = S.suggeriti.length;
+}
+
+function _fmtGiorno(iso) {
+  const [y, m, d] = (iso || '').split('-');
+  return d ? `${d}/${m}` : '';
+}
+
+function _quandoSuggerito(s) {
+  if (s.mancano < 0) return `in ritardo di ${-s.mancano} ${s.mancano === -1 ? 'giorno' : 'giorni'}`;
+  if (s.mancano === 0) return 'serve oggi';
+  if (s.mancano === 1) return 'serve domani';
+  return `serve tra ${s.mancano} giorni`;
+}
+
+function apriSuggeriti() {
+  const gruppi = {};
+  S.suggeriti.forEach((s, i) => {
+    const f = s.fornitore || 'Senza fornitore';
+    (gruppi[f] = gruppi[f] || []).push({ s, i });
+  });
+  document.getElementById('suggeriti-list').innerHTML = Object.keys(gruppi).sort().map(f => {
+    const giorni = (gruppi[f][0].s.giorni_fornitore || []).join(', ');
+    return `
+      <div class="suggeriti-gruppo">
+        <div class="spesa-group-hdr">${esc(f)}${giorni ? `<span class="suggeriti-giorni">di solito ${esc(giorni)}</span>` : ''}</div>
+        ${gruppi[f].map(({ s, i }) => `
+          <label class="suggerito-row">
+            <input type="checkbox" class="suggerito-check" data-idx="${i}" onchange="_aggiornaBtnSuggeriti()">
+            <span class="suggerito-info">
+              <span class="suggerito-nome">${esc(s.prodotto)}</span>
+              <span class="suggerito-sub ${s.mancano < 0 ? 'ritardo' : ''}">${_quandoSuggerito(s)} · ogni ~${s.ogni_giorni} gg · ultimo ${_fmtGiorno(s.ultimo)}</span>
+            </span>
+            ${s.quantita ? `<span class="suggerito-qty">${s.quantita} ${esc(s.unita || '')}</span>` : ''}
+          </label>`).join('')}
+      </div>`;
+  }).join('');
+  _aggiornaBtnSuggeriti();
+  document.getElementById('modal-suggeriti').classList.add('open');
+}
+
+function chiudiSuggeriti() {
+  document.getElementById('modal-suggeriti').classList.remove('open');
+}
+
+function _aggiornaBtnSuggeriti() {
+  const n = document.querySelectorAll('.suggerito-check:checked').length;
+  const btn = document.getElementById('suggeriti-aggiungi');
+  btn.disabled = !n;
+  btn.textContent = n ? `Aggiungi alla spesa (${n})` : 'Aggiungi alla spesa';
+}
+
+async function aggiungiSuggeriti() {
+  const scelti = [...document.querySelectorAll('.suggerito-check:checked')].map(c => S.suggeriti[+c.dataset.idx]);
+  if (!scelti.length) return;
+  const btn = document.getElementById('suggeriti-aggiungi');
+  btn.disabled = true;
+  for (const s of scelti) {
+    // categoria e reparto dal listino se il prodotto c'è, così finisce nella
+    // stessa categoria di sempre
+    const p = S.prodotti.find(x => x.prodotto.toLowerCase() === s.prodotto.toLowerCase());
+    await api('/api/lista-spesa', { method: 'POST', body: {
+      prodotto:  p ? p.prodotto : s.prodotto,
+      fornitore: s.fornitore,
+      categoria: (p && p.categoria) || s.categoria || '',
+      reparto:   (p && p.reparto) || s.reparto || '',
+      quantita:  s.quantita || 0,
+      unita:     (p && p.unita) || s.unita || '',
+    }});
+  }
+  chiudiSuggeriti();
+  toast(`${scelti.length} ${scelti.length === 1 ? 'prodotto aggiunto' : 'prodotti aggiunti'} alla spesa`, 'success');
+  await loadListaSpesa();
+  loadSuggeriti();
 }
 
 // ── LISTA SPESA — COUNTDOWN ───────────────────────────────────────────────

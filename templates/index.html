@@ -1227,6 +1227,13 @@
       <button class="fpill active" onclick="setSpesaFilter('all', this)">Tutti</button>
     </div>
 
+    <!-- Programma della spesa: prodotti che di solito ricomprate a quest'ora -->
+    <button type="button" class="spesa-suggeriti-btn" id="spesa-suggeriti-btn" style="display:none" onclick="apriSuggeriti()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <span>Da ricomprare</span>
+      <span class="spesa-suggeriti-num" id="spesa-suggeriti-num">0</span>
+    </button>
+
     <!-- Panel aggiunta manuale -->
     <div class="spesa-add-panel" id="spesa-add-panel">
       <div class="fgroup" style="margin-bottom:10px">
@@ -1296,6 +1303,22 @@
       <button class="btn-print" onclick="window.print()">Stampa</button>
       <button class="btn-print" onclick="copiaEtichettaLotto()">Copia testo</button>
       <button class="btn-close-modal" onclick="closeEtiLotto()">Chiudi</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL DA RICOMPRARE (programma della spesa) ────────────────────────── -->
+<div class="modal-backdrop" id="modal-suggeriti" onclick="if (event.target === this) chiudiSuggeriti()">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Da ricomprare</div>
+    <div class="modal-body">
+      <div class="suggeriti-intro">In base a ogni quanto li comprate di solito. Scegli quali mettere nella lista spesa.</div>
+      <div id="suggeriti-list"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-print" id="suggeriti-aggiungi" onclick="aggiungiSuggeriti()" disabled>Aggiungi alla spesa</button>
+      <button class="btn-close-modal" onclick="chiudiSuggeriti()">Chiudi</button>
     </div>
   </div>
 </div>

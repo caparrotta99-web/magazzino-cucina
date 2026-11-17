@@ -1552,6 +1552,19 @@ def api_spesa_comprati():
     return jsonify({'success': True, 'comprati': get_comprati_da_registrare()})
 
 
+@app.route('/api/spesa-suggeriti')
+@login_required
+def api_spesa_suggeriti():
+    """Lista "Da ricomprare": calcolata da cosa avete comprato e quando.
+    Non aggiunge niente alla lista spesa: propone soltanto."""
+    from programma_spesa import calcola_suggeriti
+    import database as _db
+    suggeriti = calcola_suggeriti(_db.get_storico_acquisti(),
+                                  _db.get_nomi_da_non_riproporre(),
+                                  oggi=today_it())
+    return jsonify({'success': True, 'suggeriti': suggeriti})
+
+
 @app.route('/api/spesa-comprati/<int:comprato_id>/registrato', methods=['POST'])
 @login_required
 def api_spesa_comprato_registrato(comprato_id):

@@ -2146,3 +2146,34 @@ body.comprati-aperto .btn-help { display: none !important; }
   border: 1.5px solid rgba(255,255,255,.35); background: transparent; color: #fff; cursor: pointer;
 }
 .comprato-btn.registra { background: var(--green, #22c55e); border-color: transparent; }
+
+/* Lista spesa: pulsante "Da ricomprare" e la sua finestra */
+.spesa-suggeriti-btn {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  margin: 0 0 16px; padding: 12px 14px; cursor: pointer;
+  background: rgba(var(--action-rgb), .08); color: var(--text);
+  border: 1px dashed rgba(var(--action-rgb), .45); border-radius: 14px;
+  font-family: inherit; font-size: 14px; font-weight: 600; text-align: left;
+}
+.spesa-suggeriti-btn svg { color: var(--action); flex-shrink: 0; }
+.spesa-suggeriti-btn span:nth-child(2) { flex: 1; }
+.spesa-suggeriti-num {
+  min-width: 26px; height: 26px; padding: 0 8px; border-radius: 100px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: rgba(var(--action-rgb), .2); color: var(--text); font-size: 13px; font-weight: 700;
+}
+.suggeriti-intro { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+.suggeriti-gruppo .spesa-group-hdr { margin: 16px 2px 8px; }
+.suggeriti-giorni { font-weight: 500; text-transform: none; letter-spacing: 0; color: var(--muted); font-size: 11px; }
+.suggerito-row {
+  display: flex; align-items: center; gap: 12px; padding: 10px 12px; margin-bottom: 6px;
+  border: 1px solid var(--border); border-radius: 14px; cursor: pointer;
+}
+.suggerito-check { width: 22px; height: 22px; flex-shrink: 0; accent-color: var(--action); }
+.suggerito-info { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.suggerito-nome { font-size: 15px; font-weight: 600; }
+.suggerito-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+.suggerito-sub.ritardo { color: var(--orange, #f59e0b); }
+.suggerito-qty { font-size: 13px; font-weight: 600; color: var(--muted); white-space: nowrap; }
+#suggeriti-aggiungi { font-weight: 700; }
+#suggeriti-aggiungi:disabled { opacity: .45; cursor: default; }

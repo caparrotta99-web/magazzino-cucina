@@ -229,10 +229,9 @@ async function loadComprati() {
   _renderComprati();
 }
 
-// Brigade 3000: la casella è una capsula piccola, toccandola si apre il
-// pannello con l'elenco. Nel Classico non cambia niente (elenco sempre visibile).
+// La casella "Comprati, da registrare" è una capsula piccola: toccandola si
+// apre il pannello con l'elenco (sia nel Classico sia in Brigade 3000).
 function apriComprati(ev) {
-  if (document.documentElement.dataset.stile !== 'futuro') return;
   const box = document.getElementById('home-dash-comprati');
   if (!box || box.classList.contains('aperto')) return;
   box.classList.add('aperto');

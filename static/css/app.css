@@ -2108,8 +2108,32 @@ html.chat-no-scroll { overflow: hidden; }
 
 /* Home: comprati dalla lista spesa, da registrare */
 .home-dash-comprati-sub { font-size: 13px; color: rgba(255,255,255,.7); margin-top: 4px; }
-/* pulsante di chiusura usato solo dallo stile Brigade 3000 */
+/* Capsula piccola su una riga; toccandola si apre il pannello con l'elenco */
+.home-dash-comprati { border-radius: 100px; padding: 12px 18px; border-color: rgba(255,179,63,.55); }
+.home-dash-comprati .home-dash-card-num { color: #ffb23f; }
+.home-dash-comprati .home-dash-card-title::before {
+  content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 10px; vertical-align: middle;
+  border-radius: 50%; background: #ffb23f;
+}
+.home-dash-comprati:not(.aperto) .home-dash-comprati-sub,
+.home-dash-comprati:not(.aperto) #home-dash-comprati-list,
 .comprati-chiudi { display: none; }
+.home-dash-comprati.aperto {
+  position: fixed; z-index: 5000; left: 12px; right: 12px; bottom: 12px;
+  max-height: 78vh; overflow-y: auto; cursor: default;
+  border-radius: 24px; padding: 20px 16px;
+  background: #1c4b58;
+  box-shadow: 0 0 0 100vmax rgba(0,0,0,.55);
+}
+:root[data-theme="dark"] .home-dash-comprati.aperto { background: #0f2c35; }
+.home-dash-comprati.aperto .comprati-chiudi {
+  display: flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; margin-left: 10px; border-radius: 50%;
+  border: 1px solid rgba(255,255,255,.3); background: transparent; color: #fff; font-size: 20px; cursor: pointer;
+}
+/* pannello aperto: niente capsula Dashboard/Menu e "?" sopra all'elenco */
+body.comprati-aperto .home-switcher,
+body.comprati-aperto .btn-help { display: none !important; }
 #home-dash-comprati-list { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
 .comprato-row {
   display: flex; align-items: center; gap: 10px; padding: 10px 12px;

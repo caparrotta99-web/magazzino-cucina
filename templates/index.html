@@ -295,10 +295,13 @@
             </div>
 
             <!-- Comprati dalla lista spesa e non ancora registrati come carico -->
-            <div class="home-dash-card home-dash-comprati" id="home-dash-comprati" style="display:none">
+            <div class="home-dash-card home-dash-comprati" id="home-dash-comprati" style="display:none" onclick="apriComprati(event)">
               <div class="home-dash-card-top">
                 <div class="home-dash-card-title">Comprati, da registrare</div>
-                <div class="home-dash-card-num" id="home-dash-comprati-num">0</div>
+                <div style="display:flex;align-items:center">
+                  <div class="home-dash-card-num" id="home-dash-comprati-num">0</div>
+                  <button type="button" class="comprati-chiudi" onclick="event.stopPropagation(); chiudiComprati()" aria-label="Chiudi">&times;</button>
+                </div>
               </div>
               <div class="home-dash-comprati-sub">Tocca un prodotto per registrarlo con la foto dell'etichetta</div>
               <div id="home-dash-comprati-list"></div>

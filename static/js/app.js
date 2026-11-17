@@ -229,10 +229,26 @@ async function loadComprati() {
   _renderComprati();
 }
 
+// Brigade 3000: la casella è una capsula piccola, toccandola si apre il
+// pannello con l'elenco. Nel Classico non cambia niente (elenco sempre visibile).
+function apriComprati(ev) {
+  if (document.documentElement.dataset.stile !== 'futuro') return;
+  const box = document.getElementById('home-dash-comprati');
+  if (!box || box.classList.contains('aperto')) return;
+  box.classList.add('aperto');
+  document.body.classList.add('comprati-aperto');
+}
+function chiudiComprati() {
+  const box = document.getElementById('home-dash-comprati');
+  if (box) box.classList.remove('aperto');
+  document.body.classList.remove('comprati-aperto');
+}
+
 function _renderComprati() {
   const box = document.getElementById('home-dash-comprati');
   if (!box) return;
   box.style.display = S.comprati.length ? '' : 'none';
+  if (!S.comprati.length) chiudiComprati();
   document.getElementById('home-dash-comprati-num').textContent = S.comprati.length;
   document.getElementById('home-dash-comprati-list').innerHTML = S.comprati.map(c => {
     const qta = c.quantita ? ` · ${c.quantita} ${esc(c.unita || '')}` : '';
@@ -251,6 +267,7 @@ async function registraComprato(id) {
   const nome = (c.prodotto || '').toLowerCase();
   const p = S.prodotti.find(x => x.prodotto.toLowerCase() === nome && (x.fornitore || '') === (c.fornitore || ''))
          || S.prodotti.find(x => x.prodotto.toLowerCase() === nome);
+  chiudiComprati();
   navTo('carico');               // azzera il carico precedente
   S.caricoDaSpesaId = id;
   if (p) {

@@ -88,18 +88,13 @@
   color-scheme: light;
 }
 
-/* ── Sfondo: griglia leggera + due bagliori, al posto di aurora e posate ── */
+/* ── Sfondo: tinta unita (nero nel tema scuro), niente griglia ─────────── */
 :root[data-stile="futuro"] body {
   font-family: var(--f-font);
   color: var(--text);
-  background:
-    radial-gradient(520px 380px at 92% -6%, var(--f-halo-1), transparent 70%),
-    radial-gradient(460px 360px at -12% 52%, var(--f-halo-2), transparent 70%),
-    linear-gradient(var(--f-grid) 1px, transparent 1px) 0 0 / 26px 26px,
-    linear-gradient(90deg, var(--f-grid) 1px, transparent 1px) 0 0 / 26px 26px,
-    var(--f-bg);
-  background-attachment: fixed;
+  background: var(--f-bg);
 }
+:root[data-stile="futuro"]:not([data-theme="light"]) body { background: #000000; }
 :root[data-stile="futuro"] .aurora-bg,
 :root[data-stile="futuro"] .utensils-bg,
 :root[data-stile="futuro"] .utensil { display: none !important; }
@@ -635,3 +630,40 @@
   border: 1px solid rgba(var(--f-cy-rgb), .5) !important; border-radius: 999px !important;
 }
 :root[data-stile="futuro"] .home-dash-chat-link svg { color: var(--f-cy) !important; stroke: currentColor; }
+
+/* ── Comprati, da registrare: capsula piccola, si apre in un pannello ───── */
+:root[data-stile="futuro"] .home-dash-comprati {
+  border-radius: 999px !important; padding: 12px 18px !important; cursor: pointer;
+  border: 1px solid color-mix(in srgb, var(--f-am) 45%, transparent) !important;
+}
+:root[data-stile="futuro"] .home-dash-comprati .home-dash-card-title::before {
+  content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 10px; vertical-align: middle;
+  border-radius: 50%; background: var(--f-am); box-shadow: 0 0 10px var(--f-am);
+}
+:root[data-stile="futuro"] .home-dash-comprati:not(.aperto) .home-dash-comprati-sub,
+:root[data-stile="futuro"] .home-dash-comprati:not(.aperto) #home-dash-comprati-list,
+:root[data-stile="futuro"] .home-dash-comprati:not(.aperto) .comprati-chiudi { display: none; }
+:root[data-stile="futuro"] .comprati-chiudi { display: none; }
+:root[data-stile="futuro"] .home-dash-comprati.aperto {
+  position: fixed; z-index: 5000; left: 12px; right: 12px; bottom: 12px;
+  max-height: 78vh; overflow-y: auto; cursor: default;
+  border-radius: 28px !important; padding: 20px 16px !important;
+  background: var(--f-bg) !important;
+  box-shadow: 0 0 0 100vmax rgba(0,0,0,.6) !important;
+}
+:root[data-stile="futuro"] .home-dash-comprati.aperto .comprati-chiudi {
+  display: flex; align-items: center; justify-content: center;
+  width: 36px; height: 36px; margin-left: 10px; border-radius: 50%;
+  border: 1px solid var(--f-ln); background: transparent; color: var(--text); font-size: 20px; cursor: pointer;
+}
+:root[data-stile="futuro"] .comprato-row {
+  border-radius: 22px; background: var(--f-panel); border: 1px solid var(--f-ln); flex-wrap: wrap;
+}
+:root[data-stile="futuro"] .comprato-nome { color: var(--text); }
+:root[data-stile="futuro"] .comprato-nome small { color: var(--f-mu); }
+:root[data-stile="futuro"] .comprato-btn { border-radius: 999px; border-color: var(--f-ln); color: var(--text); }
+:root[data-stile="futuro"] .comprato-btn.registra { background: var(--f-li); color: #05070B; }
+/* pannello aperto: nascondo la capsula Dashboard/Menu e il "?" che lo coprirebbero */
+:root[data-stile="futuro"] body.comprati-aperto .home-switcher,
+:root[data-stile="futuro"] body.comprati-aperto .btn-help { display: none !important; }
+:root[data-stile="futuro"][data-theme="light"] .comprato-btn.registra { color: #FFFFFF; }

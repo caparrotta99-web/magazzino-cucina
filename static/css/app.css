@@ -2108,6 +2108,8 @@ html.chat-no-scroll { overflow: hidden; }
 
 /* Home: comprati dalla lista spesa, da registrare */
 .home-dash-comprati-sub { font-size: 13px; color: rgba(255,255,255,.7); margin-top: 4px; }
+/* pulsante di chiusura usato solo dallo stile Brigade 3000 */
+.comprati-chiudi { display: none; }
 #home-dash-comprati-list { margin-top: 10px; display: flex; flex-direction: column; gap: 8px; }
 .comprato-row {
   display: flex; align-items: center; gap: 10px; padding: 10px 12px;

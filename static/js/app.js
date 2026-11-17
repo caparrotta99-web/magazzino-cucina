@@ -132,6 +132,7 @@ async function init() {
   renderInUsoProdotti();
   if (CAN_CHAT) loadChatUnreadBadge();
   loadComprati();
+  loadSuggeriti();
 
   // Al primo login apri automaticamente il tutorial (menu principale) e
   // segna subito come visto, così non si ripresenta ai login successivi.
@@ -301,6 +302,7 @@ function renderHomeDashboard() {
 
   _renderDashDocks();
   loadComprati();
+  loadSuggeriti();
 
   loadMeteoVigevano();
   loadRifiutiRaccolta();
@@ -666,7 +668,6 @@ function navTo(page) {
     // server: la pagina non resta vuota ad aspettare la risposta.
     if (S.listaSpesa && S.listaSpesa.length) renderListaSpesa();
     loadListaSpesa();
-    loadSuggeriti();
   }
   if (page === 'temperature') { loadApparecchi(); loadStoricoTemperature(); }
   if (page === 'controllo')  loadControlloLogs();
@@ -2675,55 +2676,41 @@ function renderListaSpesa() {
   _restoreCountdownBars();
 }
 
-// ── LISTA SPESA — DA RICOMPRARE (programma della spesa) ──────────────────
-// Il server guarda ogni quanti giorni comprate ogni prodotto e propone quelli
-// che stanno per servire. Qui si sceglie quali mettere in lista: niente
-// viene aggiunto da solo.
+// ── SPESA PROGRAMMATA (solo admin, in Dashboard) ─────────────────────────
+// Il server guarda gli ordini: un prodotto spuntato lo stesso giorno della
+// settimana per 4 settimane di fila viene suggerito per quel giorno.
+// Sta in Dashboard e non nella lista spesa, così chi va a comprare non lo
+// confonde con la lista vera. Niente viene aggiunto da solo.
 S.suggeriti = [];
 
 async function loadSuggeriti() {
+  const box = document.getElementById('home-dash-programmata');
+  if (!box) return;                       // non admin
   const data = await api('/api/spesa-suggeriti');
   S.suggeriti = (data && data.suggeriti) || [];
-  const btn = document.getElementById('spesa-suggeriti-btn');
-  if (btn) btn.style.display = S.suggeriti.length ? '' : 'none';
-  const num = document.getElementById('spesa-suggeriti-num');
-  if (num) num.textContent = S.suggeriti.length;
-}
-
-function _fmtGiorno(iso) {
-  const [y, m, d] = (iso || '').split('-');
-  return d ? `${d}/${m}` : '';
-}
-
-function _quandoSuggerito(s) {
-  if (s.mancano < 0) return `in ritardo di ${-s.mancano} ${s.mancano === -1 ? 'giorno' : 'giorni'}`;
-  if (s.mancano === 0) return 'serve oggi';
-  if (s.mancano === 1) return 'serve domani';
-  return `serve tra ${s.mancano} giorni`;
+  box.style.display = S.suggeriti.length ? '' : 'none';
+  document.getElementById('home-dash-programmata-num').textContent = S.suggeriti.length;
 }
 
 function apriSuggeriti() {
   const gruppi = {};
   S.suggeriti.forEach((s, i) => {
-    const f = s.fornitore || 'Senza fornitore';
-    (gruppi[f] = gruppi[f] || []).push({ s, i });
+    const titolo = `${s.quando === 'oggi' ? 'Oggi' : 'Domani'}, ${s.giorno_settimana} · ${s.fornitore || 'senza fornitore'}`;
+    (gruppi[titolo] = gruppi[titolo] || []).push({ s, i });
   });
-  document.getElementById('suggeriti-list').innerHTML = Object.keys(gruppi).sort().map(f => {
-    const giorni = (gruppi[f][0].s.giorni_fornitore || []).join(', ');
-    return `
+  document.getElementById('suggeriti-list').innerHTML = Object.keys(gruppi).map(t => `
       <div class="suggeriti-gruppo">
-        <div class="spesa-group-hdr">${esc(f)}${giorni ? `<span class="suggeriti-giorni">di solito ${esc(giorni)}</span>` : ''}</div>
-        ${gruppi[f].map(({ s, i }) => `
+        <div class="spesa-group-hdr">${esc(t)}</div>
+        ${gruppi[t].map(({ s, i }) => `
           <label class="suggerito-row">
             <input type="checkbox" class="suggerito-check" data-idx="${i}" onchange="_aggiornaBtnSuggeriti()">
             <span class="suggerito-info">
               <span class="suggerito-nome">${esc(s.prodotto)}</span>
-              <span class="suggerito-sub ${s.mancano < 0 ? 'ritardo' : ''}">${_quandoSuggerito(s)} · ogni ~${s.ogni_giorni} gg · ultimo ${_fmtGiorno(s.ultimo)}</span>
+              <span class="suggerito-sub">ogni ${esc(s.giorno_settimana)} da ${s.settimane} settimane</span>
             </span>
             ${s.quantita ? `<span class="suggerito-qty">${s.quantita} ${esc(s.unita || '')}</span>` : ''}
           </label>`).join('')}
-      </div>`;
-  }).join('');
+      </div>`).join('');
   _aggiornaBtnSuggeriti();
   document.getElementById('modal-suggeriti').classList.add('open');
 }
@@ -2742,11 +2729,9 @@ function _aggiornaBtnSuggeriti() {
 async function aggiungiSuggeriti() {
   const scelti = [...document.querySelectorAll('.suggerito-check:checked')].map(c => S.suggeriti[+c.dataset.idx]);
   if (!scelti.length) return;
-  const btn = document.getElementById('suggeriti-aggiungi');
-  btn.disabled = true;
+  document.getElementById('suggeriti-aggiungi').disabled = true;
   for (const s of scelti) {
-    // categoria e reparto dal listino se il prodotto c'è, così finisce nella
-    // stessa categoria di sempre
+    // categoria e reparto dal listino, così finisce nella categoria di sempre
     const p = S.prodotti.find(x => x.prodotto.toLowerCase() === s.prodotto.toLowerCase());
     await api('/api/lista-spesa', { method: 'POST', body: {
       prodotto:  p ? p.prodotto : s.prodotto,

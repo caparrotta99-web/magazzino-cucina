@@ -2147,20 +2147,11 @@ body.comprati-aperto .btn-help { display: none !important; }
 }
 .comprato-btn.registra { background: var(--green, #22c55e); border-color: transparent; }
 
-/* Lista spesa: pulsante "Da ricomprare" e la sua finestra */
-.spesa-suggeriti-btn {
-  display: flex; align-items: center; gap: 8px; width: 100%;
-  margin: 0 0 16px; padding: 12px 14px; cursor: pointer;
-  background: rgba(var(--action-rgb), .08); color: var(--text);
-  border: 1px dashed rgba(var(--action-rgb), .45); border-radius: 14px;
-  font-family: inherit; font-size: 14px; font-weight: 600; text-align: left;
-}
-.spesa-suggeriti-btn svg { color: var(--action); flex-shrink: 0; }
-.spesa-suggeriti-btn span:nth-child(2) { flex: 1; }
-.spesa-suggeriti-num {
-  min-width: 26px; height: 26px; padding: 0 8px; border-radius: 100px;
-  display: inline-flex; align-items: center; justify-content: center;
-  background: rgba(var(--action-rgb), .2); color: var(--text); font-size: 13px; font-weight: 700;
+/* Dashboard (solo admin): capsula "Spesa programmata" e la sua finestra */
+.home-dash-programmata { border-radius: 100px; padding: 12px 18px; border-color: rgba(0,229,255,.45); }
+.home-dash-programmata .home-dash-card-title::before {
+  content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 10px; vertical-align: middle;
+  border-radius: 50%; background: #00e5ff;
 }
 .suggeriti-intro { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
 .suggeriti-gruppo .spesa-group-hdr { margin: 16px 2px 8px; }

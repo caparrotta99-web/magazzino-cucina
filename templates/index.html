@@ -308,6 +308,16 @@
             </div>
 
             {% if current_user.puo_accedere_chat %}
+            {% if current_user.is_authenticated and current_user.role == 'admin' %}
+            <!-- Spesa programmata: solo per chi fa gli ordini, non nella lista spesa -->
+            <div class="home-dash-card home-dash-programmata" id="home-dash-programmata" style="display:none" onclick="apriSuggeriti()">
+              <div class="home-dash-card-top">
+                <div class="home-dash-card-title">Spesa programmata</div>
+                <div class="home-dash-card-num" id="home-dash-programmata-num">0</div>
+              </div>
+            </div>
+            {% endif %}
+
             <div id="home-dash-chat-wrap"></div>
             {% endif %}
 
@@ -1227,13 +1237,6 @@
       <button class="fpill active" onclick="setSpesaFilter('all', this)">Tutti</button>
     </div>
 
-    <!-- Programma della spesa: prodotti che di solito ricomprate a quest'ora -->
-    <button type="button" class="spesa-suggeriti-btn" id="spesa-suggeriti-btn" style="display:none" onclick="apriSuggeriti()">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-      <span>Da ricomprare</span>
-      <span class="spesa-suggeriti-num" id="spesa-suggeriti-num">0</span>
-    </button>
-
     <!-- Panel aggiunta manuale -->
     <div class="spesa-add-panel" id="spesa-add-panel">
       <div class="fgroup" style="margin-bottom:10px">
@@ -1311,9 +1314,9 @@
 <div class="modal-backdrop" id="modal-suggeriti" onclick="if (event.target === this) chiudiSuggeriti()">
   <div class="modal">
     <div class="modal-handle"></div>
-    <div class="modal-title">Da ricomprare</div>
+    <div class="modal-title">Spesa programmata</div>
     <div class="modal-body">
-      <div class="suggeriti-intro">In base a ogni quanto li comprate di solito. Scegli quali mettere nella lista spesa.</div>
+      <div class="suggeriti-intro">Prodotti comprati lo stesso giorno della settimana nelle ultime 4 settimane. Scegli tu quali mettere nella lista spesa.</div>
       <div id="suggeriti-list"></div>
     </div>
     <div class="modal-actions">

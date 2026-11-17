@@ -1561,12 +1561,11 @@ def get_comprati_da_registrare(oggi=None):
         ))
 
 
-def get_storico_acquisti():
-    """Tutto quello che risulta comprato, per il programma della spesa:
-    - i prodotti spuntati nella lista spesa (con il fornitore della riga);
-    - i carichi del registro (merce arrivata);
-    - per il periodo prima che esistesse "comprati", le righe tolte dalla
-      lista spesa (allora spuntare = togliere)."""
+def get_storico_ordini():
+    """Gli ordini, per la spesa programmata: i prodotti spuntati nella lista
+    spesa (con il fornitore della riga). Per il periodo prima che esistesse
+    "comprati", le righe tolte dalla lista (allora spuntare = togliere).
+    Il magazzino e i carichi non si guardano."""
     with get_conn() as conn:
         comprati = _rows(conn.execute(
             "SELECT prodotto, fornitore, categoria, reparto, quantita, unita, "
@@ -1577,18 +1576,12 @@ def get_storico_acquisti():
             "SELECT prodotto, fornitore, quando AS data FROM log_lista_spesa "
             "WHERE azione = 'eliminato' AND quando < ?", (primo[:10],)
         ))
-        carichi = _rows(conn.execute(
-            "SELECT prodotto, fornitore, data FROM registro "
-            "WHERE tipo = 'CARICO' AND carico > 0"
-        ))
-    return comprati + vecchi + carichi
+    return comprati + vecchi
 
 
-def get_nomi_da_non_riproporre():
-    """Prodotti già in lista spesa o comprati da poco e non ancora registrati."""
+def get_nomi_in_lista_spesa():
     with get_conn() as conn:
-        in_lista = [r['prodotto'] for r in _rows(conn.execute("SELECT prodotto FROM lista_spesa"))]
-    return in_lista + [c['prodotto'] for c in get_comprati_da_registrare()]
+        return [r['prodotto'] for r in _rows(conn.execute("SELECT prodotto FROM lista_spesa"))]
 
 
 def get_comprato(comprato_id):

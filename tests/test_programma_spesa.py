@@ -1,99 +1,94 @@
 from datetime import date, timedelta
 
-from programma_spesa import calcola_suggeriti, giorni_abituali
+from programma_spesa import calcola_suggeriti
 
-OGGI = date(2026, 11, 20)  # venerdì
+OGGI = date(2026, 11, 24)  # martedì
 
 
-def compra(prodotto, giorni_fa, fornitore='DOCKS', quantita=0, unita='kg'):
+def ordine(prodotto, giorno, fornitore='DOCKS', quantita=0):
     return {'prodotto': prodotto, 'fornitore': fornitore,
-            'data': (OGGI - timedelta(days=giorni_fa)).isoformat(),
-            'quantita': quantita, 'unita': unita}
+            'data': giorno.isoformat() + 'T10:00:00', 'quantita': quantita, 'unita': 'kg'}
 
 
-def test_propone_il_prodotto_quando_e_ora():
-    # comprato ogni 4 giorni, l'ultima volta 4 giorni fa: serve oggi
-    acquisti = [compra('Mozzarella', d, quantita=2) for d in (16, 12, 8, 4)]
-    s = calcola_suggeriti(acquisti, oggi=OGGI)
-    assert len(s) == 1
-    assert s[0]['prodotto'] == 'Mozzarella'
-    assert s[0]['ogni_giorni'] == 4
-    assert s[0]['mancano'] == 0
-    assert s[0]['quantita'] == 2
+def ogni_settimana(prodotto, giorno, settimane=4, **kw):
+    return [ordine(prodotto, giorno - timedelta(days=7 * i), **kw) for i in range(1, settimane + 1)]
 
 
-def test_non_propone_se_manca_ancora_tempo():
-    acquisti = [compra('Farina', d) for d in (21, 14, 7, 1)]  # ogni 7, comprata ieri
-    assert calcola_suggeriti(acquisti, oggi=OGGI) == []
+def test_quattro_martedi_di_fila_viene_suggerito_oggi():
+    s = calcola_suggeriti(ogni_settimana('Orata', OGGI, quantita=3), oggi=OGGI)
+    assert [(x['prodotto'], x['quando'], x['giorno_settimana'], x['quantita']) for x in s] == \
+        [('Orata', 'oggi', 'martedì', 3)]
 
 
-def test_servono_almeno_quattro_acquisti():
-    acquisti = [compra('Basilico', d) for d in (15, 10, 5)]
-    assert calcola_suggeriti(acquisti, oggi=OGGI) == []
+def test_suggerito_anche_il_giorno_prima_come_domani():
+    domani = OGGI + timedelta(days=1)
+    s = calcola_suggeriti(ogni_settimana('Pane', domani), oggi=OGGI)
+    assert [(x['prodotto'], x['quando']) for x in s] == [('Pane', 'domani')]
 
 
-def test_non_ripropone_quello_gia_in_lista():
-    acquisti = [compra('Mozzarella', d) for d in (16, 12, 8, 4)]
-    assert calcola_suggeriti(acquisti, gia_in_lista=['mozzarella '], oggi=OGGI) == []
+def test_tre_settimane_non_bastano():
+    assert calcola_suggeriti(ogni_settimana('Orata', OGGI, settimane=3), oggi=OGGI) == []
 
 
-def test_fornitore_dell_ultimo_acquisto_e_ritardo_di_un_giorno():
-    acquisti = [compra('Limoni', 13, 'DOCKS'), compra('Limoni', 10, 'DOCKS'),
-                compra('Limoni', 7, 'DOCKS'), compra('Limoni', 4, 'GLOBAL')]
-    s = calcola_suggeriti(acquisti, oggi=OGGI)
-    assert s[0]['fornitore'] == 'GLOBAL'
-    assert s[0]['mancano'] == -1          # ogni 3 giorni, ultimo 4 giorni fa
+def test_una_settimana_saltata_non_viene_suggerito():
+    ordini = ogni_settimana('Orata', OGGI)
+    ordini = [o for o in ordini if o['data'][:10] != (OGGI - timedelta(days=14)).isoformat()]
+    assert calcola_suggeriti(ordini, oggi=OGGI) == []
 
 
-def test_troppo_in_ritardo_non_viene_proposto():
-    # ogni 3 giorni ma l'ultimo è di 9 giorni fa: comprato senza spuntarlo
-    # o non si compra più
-    acquisti = [compra('Limoni', d) for d in (18, 15, 12, 9)]
-    assert calcola_suggeriti(acquisti, oggi=OGGI) == []
+def test_giorno_diverso_non_conta():
+    # comprato 4 mercoledì: oggi (martedì) no, domani (mercoledì) sì
+    mer = OGGI + timedelta(days=1)
+    s = calcola_suggeriti(ogni_settimana('Cozze', mer), oggi=OGGI)
+    assert [x['quando'] for x in s] == ['domani']
 
 
-def test_dopodomani_ancora_no():
-    acquisti = [compra('Farina', d) for d in (14, 10, 6, 2)]  # ogni 4, serve tra 2 giorni
-    assert calcola_suggeriti(acquisti, oggi=OGGI) == []
+def test_gia_in_lista_o_gia_comprato_oggi():
+    ordini = ogni_settimana('Orata', OGGI)
+    assert calcola_suggeriti(ordini, gia_in_lista=['ORATA'], oggi=OGGI) == []
+    assert calcola_suggeriti(ordini + [ordine('Orata', OGGI)], oggi=OGGI) == []
 
 
-def test_stesso_giorno_conta_una_volta_e_nomi_uguali_senza_maiuscole():
-    acquisti = [compra('Cozze', 12), compra('Cozze', 9), compra('cozze', 9), compra('COZZE ', 6), compra('Cozze', 3)]
-    s = calcola_suggeriti(acquisti, oggi=OGGI)
-    assert s[0]['acquisti'] == 4 and s[0]['ogni_giorni'] == 3
+def test_fornitore_dell_ultimo_ordine():
+    ordini = ogni_settimana('Limoni', OGGI, fornitore='DOCKS')
+    ordini[0]['fornitore'] = 'GLOBAL'          # la settimana scorsa
+    assert calcola_suggeriti(ordini, oggi=OGGI)[0]['fornitore'] == 'GLOBAL'
 
 
-def test_prodotto_abbandonato_non_viene_proposto():
-    acquisti = [compra('Panettone', d) for d in (83, 80, 77, 74)]
-    assert calcola_suggeriti(acquisti, oggi=OGGI) == []
+def test_ora_utc_di_notte_conta_come_giorno_italiano():
+    # 23:30 italiane di lunedì = 22:30 UTC: è lunedì, non martedì
+    lun = OGGI - timedelta(days=1)
+    ordini = [{'prodotto': 'Uova', 'fornitore': 'DOCKS',
+               'data': (lun - timedelta(days=7 * i)).isoformat() + 'T22:30:00+00:00'} for i in range(0, 4)]
+    s = calcola_suggeriti(ordini, oggi=OGGI + timedelta(days=6))  # lunedì prossimo
+    assert [x['prodotto'] for x in s] == ['Uova']
 
 
-def test_giorni_abituali_del_fornitore():
-    # DOCKS il martedì e il venerdì
-    acquisti = [compra('x', d, 'DOCKS') for d in (3, 7, 10, 14)]
-    assert giorni_abituali(acquisti)['DOCKS'] == ['mar', 'ven']
-
-
-def test_endpoint_usa_comprati_e_registro(db, monkeypatch):
+def test_solo_admin_e_non_guarda_i_carichi(db):
     import app as A
-    oggi = date.today()
-    for giorni_fa in (12, 9, 6, 3):
-        g = (oggi - timedelta(days=giorni_fa)).isoformat()
+    from werkzeug.security import generate_password_hash
+    oggi = A.today_it()
+    for i in range(1, 5):
+        g = (oggi - timedelta(days=7 * i)).isoformat()
         with db.get_conn() as conn:
             conn.execute(
                 "INSERT INTO spesa_comprati (prodotto, fornitore, quantita, unita, comprato_il, stato) "
                 "VALUES (?, ?, ?, ?, ?, 'registrato')", ('Vongole', 'GLOBAL', 2, 'kg', g + 'T10:00:00'))
+        # un carico in magazzino con lo stesso ritmo non deve contare
+        with db.get_conn() as conn:
+            conn.execute("INSERT INTO registro (data, fornitore, prodotto, carico, tipo) VALUES (?, 'DOCKS', 'Farina', 5, 'CARICO')", (g,))
     A.app.config['TESTING'] = True
-    client = A.app.test_client()
-    from werkzeug.security import generate_password_hash
-    db.create_user('Prova Utente', 'prova', generate_password_hash('pw123456', method='pbkdf2'), 'cucina')
-    client.post('/login', data={'nome': 'Prova Utente', 'password': 'pw123456'})
-    r = client.get('/api/spesa-suggeriti').get_json()
-    assert r['success']
-    assert [s['prodotto'] for s in r['suggeriti']] == ['Vongole']
-    assert r['suggeriti'][0]['fornitore'] == 'GLOBAL'
+    db.create_user('Capo Cucina', 'capo', generate_password_hash('pw123456', method='pbkdf2'), 'cucina', role='admin')
+    db.create_user('Aiuto Cuoco', 'aiuto', generate_password_hash('pw123456', method='pbkdf2'), 'cucina')
 
-    # se è già in lista spesa non viene riproposto
+    staff = A.app.test_client()
+    staff.post('/login', data={'nome': 'Aiuto Cuoco', 'password': 'pw123456'})
+    assert staff.get('/api/spesa-suggeriti').status_code == 403
+
+    admin = A.app.test_client()
+    admin.post('/login', data={'nome': 'Capo Cucina', 'password': 'pw123456'})
+    r = admin.get('/api/spesa-suggeriti').get_json()
+    assert [(s['prodotto'], s['fornitore'], s['quando']) for s in r['suggeriti']] == [('Vongole', 'GLOBAL', 'oggi')]
+
     db.add_lista_spesa_item('Vongole', 'GLOBAL', '', 2, 'kg')
-    r = client.get('/api/spesa-suggeriti').get_json()
-    assert r['suggeriti'] == []
+    assert admin.get('/api/spesa-suggeriti').get_json()['suggeriti'] == []

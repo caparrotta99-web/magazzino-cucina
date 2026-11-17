@@ -1555,12 +1555,14 @@ def api_spesa_comprati():
 @app.route('/api/spesa-suggeriti')
 @login_required
 def api_spesa_suggeriti():
-    """Lista "Da ricomprare": calcolata da cosa avete comprato e quando.
-    Non aggiunge niente alla lista spesa: propone soltanto."""
+    """Spesa programmata (solo admin): prodotti comprati lo stesso giorno
+    della settimana per 4 settimane di fila. Non aggiunge niente da solo."""
+    if current_user.role != 'admin':
+        return jsonify({'success': False, 'error': 'Solo per amministratori'}), 403
     from programma_spesa import calcola_suggeriti
     import database as _db
-    suggeriti = calcola_suggeriti(_db.get_storico_acquisti(),
-                                  _db.get_nomi_da_non_riproporre(),
+    suggeriti = calcola_suggeriti(_db.get_storico_ordini(),
+                                  _db.get_nomi_in_lista_spesa(),
                                   oggi=today_it())
     return jsonify({'success': True, 'suggeriti': suggeriti})
 

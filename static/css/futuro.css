@@ -668,13 +668,15 @@
 :root[data-stile="futuro"] body.comprati-aperto .btn-help { display: none !important; }
 :root[data-stile="futuro"][data-theme="light"] .comprato-btn.registra { color: #FFFFFF; }
 
-/* Lista spesa: "Da ricomprare" come capsula */
-:root[data-stile="futuro"] .spesa-suggeriti-btn {
-  border-radius: 999px !important; background: transparent !important;
-  border: 1px dashed rgba(var(--f-cy-rgb), .6) !important; color: var(--text) !important;
+/* Dashboard: capsula "Spesa programmata" */
+:root[data-stile="futuro"] .home-dash-programmata {
+  border-radius: 999px !important; padding: 12px 18px !important;
+  border: 1px solid rgba(var(--f-cy-rgb), .45) !important;
 }
-:root[data-stile="futuro"] .spesa-suggeriti-btn svg { color: var(--f-cy) !important; }
-:root[data-stile="futuro"] .spesa-suggeriti-num { background: var(--f-cy) !important; color: var(--f-bg) !important; }
+:root[data-stile="futuro"] .home-dash-programmata .home-dash-card-title::before {
+  content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 10px; vertical-align: middle;
+  border-radius: 50%; background: var(--f-cy); box-shadow: 0 0 10px var(--f-cy);
+}
 :root[data-stile="futuro"] .suggerito-row { border-radius: 999px !important; border-color: var(--f-ln) !important; background: var(--f-panel); }
 :root[data-stile="futuro"] .suggerito-check { accent-color: var(--f-cy); }
 :root[data-stile="futuro"] .suggerito-sub.ritardo { color: var(--f-am) !important; }

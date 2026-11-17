@@ -11,7 +11,14 @@ Come funziona, in parole semplici:
 - il giorno prima ve lo consiglia ("domani"); se il giorno è arrivato e non
   è ancora stato ordinato, resta consigliato anche quel giorno ("oggi");
 - se il giorno è passato da più di un giorno, smette di proporlo: vuol dire
-  che il ritmo è cambiato. Riprende da solo al prossimo ordine.
+  che il ritmo è cambiato. Riprende da solo al prossimo ordine;
+- consiglia solo i prodotti con un ritmo REGOLARE: almeno 2 intervalli su 3
+  devono essere vicini al ritmo tipico. Un prodotto ordinato a caso (una
+  volta dopo 2 giorni, poi dopo 10, poi dopo 4) non viene consigliato;
+- il ritmo si misura sugli ordini più recenti, così se cambia l'app si adegua;
+- nelle righe vecchie (prima che esistesse "comprati") ignora gli "svuota
+  lista": tanti prodotti tolti dalla stessa persona nello stesso minuto non
+  sono acquisti.
 
 Non aggiunge niente alla lista spesa da solo.
 Questo file non tocca il database e non parla con i fogli Google: riceve
@@ -22,8 +29,11 @@ from statistics import median
 
 from timezone_utils import TZ_ITALIA
 
-ORDINI_MINIMI = 3      # servono almeno 3 ordini (2 intervalli) per capire il ritmo
-STORICO_GIORNI = 120   # il ritmo si calcola sugli ultimi 4 mesi
+ORDINI_MINIMI = 4      # servono almeno 4 ordini (3 intervalli) per capire il ritmo
+STORICO_GIORNI = 120   # si guardano gli ultimi 4 mesi...
+INTERVALLI_RECENTI = 8 # ...ma il ritmo si misura sugli ultimi 8 intervalli
+REGOLARITA_MINIMA = 2 / 3   # quota di intervalli vicini al ritmo tipico
+SVUOTA_MINIMO = 8      # 8+ prodotti tolti dalla stessa persona nello stesso minuto = svuota
 
 
 def _giorno(valore):
@@ -61,6 +71,16 @@ def calcola_suggeriti(ordini, gia_in_lista=(), oggi=None):
     oggi = oggi or date.today()
     esclusi = {_chiave(p) for p in gia_in_lista}
 
+    # righe vecchie tolte in blocco (svuota lista): non sono acquisti
+    blocchi = {}
+    for o in ordini:
+        if o.get('fonte') == 'log':
+            chiave_min = (o.get('utente') or '', str(o.get('data') or '')[:16])
+            blocchi[chiave_min] = blocchi.get(chiave_min, 0) + 1
+    ordini = [o for o in ordini if not (
+        o.get('fonte') == 'log'
+        and blocchi[(o.get('utente') or '', str(o.get('data') or '')[:16])] >= SVUOTA_MINIMO)]
+
     per_prodotto = {}
     for o in ordini:
         k = _chiave(o.get('prodotto'))
@@ -76,8 +96,13 @@ def calcola_suggeriti(ordini, gia_in_lista=(), oggi=None):
         giorni = sorted({g for g, _ in righe})
         if len(giorni) < ORDINI_MINIMI:
             continue
-        intervalli = [(b - a).days for a, b in zip(giorni, giorni[1:])]
+        intervalli = [(b - a).days for a, b in zip(giorni, giorni[1:])][-INTERVALLI_RECENTI:]
         ogni = max(1, round(median(intervalli)))
+        # vicino al ritmo = entro un terzo del ritmo (almeno 1 giorno)
+        tolleranza = max(1, round(ogni / 3))
+        vicini = sum(1 for i in intervalli if abs(i - ogni) <= tolleranza)
+        if vicini / len(intervalli) < REGOLARITA_MINIMA:
+            continue
         ultimo = giorni[-1]
         prossimo = ultimo + timedelta(days=ogni)
         mancano = (prossimo - oggi).days
@@ -108,6 +133,8 @@ def calcola_suggeriti(ordini, gia_in_lista=(), oggi=None):
             'quantita':    round(median(quantita), 2) if quantita else 0,
             'ogni_giorni': ogni,
             'ordini':      len(giorni),
+            'regolari':    vicini,
+            'intervalli':  len(intervalli),
             'ultimo':      ultimo.isoformat(),
         })
 

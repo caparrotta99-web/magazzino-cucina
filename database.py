@@ -1573,9 +1573,11 @@ def get_storico_ordini():
         ))
         primo = min((c['data'] for c in comprati), default='9999')
         vecchi = _rows(conn.execute(
-            "SELECT prodotto, fornitore, quando AS data FROM log_lista_spesa "
+            "SELECT prodotto, fornitore, utente, quando AS data FROM log_lista_spesa "
             "WHERE azione = 'eliminato' AND quando < ?", (primo[:10],)
         ))
+    for v in vecchi:
+        v['fonte'] = 'log'      # riga tolta dalla lista: può essere anche uno "svuota"
     return comprati + vecchi
 
 

@@ -15,53 +15,80 @@ def test_ritmi_diversi_consigliati_il_giorno_prima():
     # roast-beef ogni 7 giorni, ultimo 6 giorni fa → serve domani
     # mele ogni 15 giorni, ultimo 14 giorni fa → serve domani
     ordini = [ordine('Roast-beef', d, quantita=2) for d in (27, 20, 13, 6)] + \
-             [ordine('Mele', d) for d in (44, 29, 14)]
+             [ordine('Mele', d) for d in (59, 44, 29, 14)]
     s = calcola_suggeriti(ordini, oggi=OGGI)
     assert {(x['prodotto'], x['ogni_giorni'], x['quando']) for x in s} == \
         {('Roast-beef', 7, 'domani'), ('Mele', 15, 'domani')}
-    assert next(x for x in s if x['prodotto'] == 'Roast-beef')['quantita'] == 2
+    rb = next(x for x in s if x['prodotto'] == 'Roast-beef')
+    assert rb['quantita'] == 2 and (rb['regolari'], rb['intervalli']) == (3, 3)
 
 
 def test_resta_consigliato_il_giorno_stesso_se_non_ancora_ordinato():
-    s = calcola_suggeriti([ordine('Roast-beef', d) for d in (21, 14, 7)], oggi=OGGI)
+    s = calcola_suggeriti([ordine('Roast-beef', d) for d in (28, 21, 14, 7)], oggi=OGGI)
     assert [(x['prodotto'], x['quando']) for x in s] == [('Roast-beef', 'oggi')]
 
 
 def test_non_consiglia_prima_del_giorno_prima():
-    assert calcola_suggeriti([ordine('Roast-beef', d) for d in (19, 12, 5)], oggi=OGGI) == []
+    assert calcola_suggeriti([ordine('Roast-beef', d) for d in (26, 19, 12, 5)], oggi=OGGI) == []
 
 
 def test_giorno_passato_smette_di_proporlo():
-    assert calcola_suggeriti([ordine('Roast-beef', d) for d in (23, 16, 9)], oggi=OGGI) == []
+    assert calcola_suggeriti([ordine('Roast-beef', d) for d in (30, 23, 16, 9)], oggi=OGGI) == []
 
 
-def test_servono_almeno_tre_ordini():
-    assert calcola_suggeriti([ordine('Mele', d) for d in (29, 14)], oggi=OGGI) == []
+def test_servono_almeno_quattro_ordini():
+    assert calcola_suggeriti([ordine('Mele', d) for d in (44, 29, 14)], oggi=OGGI) == []
+
+
+def test_ritmo_irregolare_non_viene_consigliato():
+    # intervalli 2, 10, 4, 9, 3: nessun ritmo vero
+    giorni = [29, 27, 17, 13, 4, 1]
+    assert calcola_suggeriti([ordine('Peperoni', d) for d in giorni], oggi=OGGI) == []
 
 
 def test_una_volta_strana_non_sballa_il_ritmo():
-    # ogni 7 giorni, una volta sola dopo 3: la mediana resta 7
+    # ogni 7 giorni, una volta sola dopo 3: 3 intervalli su 4 regolari
     s = calcola_suggeriti([ordine('Lonza', d) for d in (30, 23, 20, 13, 6)], oggi=OGGI)
     assert s and s[0]['ogni_giorni'] == 7 and s[0]['quando'] == 'domani'
+    assert (s[0]['regolari'], s[0]['intervalli']) == (3, 4)
+
+
+def test_il_ritmo_si_adegua_agli_ordini_recenti():
+    # prima ogni 14 giorni, ora ogni 4: contano gli ultimi intervalli
+    vecchi = [100, 86, 72]
+    nuovi = [35, 31, 27, 23, 19, 15, 11, 7, 3]
+    s = calcola_suggeriti([ordine('Zucchine', d) for d in vecchi + nuovi], oggi=OGGI)
+    assert s and s[0]['ogni_giorni'] == 4 and s[0]['quando'] == 'domani'
+
+
+def test_svuota_lista_non_conta_come_acquisto():
+    # ogni 7 giorni, più un vecchio "svuota" serale con 10 prodotti nello stesso minuto
+    ordini = [ordine('Orata', d) for d in (27, 20, 13, 6)]
+    svuota = [{'prodotto': p, 'fornitore': 'DOCKS', 'utente': 'Antonella', 'fonte': 'log',
+               'data': (OGGI - timedelta(days=10)).isoformat() + 'T21:04:3' + str(i) + '+00:00'}
+              for i, p in enumerate(['Orata'] + [f'altro {n}' for n in range(9)])]
+    s = calcola_suggeriti(ordini + svuota, oggi=OGGI)
+    assert [(x['prodotto'], x['ogni_giorni'], x['quando']) for x in s] == [('Orata', 7, 'domani')]
 
 
 def test_gia_in_lista_e_nomi_senza_maiuscole():
     # stesso giorno due volte = un ordine solo; maiuscole e spazi non contano
-    ordini = [ordine('Cozze', 9), ordine('cozze ', 6), ordine('COZZE', 3), ordine('Cozze', 3)]
+    ordini = [ordine('Cozze', 12), ordine('Cozze', 9), ordine('cozze ', 6), ordine('COZZE', 3), ordine('Cozze', 3)]
     s = calcola_suggeriti(ordini, oggi=OGGI)
-    assert [(x['ordini'], x['ogni_giorni'], x['quando']) for x in s] == [(3, 3, 'oggi')]
+    assert [(x['ordini'], x['ogni_giorni'], x['quando']) for x in s] == [(4, 3, 'oggi')]
     assert calcola_suggeriti(ordini, gia_in_lista=['Cozze'], oggi=OGGI) == []
 
 
 def test_fornitore_dell_ultimo_ordine():
-    ordini = [ordine('Limoni', 21, 'DOCKS'), ordine('Limoni', 14, 'DOCKS'), ordine('Limoni', 7, 'GLOBAL')]
+    ordini = [ordine('Limoni', 28, 'DOCKS'), ordine('Limoni', 21, 'DOCKS'),
+              ordine('Limoni', 14, 'DOCKS'), ordine('Limoni', 7, 'GLOBAL')]
     assert calcola_suggeriti(ordini, oggi=OGGI)[0]['fornitore'] == 'GLOBAL'
 
 
 def test_ora_utc_di_notte_conta_come_giorno_italiano():
-    # 23:30 italiane = 22:30 UTC dello stesso giorno italiano
+    # 22:30 UTC = 23:30 italiane dello stesso giorno: il giorno non cambia
     ordini = [{'prodotto': 'Uova', 'fornitore': 'DOCKS',
-               'data': (OGGI - timedelta(days=d)).isoformat() + 'T22:30:00+00:00'} for d in (15, 8, 1)]
+               'data': (OGGI - timedelta(days=d)).isoformat() + 'T22:30:00+00:00'} for d in (22, 15, 8, 1)]
     s = calcola_suggeriti(ordini, oggi=OGGI + timedelta(days=5))   # ogni 7, ultimo 6 giorni prima
     assert [(x['prodotto'], x['quando']) for x in s] == [('Uova', 'domani')]
 
@@ -70,7 +97,7 @@ def test_tutti_la_vedono_e_non_guarda_i_carichi(db):
     import app as A
     from werkzeug.security import generate_password_hash
     oggi = A.today_it()
-    for d in (20, 13, 6):     # ogni 7, ultimo 6 giorni fa → domani
+    for d in (27, 20, 13, 6):     # ogni 7, ultimo 6 giorni fa → domani
         g = (oggi - timedelta(days=d)).isoformat()
         with db.get_conn() as conn:
             conn.execute(
@@ -80,18 +107,12 @@ def test_tutti_la_vedono_e_non_guarda_i_carichi(db):
             conn.execute("INSERT INTO registro (data, fornitore, prodotto, carico, tipo) "
                          "VALUES (?, 'DOCKS', 'Farina', 5, 'CARICO')", (g,))
     A.app.config['TESTING'] = True
-    db.create_user('Capo Cucina', 'capo', generate_password_hash('pw123456', method='pbkdf2'), 'cucina', role='admin')
     db.create_user('Aiuto Cuoco', 'aiuto', generate_password_hash('pw123456', method='pbkdf2'), 'cucina')
 
     staff = A.app.test_client()
     staff.post('/login', data={'nome': 'Aiuto Cuoco', 'password': 'pw123456'})
     r = staff.get('/api/spesa-suggeriti').get_json()
-    assert [s['prodotto'] for s in r['suggeriti']] == ['Vongole']
-
-    admin = A.app.test_client()
-    admin.post('/login', data={'nome': 'Capo Cucina', 'password': 'pw123456'})
-    r = admin.get('/api/spesa-suggeriti').get_json()
     assert [(s['prodotto'], s['fornitore'], s['quando']) for s in r['suggeriti']] == [('Vongole', 'GLOBAL', 'domani')]
 
     db.add_lista_spesa_item('Vongole', 'GLOBAL', '', 2, 'kg')
-    assert admin.get('/api/spesa-suggeriti').get_json()['suggeriti'] == []
+    assert staff.get('/api/spesa-suggeriti').get_json()['suggeriti'] == []

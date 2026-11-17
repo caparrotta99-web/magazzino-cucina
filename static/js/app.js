@@ -2711,7 +2711,7 @@ function apriSuggeriti() {
             <input type="checkbox" class="suggerito-check" data-idx="${i}" onchange="_aggiornaBtnSuggeriti()">
             <span class="suggerito-info">
               <span class="suggerito-nome">${esc(s.prodotto)}</span>
-              <span class="suggerito-sub">ordinato ogni ~${s.ogni_giorni} ${s.ogni_giorni === 1 ? 'giorno' : 'giorni'} · ultimo ${_fmtGiorno(s.ultimo)}</span>
+              <span class="suggerito-sub">ordinato ogni ~${s.ogni_giorni} ${s.ogni_giorni === 1 ? 'giorno' : 'giorni'} (${s.regolari} volte su ${s.intervalli}) · ultimo ${_fmtGiorno(s.ultimo)}</span>
             </span>
             ${s.quantita ? `<span class="suggerito-qty">${s.quantita} ${esc(s.unita || '')}</span>` : ''}
           </label>`).join('')}

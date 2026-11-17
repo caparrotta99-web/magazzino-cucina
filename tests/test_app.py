@@ -314,3 +314,33 @@ def test_riordino_coda_sheets_nel_formato_del_worker(app_mod, db):
     finally:
         modulo.aggiorna_tipo_movimento = orig
     assert chiamate == [('SCARICO', 1.0)]
+
+
+# ─── STILE DELL'APP (Classico / Brigade 3000) ────────────────────────────────
+
+def test_classico_di_base_senza_foglio_futuro(app_mod):
+    c = _login(app_mod)
+    html = c.get('/').get_data(as_text=True)
+    assert 'data-stile="classico"' in html and 'futuro.css' not in html
+
+
+def test_scegliere_brigade_3000(app_mod):
+    c = _login(app_mod)
+    assert c.post('/api/stile', json={'stile': 'futuro'}).get_json()['success']
+    for pagina in ('/', '/profile'):
+        html = c.get(pagina).get_data(as_text=True)
+        assert 'data-stile="futuro"' in html and 'futuro.css' in html
+    # il foglio di stile esiste e tocca solo lo stile futuro
+    url = __import__('re').search(r'href="(/static/css/futuro\.css[^"]*)"', c.get('/').get_data(as_text=True)).group(1)
+    css = c.get(url).get_data(as_text=True)
+    regole = [r.split('{')[0] for r in css.split('}') if '{' in r]
+    assert all('data-stile="futuro"' in sel for sel in regole if sel.strip() and not sel.strip().startswith('/*'))
+    # si torna indietro
+    c.post('/api/stile', json={'stile': 'classico'})
+    assert 'futuro.css' not in c.get('/').get_data(as_text=True)
+    assert c.post('/api/stile', json={'stile': 'boh'}).status_code == 400
+
+
+def test_profilo_mostra_la_scelta_dello_stile(app_mod):
+    html = _login(app_mod).get('/profile').get_data(as_text=True)
+    assert "salvaAspetto('stile', 'futuro')" in html and "salvaAspetto('tema', 'scuro')" in html

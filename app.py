@@ -51,7 +51,7 @@ from database import (
     approva_utente, rifiuta_utente, update_user_controllo_permesso,
     create_reset_token, get_reset_token, use_reset_token, update_user_password,
     get_active_reset_tokens, confirm_reset_token,
-    update_user_profile, update_user_reparto, update_user_tema, update_user_home_card, is_username_taken,
+    update_user_profile, update_user_reparto, update_user_tema, update_user_stile, STILI, update_user_home_card, is_username_taken,
     update_user_dash_cards, get_ultimo_carico, update_user_tutorial_visto,
     CHAT_CANALI,
     get_chat_messaggi, get_chat_preview, get_chat_messaggio_by_id, insert_chat_messaggio,
@@ -176,6 +176,7 @@ class User(UserMixin):
         self.role     = data.get('role', 'staff')
         self.gestisce_apparecchi = bool(data.get('gestisce_apparecchi'))
         self.tema     = data.get('tema') or 'chiaro'
+        self.stile    = data.get('stile') or 'classico'
         self.stato    = data.get('stato') or 'attivo'
         self.home_card = data.get('home_card') or 'preparazioni'
         self.dash_card1 = data.get('dash_card1') or 'alert'
@@ -1277,6 +1278,18 @@ def api_tema():
         return jsonify({'success': False, 'error': 'Tema non valido'}), 400
     update_user_tema(int(current_user.id), tema)
     return jsonify({'success': True, 'tema': tema})
+
+
+@app.route('/api/stile', methods=['POST'])
+@login_required
+def api_stile():
+    """Stile dell'app scelto dall'utente: 'classico' (quello di sempre) o
+    'futuro' (Brigade 3000). Vale insieme al tema chiaro/scuro."""
+    stile = (request.get_json(force=True).get('stile') or '').strip()
+    if stile not in STILI:
+        return jsonify({'success': False, 'error': 'Stile non valido'}), 400
+    update_user_stile(int(current_user.id), stile)
+    return jsonify({'success': True, 'stile': stile})
 
 
 DASH_CARD_TYPES = (

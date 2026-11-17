@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="it" data-theme="{{ 'dark' if (current_user.is_authenticated and current_user.tema == 'scuro') else 'light' }}">
+<html lang="it" data-theme="{{ 'dark' if (current_user.is_authenticated and current_user.tema == 'scuro') else 'light' }}" data-stile="{{ current_user.stile if current_user.is_authenticated else 'classico' }}">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="{{ '#0f2c35' if (current_user.is_authenticated and current_user.tema == 'scuro') else '#ffffff' }}">
+<meta name="theme-color" content="{% if current_user.is_authenticated and current_user.stile == 'futuro' %}{{ '#05070B' if current_user.tema == 'scuro' else '#EDF2F7' }}{% else %}{{ '#0f2c35' if (current_user.is_authenticated and current_user.tema == 'scuro') else '#ffffff' }}{% endif %}">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Gestione Utenti — Brigade</title>
@@ -14,6 +14,10 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/theme.css">
+{% if current_user.is_authenticated and current_user.stile == 'futuro' %}
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="{{ asset_url('css/futuro.css') }}">
+{% endif %}
 <style>
 .page-title { font-size: 22px; font-weight: 700; color: var(--text); margin-bottom: 6px; letter-spacing: -.2px; }
 .page-sub { font-size: 14px; color: var(--muted); margin-bottom: 26px; }

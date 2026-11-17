@@ -580,6 +580,7 @@ def db_init():
         ('users',        'notif_temperature', "INTEGER NOT NULL DEFAULT 0"),
         ('users',        'notif_rifiuti',     "INTEGER NOT NULL DEFAULT 1"),
         ('users',        'notif_chat',        "INTEGER NOT NULL DEFAULT 1"),
+        ('users',        'stile',             "TEXT NOT NULL DEFAULT 'classico'"),
         ('users',        'puo_chat', "INTEGER NOT NULL DEFAULT 0"),
         ('users',        'chat_last_seen', "TEXT NOT NULL DEFAULT ''"),
         ('chat_messaggi', 'autore_badge', "TEXT NOT NULL DEFAULT ''"),
@@ -1591,6 +1592,16 @@ def update_user_reparto(user_id, reparto):
         conn.execute(
             "UPDATE users SET reparto = ? WHERE id = ?", (reparto, user_id)
         )
+
+
+STILI = ('classico', 'futuro')   # aspetto dell'app scelto da ogni utente
+
+
+def update_user_stile(user_id, stile):
+    if stile not in STILI:
+        raise ValueError(f'stile non valido: {stile}')
+    with get_conn() as conn:
+        conn.execute("UPDATE users SET stile = ? WHERE id = ?", (stile, user_id))
 
 
 def update_user_tema(user_id, tema):

@@ -1,0 +1,402 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   STILE "BRIGADE 3000"
+   Attivo solo con <html data-stile="futuro">. Il tema Classico non viene
+   toccato: ogni regola qui sotto è limitata a :root[data-stile="futuro"].
+   Funziona sia scuro (data-theme="dark") sia chiaro (data-theme="light").
+   Cambia solo l'aspetto: stesse schermate, stessi pulsanti, stesse scritte.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ── Colori: scuro ──────────────────────────────────────────────────────── */
+:root[data-stile="futuro"] {
+  --f-bg:      #05070B;
+  --f-fg:      #EAF6FF;
+  --f-mu:      #8A9AAE;
+  --f-cy:      #5CF2FF;
+  --f-cy-rgb:  92,242,255;
+  --f-vi:      #8C7BFF;
+  --f-li:      #B6FF5C;
+  --f-am:      #FFB23F;
+  --f-rd:      #FF5C7A;
+  --f-ln:      rgba(140,200,255,.16);
+  --f-panel:   rgba(18,26,38,.78);
+  --f-panel-2: rgba(28,38,54,.82);
+  --f-glow:    0 0 26px rgba(92,242,255,.35);
+  --f-orb-hi:  #CFFBFF;
+  --f-orb-lo:  #1FA8C9;
+  --f-on-cy:   #05070B;
+  --f-grid:    rgba(140,200,255,.05);
+  --f-halo-1:  rgba(92,242,255,.16);
+  --f-halo-2:  rgba(140,123,255,.14);
+
+  --text:      var(--f-fg);
+  --muted:     var(--f-mu);
+  --muted-2:   rgba(138,154,174,.75);
+  --border:    var(--f-ln);
+  --border-2:  rgba(140,200,255,.26);
+  --bg:        var(--f-bg);
+  --card:      var(--f-panel);
+  --surface-2: var(--f-panel-2);
+  --surface-3: rgba(18,26,38,.6);
+  --action:     var(--f-cy);
+  --action-rgb: var(--f-cy-rgb);
+  --green:   var(--f-li);
+  --orange:  var(--f-am);
+  --red:     var(--f-rd);
+  --blue:    #6FA8FF;
+  --violet:  var(--f-vi);
+  --teal:    #3FE0D0;
+  --pink:    #FF7FB6;
+  --yellow:  #FFD24A;
+  --shadow:     0 0 0 1px rgba(92,242,255,.04), 0 10px 30px rgba(0,0,0,.45);
+  --shadow-lg:  0 0 0 1px rgba(92,242,255,.06), 0 18px 46px rgba(0,0,0,.6);
+  --glass-blur: blur(14px) saturate(140%);
+  --f-font:  'Space Grotesk', 'Inter', system-ui, sans-serif;
+  --f-mono:  'JetBrains Mono', ui-monospace, monospace;
+  color-scheme: dark;
+}
+
+/* ── Colori: chiaro ─────────────────────────────────────────────────────── */
+:root[data-stile="futuro"][data-theme="light"] {
+  --f-bg:      #EDF2F7;
+  --f-fg:      #0B1422;
+  --f-mu:      #56677B;
+  --f-cy:      #0090B3;
+  --f-cy-rgb:  0,144,179;
+  --f-vi:      #5A49DB;
+  --f-li:      #3D8F1C;
+  --f-am:      #B87100;
+  --f-rd:      #D12F57;
+  --f-ln:      rgba(12,45,90,.13);
+  --f-panel:   rgba(255,255,255,.86);
+  --f-panel-2: rgba(244,248,252,.95);
+  --f-glow:    0 0 22px rgba(0,144,179,.25);
+  --f-orb-hi:  #7FE3F7;
+  --f-orb-lo:  #00708C;
+  --f-on-cy:   #FFFFFF;
+  --f-grid:    rgba(12,45,90,.05);
+  --f-halo-1:  rgba(0,144,179,.13);
+  --f-halo-2:  rgba(90,73,219,.09);
+  --muted-2:   rgba(86,103,123,.8);
+  --border-2:  rgba(12,45,90,.2);
+  --surface-3: rgba(255,255,255,.7);
+  --blue:    #2F6FDB;
+  --teal:    #0F8F86;
+  --pink:    #C2417A;
+  --yellow:  #B88A00;
+  --shadow:     0 1px 2px rgba(12,45,90,.05), 0 8px 24px rgba(12,45,90,.08);
+  --shadow-lg:  0 2px 6px rgba(12,45,90,.06), 0 16px 40px rgba(12,45,90,.12);
+  color-scheme: light;
+}
+
+/* ── Sfondo: griglia leggera + due bagliori, al posto di aurora e posate ── */
+:root[data-stile="futuro"] body {
+  font-family: var(--f-font);
+  color: var(--text);
+  background:
+    radial-gradient(520px 380px at 92% -6%, var(--f-halo-1), transparent 70%),
+    radial-gradient(460px 360px at -12% 52%, var(--f-halo-2), transparent 70%),
+    linear-gradient(var(--f-grid) 1px, transparent 1px) 0 0 / 26px 26px,
+    linear-gradient(90deg, var(--f-grid) 1px, transparent 1px) 0 0 / 26px 26px,
+    var(--f-bg);
+  background-attachment: fixed;
+}
+:root[data-stile="futuro"] .aurora-bg,
+:root[data-stile="futuro"] .utensils-bg,
+:root[data-stile="futuro"] .utensil { display: none !important; }
+:root[data-stile="futuro"] main,
+:root[data-stile="futuro"] .page { background: transparent; }
+
+/* ── Caratteri ──────────────────────────────────────────────────────────── */
+:root[data-stile="futuro"] button,
+:root[data-stile="futuro"] input,
+:root[data-stile="futuro"] select,
+:root[data-stile="futuro"] textarea { font-family: var(--f-font); }
+:root[data-stile="futuro"] .flabel,
+:root[data-stile="futuro"] .home-group-label,
+:root[data-stile="futuro"] .tutorial-menu-label {
+  font-family: var(--f-mono);
+  letter-spacing: .16em;
+  text-transform: uppercase;
+  font-size: 10.5px;
+  color: var(--f-mu);
+}
+:root[data-stile="futuro"] .home-group-label {
+  display: flex; align-items: center; gap: 10px;
+}
+:root[data-stile="futuro"] .home-group-label::after {
+  content: ""; flex: 1; height: 1px; background: var(--f-ln);
+}
+:root[data-stile="futuro"] .pg-title,
+:root[data-stile="futuro"] .modal-title,
+:root[data-stile="futuro"] .hcard-label,
+:root[data-stile="futuro"] .home-dash-card-title { letter-spacing: -.02em; }
+
+/* ── Barra in alto ──────────────────────────────────────────────────────── */
+:root[data-stile="futuro"] header {
+  background: color-mix(in srgb, var(--f-bg) 82%, transparent) !important;
+  border-bottom: 1px solid var(--f-ln) !important;
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  box-shadow: none !important;
+}
+:root[data-stile="futuro"] .btn-icon,
+:root[data-stile="futuro"] .back-arrow,
+:root[data-stile="futuro"] .js-btn-sync,
+:root[data-stile="futuro"] .js-btn-hamburger {
+  border-radius: 50% !important;
+  border: 1px solid var(--f-ln) !important;
+  background: transparent !important;
+  color: var(--text) !important;
+}
+
+/* ── Riquadri della home: pannelli ad angoli tagliati ───────────────────── */
+:root[data-stile="futuro"] .hcard {
+  background: var(--f-panel) !important;
+  border: 0 !important;
+  border-top: 1px solid rgba(var(--f-cy-rgb), .45) !important;
+  border-radius: 0 !important;
+  clip-path: polygon(16px 0, 100% 0, 100% calc(100% - 16px), calc(100% - 16px) 100%, 0 100%, 0 16px);
+  box-shadow: none !important;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+:root[data-stile="futuro"] .hcard-carico      { border-top-color: var(--f-li) !important; }
+:root[data-stile="futuro"] .hcard-in-uso      { border-top-color: var(--f-am) !important; }
+:root[data-stile="futuro"] .hcard-giacenze    { border-top-color: var(--f-vi) !important; }
+:root[data-stile="futuro"] .hcard-alert       { border-top-color: var(--f-rd) !important; }
+:root[data-stile="futuro"] .hcard-temperature { border-top-color: var(--f-cy) !important; }
+:root[data-stile="futuro"] .hcard-preparazioni{ border-top-color: var(--f-vi) !important; }
+:root[data-stile="futuro"] .hcard-prenotazioni{ border-top-color: var(--f-rd) !important; }
+
+/* icone: sfere luminose al posto dei quadratini colorati */
+:root[data-stile="futuro"] .hcard-icon {
+  border-radius: 50% !important;
+  background: radial-gradient(circle at 30% 30%, rgba(var(--f-cy-rgb), .22), transparent 70%) !important;
+  border: 1px solid rgba(var(--f-cy-rgb), .4);
+  color: var(--f-cy) !important;
+  box-shadow: inset 0 0 12px rgba(var(--f-cy-rgb), .15);
+}
+:root[data-stile="futuro"] .hcard-icon svg { stroke: currentColor; color: inherit; }
+:root[data-stile="futuro"] .hcard-carico .hcard-icon       { color: var(--f-li) !important; border-color: color-mix(in srgb, var(--f-li) 45%, transparent); background: radial-gradient(circle at 30% 30%, color-mix(in srgb, var(--f-li) 22%, transparent), transparent 70%) !important; }
+:root[data-stile="futuro"] .hcard-in-uso .hcard-icon       { color: var(--f-am) !important; border-color: color-mix(in srgb, var(--f-am) 45%, transparent); background: radial-gradient(circle at 30% 30%, color-mix(in srgb, var(--f-am) 22%, transparent), transparent 70%) !important; }
+:root[data-stile="futuro"] .hcard-giacenze .hcard-icon,
+:root[data-stile="futuro"] .hcard-preparazioni .hcard-icon { color: var(--f-vi) !important; border-color: color-mix(in srgb, var(--f-vi) 45%, transparent); background: radial-gradient(circle at 30% 30%, color-mix(in srgb, var(--f-vi) 22%, transparent), transparent 70%) !important; }
+:root[data-stile="futuro"] .hcard-alert .hcard-icon,
+:root[data-stile="futuro"] .hcard-prenotazioni .hcard-icon { color: var(--f-rd) !important; border-color: color-mix(in srgb, var(--f-rd) 45%, transparent); background: radial-gradient(circle at 30% 30%, color-mix(in srgb, var(--f-rd) 22%, transparent), transparent 70%) !important; }
+:root[data-stile="futuro"] .hcard-icon svg *,
+:root[data-stile="futuro"] .hcard-icon svg { stroke: currentColor !important; }
+
+/* Lista spesa in home: l'anello luminoso col numero al centro */
+:root[data-stile="futuro"] .hcard-spesa {
+  clip-path: none;
+  border-radius: 28px !important;
+  border: 1px solid var(--f-ln) !important;
+  position: relative;
+  min-height: 170px;
+}
+:root[data-stile="futuro"] .hcard-spesa .hcard-icon {
+  color: var(--f-cy) !important;
+  background: radial-gradient(circle at 30% 30%, rgba(var(--f-cy-rgb), .22), transparent 70%) !important;
+}
+:root[data-stile="futuro"] .hcard-spesa-num {
+  position: relative;
+  width: 112px; height: 112px;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  font-family: var(--f-font);
+  font-size: 44px; font-weight: 700; letter-spacing: -.04em;
+  color: var(--text) !important;
+  background:
+    radial-gradient(circle, var(--f-bg) 0 60%, transparent 61%),
+    conic-gradient(var(--f-cy) 0 72%, rgba(var(--f-cy-rgb), .14) 72% 100%);
+  box-shadow: var(--f-glow);
+  margin-top: 6px;
+}
+:root[data-stile="futuro"][data-theme="light"] .hcard-spesa-num {
+  background:
+    radial-gradient(circle, #FFFFFF 0 60%, transparent 61%),
+    conic-gradient(var(--f-cy) 0 72%, rgba(var(--f-cy-rgb), .14) 72% 100%);
+}
+:root[data-stile="futuro"] .hcard-spesa-lbl {
+  font-family: var(--f-mono); font-size: 10.5px; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--f-mu) !important; margin-top: 8px;
+}
+
+/* ── Dashboard (prima pagina della home) ────────────────────────────────── */
+:root[data-stile="futuro"] .home-dash-card {
+  background: var(--f-panel) !important;
+  border: 1px solid var(--f-ln) !important;
+  border-radius: 24px 24px 24px 6px !important;
+  box-shadow: none !important;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+:root[data-stile="futuro"] .home-dash-card-num { color: var(--f-cy) !important; text-shadow: 0 0 18px rgba(var(--f-cy-rgb), .45); }
+
+/* ── Pulsante Dashboard / Menu: capsula fluttuante ──────────────────────── */
+:root[data-stile="futuro"] .home-switcher {
+  background: color-mix(in srgb, var(--f-bg) 86%, transparent) !important;
+  border: 1px solid var(--f-ln) !important;
+  border-radius: 999px !important;
+  box-shadow: 0 18px 40px rgba(0,0,0,.45) !important;
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+}
+:root[data-stile="futuro"][data-theme="light"] .home-switcher { box-shadow: 0 14px 34px rgba(12,45,90,.16) !important; }
+:root[data-stile="futuro"] .home-switcher-btn { border-radius: 999px !important; color: var(--f-mu) !important; }
+:root[data-stile="futuro"] .home-switcher-btn.active {
+  color: var(--f-on-cy) !important;
+  background: radial-gradient(circle at 35% 30%, var(--f-orb-hi), var(--f-cy) 55%, var(--f-orb-lo)) !important;
+  box-shadow: var(--f-glow) !important;
+}
+:root[data-stile="futuro"] .btn-help {
+  border-radius: 50% !important;
+  border: 1px solid var(--f-ln) !important;
+  background: var(--f-panel) !important;
+  color: var(--text) !important;
+}
+
+/* ── Pulsanti ───────────────────────────────────────────────────────────── */
+:root[data-stile="futuro"] .btn-primary {
+  border-radius: 999px !important;
+  border: 0 !important;
+  color: var(--f-on-cy) !important;
+  background: radial-gradient(circle at 30% 20%, var(--f-orb-hi), var(--f-cy) 55%, var(--f-orb-lo)) !important;
+  box-shadow: var(--f-glow) !important;
+  font-weight: 700;
+}
+:root[data-stile="futuro"] .btn-secondary,
+:root[data-stile="futuro"] .btn-svuota,
+:root[data-stile="futuro"] .btn-print {
+  border-radius: 999px !important;
+  border: 1px solid var(--f-ln) !important;
+  background: transparent !important;
+}
+:root[data-stile="futuro"] .btn-scan {
+  border-radius: 999px !important;
+  border: 1.5px solid rgba(var(--f-cy-rgb), .6) !important;
+  color: var(--f-cy) !important;
+  background: radial-gradient(circle at 50% 0%, rgba(var(--f-cy-rgb), .14), transparent 70%) !important;
+  box-shadow: inset 0 0 18px rgba(var(--f-cy-rgb), .12);
+}
+:root[data-stile="futuro"] .btn-spesa-add {
+  border-radius: 999px !important;
+  border: 1px solid var(--f-cy) !important;
+  background: rgba(var(--f-cy-rgb), .12) !important;
+  color: var(--f-cy) !important;
+}
+
+/* ── Campi: capsule ─────────────────────────────────────────────────────── */
+:root[data-stile="futuro"] .finput,
+:root[data-stile="futuro"] .fselect,
+:root[data-stile="futuro"] .search-input,
+:root[data-stile="futuro"] .ftextarea {
+  background: var(--f-panel) !important;
+  border: 1px solid var(--f-ln) !important;
+  border-radius: 18px !important;
+  color: var(--text) !important;
+}
+:root[data-stile="futuro"] .search-input { border-radius: 999px !important; }
+:root[data-stile="futuro"] .finput:focus,
+:root[data-stile="futuro"] .fselect:focus,
+:root[data-stile="futuro"] .search-input:focus {
+  border-color: var(--f-cy) !important;
+  box-shadow: 0 0 0 3px rgba(var(--f-cy-rgb), .18) !important;
+  outline: none;
+}
+:root[data-stile="futuro"] .freadonly {
+  background: var(--f-panel-2) !important;
+  border: 1px dashed var(--f-ln) !important;
+  border-radius: 18px !important;
+}
+:root[data-stile="futuro"] .fpill,
+:root[data-stile="futuro"] .fselect-pill {
+  border-radius: 999px !important;
+  border: 1px solid var(--f-ln) !important;
+  background: transparent !important;
+  color: var(--f-mu) !important;
+  font-weight: 600;
+}
+:root[data-stile="futuro"] .fpill.active,
+:root[data-stile="futuro"] .fselect-pill.active {
+  background: var(--text) !important;
+  border-color: var(--text) !important;
+  color: var(--f-bg) !important;
+}
+
+/* ── Schede e pannelli generici ─────────────────────────────────────────── */
+:root[data-stile="futuro"] .form-card,
+:root[data-stile="futuro"] .giac-card,
+:root[data-stile="futuro"] .card {
+  background: var(--f-panel) !important;
+  border: 1px solid var(--f-ln) !important;
+  border-radius: 24px !important;
+  box-shadow: none !important;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+:root[data-stile="futuro"] .back-bar .back-label { font-weight: 700; letter-spacing: -.02em; }
+
+/* ── Lista spesa: ogni prodotto è una capsula con la sfera da spuntare ──── */
+:root[data-stile="futuro"] .spesa-item {
+  background: var(--f-panel) !important;
+  border: 1px solid var(--f-ln) !important;
+  border-radius: 999px !important;
+  box-shadow: none !important;
+  padding-left: 8px !important;
+  backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+}
+:root[data-stile="futuro"] .spesa-check {
+  width: 44px !important; height: 44px !important;
+  border-radius: 50% !important;
+  border: 1.5px solid rgba(var(--f-cy-rgb), .55) !important;
+  background: transparent !important;
+  box-shadow: inset 0 0 14px rgba(var(--f-cy-rgb), .12);
+}
+:root[data-stile="futuro"] .spesa-item.checked .spesa-check {
+  background: radial-gradient(circle at 35% 30%, var(--f-orb-hi), var(--f-cy) 55%, var(--f-orb-lo)) !important;
+  border-color: transparent !important;
+  box-shadow: var(--f-glow);
+}
+:root[data-stile="futuro"] .spesa-auto-tag {
+  font-family: var(--f-mono);
+  letter-spacing: .12em;
+  color: var(--f-am) !important;
+  background: transparent !important;
+  padding-left: 12px !important;
+  position: relative;
+}
+:root[data-stile="futuro"] .spesa-auto-tag::before {
+  content: ""; position: absolute; left: 0; top: 50%; width: 6px; height: 6px; margin-top: -3px;
+  border-radius: 50%; background: var(--f-am); box-shadow: 0 0 8px var(--f-am);
+}
+:root[data-stile="futuro"] .spesa-forn-select {
+  border-radius: 999px !important;
+  border: 1px solid var(--f-ln) !important;
+  background: transparent !important;
+  color: var(--text) !important;
+  font-family: var(--f-mono);
+  font-size: 11px;
+}
+:root[data-stile="futuro"] .spesa-right {
+  min-width: 54px; padding: 6px 8px;
+  border-radius: 999px;
+  background: rgba(var(--f-cy-rgb), .08);
+  text-align: center;
+}
+:root[data-stile="futuro"] .spesa-qty-lbl { font-family: var(--f-mono); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
+:root[data-stile="futuro"] .btn-spesa-del { border-radius: 50% !important; background: transparent !important; color: var(--f-rd) !important; }
+
+/* ── Finestre a comparsa ────────────────────────────────────────────────── */
+:root[data-stile="futuro"] .modal,
+:root[data-stile="futuro"] .lot-detail-sheet {
+  background: color-mix(in srgb, var(--f-bg) 92%, transparent) !important;
+  border: 1px solid var(--f-ln) !important;
+  border-bottom: 0 !important;
+  box-shadow: 0 -20px 60px rgba(0,0,0,.45) !important;
+  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+}
+:root[data-stile="futuro"] .modal-handle,
+:root[data-stile="futuro"] .lot-detail-handle { background: rgba(var(--f-cy-rgb), .5) !important; }
+
+/* ── Menu laterale ──────────────────────────────────────────────────────── */
+:root[data-stile="futuro"] .drw-item { border-radius: 999px !important; }
+:root[data-stile="futuro"] .drw-item.active {
+  background: rgba(var(--f-cy-rgb), .12) !important;
+  color: var(--f-cy) !important;
+}

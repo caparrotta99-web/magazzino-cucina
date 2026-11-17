@@ -142,8 +142,9 @@ def costruisci_richieste(sheet_id, headers, n_righe, n_regole_esistenti, bande_e
                                                    'fields': ','.join(fields)}})
         cella = dict(dati, startColumnIndex=idx, endColumnIndex=idx + 1)
         if tipo in COLONNE_NUMERICHE:
+            # numberFormat vuoto = formato "Automatico": il numero si vede
+            # com'è (0,75 resta 0,75), senza arrotondamenti né separatori
             req.append({'repeatCell': {'range': cella, 'cell': {'userEnteredFormat': {
-                'numberFormat': {'type': 'NUMBER', 'pattern': '#,##0.###'},
                 'horizontalAlignment': 'RIGHT'}},
                 'fields': 'userEnteredFormat(numberFormat,horizontalAlignment)'}})
         elif tipo in COLONNE_DATA:
@@ -174,8 +175,11 @@ def costruisci_richieste(sheet_id, headers, n_righe, n_regole_esistenti, bande_e
         req.append({'repeatCell': {'range': rng, 'cell': {'userEnteredFormat': {
             'horizontalAlignment': 'CENTER'}}, 'fields': 'userEnteredFormat.horizontalAlignment'}})
 
-    # 8. filtri sulla testata, per cercare per prodotto, fornitore, tipo...
-    req.append({'setBasicFilter': {'filter': {'range': dict(tutte, startRowIndex=0)}}})
+    # Niente filtro sulla testata: dal suo menu basta un tocco per ORDINARE il
+    # foglio, e l'app ricostruisce le giacenze seguendo l'ordine delle righe
+    # (l'ultima riga di un lotto è la sua rimanenza attuale). Per cercare si
+    # usa Cmd+F oppure Dati > Visualizzazioni filtro, che non riordinano
+    # il foglio per gli altri.
     return req
 
 
@@ -200,6 +204,16 @@ def main(applica):
         (sheets.SHEET_TEMPERATURE, ('esito',),          COLORI_ESITO),
         (sheets.SHEET_LISTINO,     (),                  None),
     ]
+    def fotografia_valori():
+        """Tutti i valori veri (non formattati) dei fogli toccati."""
+        foto = {}
+        for nome, _, _ in piano:
+            if nome in per_nome:
+                foto[nome] = sh.worksheet(nome).get_all_values(value_render_option='UNFORMATTED_VALUE')
+        return foto
+
+    prima = fotografia_valori() if applica else None
+
     for nome, col_colore, colori in piano:
         s = per_nome.get(nome)
         if not s:
@@ -224,6 +238,20 @@ def main(applica):
             print('  fatto')
     if not applica:
         print('\nProva: non ho cambiato niente. Per applicare: --applica')
+        return
+
+    # controllo finale: nessun valore deve essere cambiato
+    dopo = fotografia_valori()
+    tutto_uguale = True
+    for nome in prima:
+        if prima[nome] != dopo.get(nome):
+            tutto_uguale = False
+            print(f'ATTENZIONE: nel foglio {nome} i valori non coincidono con quelli di prima. '
+                  f'Ripristina da File > Cronologia versioni e avvisa.')
+        else:
+            righe = len(prima[nome])
+            print(f'- {nome}: {righe} righe, valori identici a prima')
+    sys.exit(0 if tutto_uguale else 1)
 
 
 if __name__ == '__main__':

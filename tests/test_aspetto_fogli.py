@@ -19,7 +19,7 @@ def test_nessuna_scrittura_di_valori():
     tipi = {list(r)[0] for r in _req()}
     assert tipi <= {'deleteConditionalFormatRule', 'deleteBanding', 'repeatCell', 'setDataValidation',
                     'updateSheetProperties', 'updateDimensionProperties', 'addBanding',
-                    'addConditionalFormatRule', 'setBasicFilter'}
+                    'addConditionalFormatRule'}
 
 
 def test_toglie_prima_le_vecchie_regole():
@@ -46,3 +46,15 @@ def test_riconosce_le_colonne():
     assert saf._tipo_colonna('ID') == 'id'
     assert saf._tipo_colonna('Tipo movimento') == 'tipo movimento'
     assert saf._tipo_colonna('Temp. rilevata') == 'rilevata'
+
+
+def test_niente_filtro_che_permetterebbe_di_riordinare():
+    assert not any('setBasicFilter' in r or 'sortRange' in r for r in _req())
+
+
+def test_numeri_in_formato_automatico_senza_arrotondare():
+    for r in _req():
+        rc = r.get('repeatCell')
+        if rc and 'numberFormat' in rc['fields']:
+            nf = rc['cell']['userEnteredFormat'].get('numberFormat')
+            assert nf is None or nf.get('type') == 'DATE'

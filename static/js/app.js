@@ -648,6 +648,8 @@ function closeDrawer() {
 // ── NAVIGATION ───────────────────────────────────────────────────────────
 function navTo(page) {
   closeDrawer();
+  // prenotazioni e mappa sala: per ora solo per chi può vederle (Simone)
+  if ((page === 'prenotazioni' || page === 'setup-sala') && !CAN_PRENOTAZIONI) page = 'home';
   S.activePage = page;
 
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
@@ -2452,6 +2454,12 @@ function _enrichItem(item) {
 }
 
 async function loadListaSpesa() {
+  if (IS_ADMIN && !S.contattiFornitori) {
+    S.contattiFornitori = {};
+    api('/api/fornitori-contatti').then(r => {
+      if (r && r.success) { S.contattiFornitori = r.contatti || {}; renderOrdinaBox(); }
+    });
+  }
   const data = await api('/api/lista-spesa');
   S.listaSpesa = (data.items || []).map(_enrichItem);
   _updateSpesaBadge();
@@ -2565,11 +2573,23 @@ function _closeSpesaDropdownDelayed() {
 }
 
 
+// Fornitori da cui si compra anche senza prodotti fissi nel listino: compaiono
+// sempre nelle scelte (lista spesa e nuovo prodotto), anche se nessun prodotto
+// del LISTINO li ha ancora come fornitore.
+const FORNITORI_SEMPRE = ['METRO'];
+
+function _tuttiFornitori() {
+  const dalListino = S.prodotti.map(p => p.fornitore).filter(Boolean);
+  const visti = new Set(dalListino.map(f => f.toUpperCase()));
+  const extra = FORNITORI_SEMPRE.filter(f => !visti.has(f.toUpperCase()));
+  return [...new Set([...dalListino, ...extra])].sort((a, b) => a.localeCompare(b, 'it', { sensitivity: 'base' }));
+}
+
 function _spesaItem(item) {
   const sottoScorta = item.scorta_min > 0 && item.qtaAttuale < item.scorta_min;
 
   // Costruisci lista fornitori: tutti dal listino + quello corrente se diverso
-  const tuttiF = [...new Set(S.prodotti.map(p => p.fornitore).filter(Boolean))].sort();
+  const tuttiF = _tuttiFornitori();
   if (item.fornitore && !tuttiF.includes(item.fornitore)) tuttiF.unshift(item.fornitore);
   const fornitoriOpts = ['', ...tuttiF].map(f =>
     `<option value="${esc(f)}" ${f === (item.fornitore || '') ? 'selected' : ''}>${f || '— fornitore —'}</option>`
@@ -2629,6 +2649,7 @@ function renderListaSpesa() {
   if (ctr) ctr.innerHTML = `<strong>${pendenti}</strong> prodott${pendenti === 1 ? 'o' : 'i'} da ordinare`;
 
   renderSpesaFilterPills();
+  renderOrdinaBox();
 
   const container = document.getElementById('spesa-list');
   if (!container) return;
@@ -3129,6 +3150,82 @@ async function removeSpesaItem(id) {
   await api(`/api/lista-spesa/${id}`, { method: 'DELETE' });
 }
 
+// ── ORDINA AL FORNITORE (WhatsApp o sito) ───────────────────────────────
+// Solo per l'admin, con un fornitore scelto nei filtri che ha un numero
+// WhatsApp o un sito in Admin → Fornitori. Dopo l'invio chiede se spuntare i
+// prodotti: spuntati così contano come ordine (spesa programmata) e finiscono
+// tra i "Comprati, da registrare", come quando spunti tutta la lista a mano.
+function _daOrdinare(forn) {
+  return S.listaSpesa.filter(i => !i.completato && i.fornitore === forn);
+}
+
+function _righeOrdine(items) {
+  return items.map(i => `- ${i.prodotto}${i.quantita ? ` x ${i.quantita}${i.unita ? ' ' + i.unita : ''}` : ''}`).join('\n');
+}
+
+function renderOrdinaBox() {
+  const box = document.getElementById('spesa-ordina-box');
+  if (!box) return;
+  const forn = S.spesaFornFilter;
+  const c = IS_ADMIN && forn && forn !== 'all' ? (S.contattiFornitori || {})[forn] : null;
+  const items = c ? _daOrdinare(forn) : [];
+  const attesa = S.ordineInviato && S.ordineInviato.fornitore === forn ? S.ordineInviato : null;
+  if (!c || (!items.length && !attesa)) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  box.style.display = '';
+  if (attesa) {
+    const n = attesa.ids.filter(id => S.listaSpesa.some(i => i.id === id)).length;
+    box.innerHTML = `
+      <div class="spesa-ordina-domanda">Hai inviato l'ordine a ${esc(forn)}?</div>
+      <div class="spesa-ordina-azioni">
+        <button type="button" class="spesa-ordina-si" onclick="confermaOrdineInviato()">Sì, spunta ${n} prodott${n === 1 ? 'o' : 'i'}</button>
+        <button type="button" class="spesa-ordina-no" onclick="annullaOrdineInviato()">Non ancora</button>
+      </div>`;
+    return;
+  }
+  const n = items.length;
+  box.innerHTML = c.whatsapp
+    ? `<button type="button" class="spesa-ordina-btn wa" onclick="ordinaFornitore()">Ordina a ${esc(forn)} su WhatsApp · ${n}</button>`
+    : `<button type="button" class="spesa-ordina-btn sito" onclick="ordinaFornitore()">Copia lista e apri ${esc(forn)} · ${n}</button>`;
+}
+
+async function ordinaFornitore() {
+  const forn = S.spesaFornFilter;
+  const c = (S.contattiFornitori || {})[forn];
+  const items = _daOrdinare(forn);
+  if (!c || !items.length) return;
+  S.ordineInviato = { fornitore: forn, ids: items.map(i => i.id) };
+  if (c.whatsapp) {
+    const testo = `Buongiorno, vorrei ordinare:\n${_righeOrdine(items)}\n\nGrazie${CURRENT_USER_NOME ? '\n' + CURRENT_USER_NOME : ''}`;
+    window.open(`https://wa.me/${c.whatsapp}?text=${encodeURIComponent(testo)}`, '_blank');
+  } else {
+    try {
+      await navigator.clipboard.writeText(items.map(i => `${i.prodotto}${i.quantita ? ` x ${i.quantita}${i.unita ? ' ' + i.unita : ''}` : ''}`).join('\n'));
+      toast('Lista copiata', 'success');
+    } catch (e) { /* se non si può copiare, il sito si apre comunque */ }
+    window.open(c.sito, '_blank');
+  }
+  renderOrdinaBox();
+}
+
+function annullaOrdineInviato() {
+  S.ordineInviato = null;
+  renderOrdinaBox();
+}
+
+async function confermaOrdineInviato() {
+  const ordine = S.ordineInviato;
+  S.ordineInviato = null;
+  if (!ordine) return;
+  const ids = ordine.ids.filter(id => S.listaSpesa.some(i => i.id === id && !i.completato));
+  S.listaSpesa = S.listaSpesa.filter(i => !ids.includes(i.id));
+  _updateSpesaBadge();
+  _renderDashDocks();
+  renderListaSpesa();
+  // come la spunta normale: il server li annota tra i comprati (= ordine)
+  await Promise.all(ids.map(id => api(`/api/lista-spesa/${id}?comprato=1`, { method: 'DELETE' })));
+  toast(`${ids.length} prodott${ids.length === 1 ? 'o spuntato' : 'i spuntati'}`, 'success');
+}
+
 async function copiaOrdineSpesa() {
   const attivi = S.listaSpesa.filter(i => !i.completato);
   const items = (S.spesaFornFilter && S.spesaFornFilter !== 'all')
@@ -3208,7 +3305,7 @@ function openNuovoProdotto(origin = 'carico') {
   document.getElementById('spesa-search-dropdown')?.classList.remove('open');
 
   // Populate fornitore select from already-loaded prodotti
-  const fornitori = [...new Set(S.prodotti.map(p => p.fornitore).filter(Boolean))].sort();
+  const fornitori = _tuttiFornitori();
   const selF = document.getElementById('np-fornitore');
   selF.innerHTML = '<option value="">Seleziona fornitore…</option>' +
     fornitori.map(f => `<option value="${esc(f)}">${esc(f)}</option>`).join('') +

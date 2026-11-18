@@ -2267,3 +2267,17 @@ body.comprati-aperto .btn-help { display: none !important; }
   border: 1px solid var(--border); border-radius: 100px; background: none; color: var(--muted);
 }
 .piano-sugg-btn.usa { border-color: var(--action); color: var(--action); }
+
+/* Lista spesa: ordina al fornitore scelto */
+.spesa-ordina { margin: -4px 0 16px; }
+.spesa-ordina-btn {
+  width: 100%; height: 46px; border-radius: 12px; cursor: pointer;
+  font: inherit; font-size: 14px; font-weight: 700; border: 1px solid transparent;
+}
+.spesa-ordina-btn.wa   { background: #25D366; color: #05301A; }
+.spesa-ordina-btn.sito { background: rgba(var(--action-rgb), .14); color: var(--action); border-color: rgba(var(--action-rgb), .4); }
+.spesa-ordina-domanda { font-size: 14px; font-weight: 600; margin-bottom: 8px; color: var(--text); }
+.spesa-ordina-azioni { display: flex; gap: 8px; }
+.spesa-ordina-azioni button { flex: 1; height: 42px; border-radius: 12px; cursor: pointer; font: inherit; font-size: 13px; font-weight: 700; }
+.spesa-ordina-si { background: var(--green, #22c55e); color: #fff; border: 0; }
+.spesa-ordina-no { background: transparent; color: var(--text); border: 1px solid var(--border); }

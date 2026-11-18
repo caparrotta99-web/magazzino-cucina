@@ -75,6 +75,7 @@ from database import (
     update_registro_lotto, log_modifica_registro, get_log_modifiche_registro,
     get_registro_by_mese, get_temperature_by_mese, get_report_mensile_anno,
     update_user_eliminazione_carichi_permesso, update_user_menu_giorno_permesso,
+    get_contatti_fornitori, set_contatto_fornitore,
     delete_registro_row, log_eliminazione_carico, get_log_eliminazioni_registro,
     insert_preparazione, insert_preparazione_ingrediente,
     get_preparazioni, get_preparazione_by_id, get_preparazione_ingredienti,
@@ -279,6 +280,27 @@ def gestione_sala_required(f):
             abort(403)
         return f(*args, **kwargs)
     return decorated
+
+
+# Prenotazioni per ora le vede solo Simone (admin): i colleghi non hanno né la
+# pagina né i dati. Per riaprirle a tutti basta mettere False.
+PRENOTAZIONI_SOLO_ADMIN = True
+
+
+def puo_vedere_prenotazioni(utente):
+    return utente.is_authenticated and (utente.role == 'admin' or not PRENOTAZIONI_SOLO_ADMIN)
+
+
+def prenotazioni_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        if not puo_vedere_prenotazioni(current_user):
+            abort(403)
+        return f(*args, **kwargs)
+    return decorated
+
+
+app.jinja_env.globals['puo_vedere_prenotazioni'] = puo_vedere_prenotazioni
 
 
 def chat_required(f):
@@ -927,9 +949,36 @@ def _render_admin_page(**extra):
     for t in reset_tokens:
         t['scade_alle']     = datetime.fromisoformat(t['expires_at']).strftime('%H:%M')
         t['richiesto_alle'] = datetime.fromisoformat(t['created_at']).strftime('%H:%M') if t['created_at'] else '—'
+    contatti = get_contatti_fornitori()
+    nomi = sorted(set(get_fornitori()) | set(FORNITORI_SEMPRE) | set(contatti), key=str.lower)
+    fornitori = [{'nome': n, **contatti.get(n, {'whatsapp': '', 'sito': ''})} for n in nomi]
     return render_template(
-        'admin.html', users=get_all_users(), reset_tokens=reset_tokens, **extra
+        'admin.html', users=get_all_users(), reset_tokens=reset_tokens, fornitori=fornitori, **extra
     )
+
+
+# Fornitori da cui si compra anche senza prodotti fissi nel listino (vedi app.js)
+FORNITORI_SEMPRE = ('METRO',)
+
+
+@app.route('/admin/fornitore-contatto', methods=['POST'])
+@login_required
+@admin_required
+def admin_set_fornitore_contatto():
+    nome = (request.form.get('nome') or '').strip()
+    if not nome:
+        abort(400)
+    set_contatto_fornitore(nome, request.form.get('whatsapp', ''), request.form.get('sito', ''))
+    return redirect(url_for('admin_page') + '#fornitori')
+
+
+@app.route('/api/fornitori-contatti')
+@login_required
+@admin_required
+def api_fornitori_contatti():
+    """Per il tasto "Ordina" della lista spesa: solo admin, è Simone che ordina
+    (così i colleghi non mandano ordini doppi)."""
+    return jsonify({'success': True, 'contatti': get_contatti_fornitori()})
 
 
 @app.route('/admin')
@@ -2864,6 +2913,7 @@ def api_tavolo_occupato(tavolo_id):
 
 @app.route('/api/prenotazioni', methods=['GET'])
 @login_required
+@prenotazioni_required
 def api_prenotazioni_list():
     data = (request.args.get('data') or now_it().strftime('%Y-%m-%d')).strip()
     return jsonify({
@@ -2876,6 +2926,7 @@ def api_prenotazioni_list():
 
 @app.route('/api/prenotazioni', methods=['POST'])
 @login_required
+@prenotazioni_required
 @gestione_sala_required
 def api_prenotazioni_crea():
     d          = request.get_json(force=True)
@@ -2909,6 +2960,7 @@ def api_prenotazioni_crea():
 
 @app.route('/api/prenotazioni/<int:prenotazione_id>', methods=['PUT'])
 @login_required
+@prenotazioni_required
 @gestione_sala_required
 def api_prenotazioni_modifica(prenotazione_id):
     esistente = get_prenotazione_by_id(prenotazione_id)
@@ -2950,6 +3002,7 @@ def api_prenotazioni_modifica(prenotazione_id):
 
 @app.route('/api/prenotazioni/<int:prenotazione_id>', methods=['DELETE'])
 @login_required
+@prenotazioni_required
 @gestione_sala_required
 def api_prenotazioni_elimina(prenotazione_id):
     prenotazione = get_prenotazione_by_id(prenotazione_id)
@@ -2962,6 +3015,7 @@ def api_prenotazioni_elimina(prenotazione_id):
 
 @app.route('/api/prenotazioni/<int:prenotazione_id>/stato', methods=['POST'])
 @login_required
+@prenotazioni_required
 @gestione_sala_required
 def api_prenotazioni_stato(prenotazione_id):
     """Avanza lo stato di servizio: prenotato -> arrivato -> conto -> libero.
@@ -3004,6 +3058,7 @@ def api_sala_disposizione():
 
 @app.route('/api/prenotazioni/calendario', methods=['GET'])
 @login_required
+@prenotazioni_required
 def api_prenotazioni_calendario():
     anno = request.args.get('anno', type=int) or now_it().year
     mese = request.args.get('mese', type=int) or now_it().month

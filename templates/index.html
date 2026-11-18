@@ -176,7 +176,7 @@
       <span class="lbl">Piano settimanale</span>
     </button>
 
-    {% if current_user.is_authenticated %}
+    {% if puo_vedere_prenotazioni(current_user) %}
     <button class="drw-item" data-page="prenotazioni" onclick="navTo('prenotazioni')">
       <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
       <span class="lbl">Prenotazioni</span>
@@ -511,7 +511,7 @@
               </div>
             </div>
 
-            {% if current_user.is_authenticated %}
+            {% if puo_vedere_prenotazioni(current_user) %}
             <div class="home-group-label">Sala</div>
             <div class="home-grid">
 
@@ -1302,6 +1302,9 @@
       <button class="fpill active" onclick="setSpesaFilter('all', this)">Tutti</button>
     </div>
 
+    <!-- Ordina al fornitore scelto (solo admin): WhatsApp o sito -->
+    <div class="spesa-ordina" id="spesa-ordina-box" style="display:none"></div>
+
     <!-- Panel aggiunta manuale -->
     <div class="spesa-add-panel" id="spesa-add-panel">
       <div class="fgroup" style="margin-bottom:10px">
@@ -1973,6 +1976,8 @@ const CAN_CHAT = {{ 'true' if current_user.is_authenticated and current_user.puo
 const CURRENT_USER_ID = {{ current_user.id if current_user.is_authenticated else 0 }};
 const USER_REPARTO = "{{ current_user.reparto if current_user.is_authenticated else '' }}";
 const IS_ADMIN = {{ 'true' if current_user.is_authenticated and current_user.role == 'admin' else 'false' }};
+const CAN_PRENOTAZIONI = {{ 'true' if puo_vedere_prenotazioni(current_user) else 'false' }};
+const CURRENT_USER_NOME = {{ (current_user.nome.split(' ')[0] if current_user.is_authenticated else '') | tojson }};
 const VAPID_PUBLIC_KEY = "{{ vapid_public_key }}";
 const CHAT_MIE_CANALI = {{ (current_user.canali_chat if current_user.is_authenticated else []) | tojson }};
 </script>

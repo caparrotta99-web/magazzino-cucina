@@ -745,3 +745,10 @@
 :root[data-stile="futuro"] .home-dash-pranzo .home-dash-card-title::before { background: var(--f-li); box-shadow: 0 0 10px var(--f-li); }
 :root[data-stile="futuro"] .pranzo-conta { font-family: var(--f-mono); font-size: 11px; letter-spacing: .06em; color: var(--f-mu) !important; opacity: 1; }
 :root[data-stile="futuro"] .pranzo-piano-btn { border-radius: 999px !important; border-color: var(--f-ln) !important; color: var(--f-tx, inherit) !important; }
+
+/* Lista spesa: tasto ordina al fornitore */
+:root[data-stile="futuro"] .spesa-ordina-btn,
+:root[data-stile="futuro"] .spesa-ordina-azioni button { border-radius: 999px !important; }
+:root[data-stile="futuro"] .spesa-ordina-btn.sito { background: transparent !important; color: var(--f-cy) !important; border-color: rgba(var(--f-cy-rgb), .5) !important; }
+:root[data-stile="futuro"] .spesa-ordina-si { background: var(--f-li) !important; color: #05070B !important; }
+:root[data-stile="futuro"] .spesa-ordina-no { border-color: var(--f-ln) !important; }

@@ -487,6 +487,13 @@ def db_init():
                 creato_il TEXT NOT NULL,
                 stato     TEXT NOT NULL DEFAULT 'attesa'
             )""",
+            # Come si ordina a ogni fornitore: numero WhatsApp e/o sito.
+            # I numeri stanno solo nel database, mai nel codice (repo pubblico).
+            f"""CREATE TABLE IF NOT EXISTS fornitori_contatti (
+                nome      TEXT PRIMARY KEY,
+                whatsapp  TEXT NOT NULL DEFAULT '',
+                sito      TEXT NOT NULL DEFAULT ''
+            )""",
             f"""CREATE TABLE IF NOT EXISTS menu_settimane (
                 id             {pk},
                 lunedi         TEXT NOT NULL,
@@ -1741,6 +1748,39 @@ def pubblica_settimana_menu(lunedi, utente, pubblicato=True):
     _salva_settimana(lunedi, pubblicato=1 if pubblicato else 0,
                      pubblicato_il=now_it().isoformat(timespec='seconds') if pubblicato else '',
                      pubblicato_da=utente if pubblicato else '')
+
+
+# ─── CONTATTI FORNITORI (per ordinare) ───────────────────────────────────────
+
+def normalizza_whatsapp(numero):
+    """Solo cifre, con il prefisso italiano se manca: '333 123 4567' -> '393331234567'."""
+    cifre = ''.join(c for c in str(numero or '') if c.isdigit())
+    if cifre.startswith('00'):
+        cifre = cifre[2:]
+    if len(cifre) in (9, 10) and cifre[0] in '03':
+        cifre = '39' + cifre
+    return cifre
+
+
+def get_contatti_fornitori():
+    with get_conn() as conn:
+        righe = _rows(conn.execute("SELECT nome, whatsapp, sito FROM fornitori_contatti ORDER BY nome"))
+    return {r['nome']: {'whatsapp': r['whatsapp'], 'sito': r['sito']} for r in righe}
+
+
+def set_contatto_fornitore(nome, whatsapp='', sito=''):
+    nome = (nome or '').strip()
+    if not nome:
+        raise ValueError('nome fornitore mancante')
+    whatsapp = normalizza_whatsapp(whatsapp)
+    sito = (sito or '').strip()
+    if sito and not sito.lower().startswith(('http://', 'https://')):
+        sito = 'https://' + sito
+    with get_conn() as conn:
+        conn.execute("DELETE FROM fornitori_contatti WHERE nome = ?", (nome,))
+        if whatsapp or sito:
+            conn.execute("INSERT INTO fornitori_contatti (nome, whatsapp, sito) VALUES (?, ?, ?)",
+                         (nome, whatsapp, sito))
 
 
 def set_giorno_chiuso(lunedi, data, chiuso):

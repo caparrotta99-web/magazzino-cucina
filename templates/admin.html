@@ -97,6 +97,14 @@
 .settings-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
 .settings-row form { margin: 0; }
 .settings-label { font-size: 13px; font-weight: 600; color: var(--text); }
+.fornitori-nota { font-size: 13px; color: var(--muted); margin: -4px 0 12px; line-height: 1.45; }
+.fornitore-card { display: flex; flex-direction: column; gap: 10px; margin: 0; }
+.fornitore-campi { display: flex; gap: 8px; flex-wrap: wrap; }
+.fornitore-input {
+  flex: 1 1 160px; min-width: 0; height: 40px; padding: 0 12px; border-radius: 10px;
+  border: 1.5px solid var(--border); background: var(--surface-2); color: var(--text);
+  font: inherit; font-size: 14px;
+}
 
 .you-label { font-size: 12px; color: var(--muted-2); font-style: italic; align-self: center; }
 .empty { text-align: center; padding: 56px 24px; color: var(--muted-2); }
@@ -323,6 +331,22 @@
     {% endfor %}
   </div>
   {% endif %}
+
+  <div class="section-label" id="fornitori">Fornitori: come ordinare</div>
+  <div class="fornitori-nota">Il numero WhatsApp fa comparire nella lista spesa il tasto "Ordina su WhatsApp" con il messaggio già scritto. Il sito fa comparire "Copia lista e apri il sito". Lascia vuoto per non mostrare niente.</div>
+  <div class="user-list">
+    {% for f in fornitori %}
+    <form class="user-card fornitore-card" method="post" action="/admin/fornitore-contatto">
+      <input type="hidden" name="nome" value="{{ f.nome }}">
+      <div class="user-nome">{{ f.nome }}</div>
+      <div class="fornitore-campi">
+        <input class="fornitore-input" type="tel" name="whatsapp" value="{{ f.whatsapp }}" placeholder="WhatsApp (es. 333 1234567)" autocomplete="off">
+        <input class="fornitore-input" type="url" name="sito" value="{{ f.sito }}" placeholder="Sito per ordinare" autocomplete="off">
+        <button type="submit" class="btn-action">Salva</button>
+      </div>
+    </form>
+    {% endfor %}
+  </div>
 
   <div class="section-label">Utenti attivi ({{ attivi|length }})</div>
   <div class="user-list">

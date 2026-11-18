@@ -680,3 +680,43 @@
 :root[data-stile="futuro"] .suggerito-row { border-radius: 999px !important; border-color: var(--f-ln) !important; background: var(--f-panel); }
 :root[data-stile="futuro"] .suggerito-check { accent-color: var(--f-cy); }
 :root[data-stile="futuro"] .suggerito-sub.ritardo { color: var(--f-am) !important; }
+
+/* ── Piano settimanale ──────────────────────────────────────────────────── */
+:root[data-stile="futuro"] .hcard-piano { border-top-color: var(--f-li) !important; }
+:root[data-stile="futuro"] .hcard-piano .hcard-icon { color: var(--f-li) !important; border-color: color-mix(in srgb, var(--f-li) 45%, transparent); background: radial-gradient(circle at 30% 30%, color-mix(in srgb, var(--f-li) 22%, transparent), transparent 70%) !important; }
+:root[data-stile="futuro"] .home-grid:has(.hcard-piano) { grid-template-columns: 1fr; }
+:root[data-stile="futuro"] .hcard-piano {
+  flex-direction: row !important; align-items: center; gap: 12px; min-height: 0;
+  padding: 8px 16px 8px 8px !important; clip-path: none !important;
+  border-radius: 999px !important; border: 1px solid var(--f-ln) !important;
+}
+:root[data-stile="futuro"] .hcard-piano .hcard-icon { width: 44px; height: 44px; }
+:root[data-stile="futuro"] .hcard-piano .hcard-label { font-size: 15px; font-weight: 600; }
+:root[data-stile="futuro"] .piano-nav-btn { border-radius: 50% !important; border-color: var(--f-ln) !important; background: transparent !important; }
+:root[data-stile="futuro"] .piano-settimana { font-size: 20px; letter-spacing: -.02em; }
+:root[data-stile="futuro"] .piano-stato { font-family: var(--f-mono); font-size: 10px; letter-spacing: .14em; text-transform: uppercase; }
+:root[data-stile="futuro"] .piano-stato.ok { color: var(--f-li) !important; }
+:root[data-stile="futuro"] .piano-stato.bozza { color: var(--f-am) !important; }
+:root[data-stile="futuro"] .piano-azioni button { border-radius: 999px !important; height: 46px; }
+:root[data-stile="futuro"] .piano-giorno {
+  background: var(--f-panel) !important; box-shadow: none !important;
+  border: 1px solid var(--f-ln); border-radius: 24px 24px 24px 6px !important;
+}
+:root[data-stile="futuro"] .piano-giorno.oggi { outline: 1px solid var(--f-cy); box-shadow: 0 0 24px rgba(var(--f-cy-rgb), .2) !important; }
+:root[data-stile="futuro"] .piano-giorno-nome em { background: rgba(var(--f-cy-rgb), .14) !important; color: var(--f-cy) !important; font-family: var(--f-mono); letter-spacing: .1em; text-transform: uppercase; }
+:root[data-stile="futuro"] .piano-col-tit { font-family: var(--f-mono); font-size: 10px; letter-spacing: .18em; color: var(--f-mu) !important; }
+:root[data-stile="futuro"] .piano-posto { border-radius: 16px !important; border-color: var(--f-ln) !important; }
+:root[data-stile="futuro"] .piano-chiuso-btn { border-color: var(--f-ln) !important; color: var(--f-mu) !important; }
+:root[data-stile="futuro"] .piano-cat { font-family: var(--f-mono); letter-spacing: .06em; text-transform: uppercase; }
+:root[data-stile="futuro"] .piano-cat.cat-pesce { color: var(--f-cy) !important; background: rgba(var(--f-cy-rgb), .12) !important; }
+:root[data-stile="futuro"] .piano-cat.cat-carne { color: var(--f-rd) !important; background: color-mix(in srgb, var(--f-rd) 14%, transparent) !important; }
+:root[data-stile="futuro"] .piano-cat.cat-verdure { color: var(--f-li) !important; background: color-mix(in srgb, var(--f-li) 14%, transparent) !important; }
+:root[data-stile="futuro"] .piatto-alt { border-radius: 999px !important; border-color: var(--f-ln) !important; background: var(--f-panel) !important; }
+:root[data-stile="futuro"] .pranzo-tit { font-family: var(--f-mono); letter-spacing: .18em; color: var(--f-mu) !important; }
+:root[data-stile="futuro"] .home-dash-pranzo .home-dash-card-title {
+  font-family: var(--f-mono); font-size: 10px; font-weight: 700; letter-spacing: .18em; text-transform: uppercase; color: var(--f-li) !important;
+}
+:root[data-stile="futuro"] .piano-azioni .btn-spesa-add {
+  width: auto !important; font-size: 14px !important; font-weight: 700; gap: 6px !important;
+  border-radius: 999px !important; padding: 0 18px !important;
+}

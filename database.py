@@ -451,6 +451,31 @@ def db_init():
                 utente      TEXT NOT NULL DEFAULT '',
                 stato       TEXT NOT NULL DEFAULT 'da_registrare'
             )""",
+            # Piano settimanale: archivio dei piatti del menu del giorno e
+            # menu di ogni giorno (pranzo: 4 primi + 4 secondi)
+            f"""CREATE TABLE IF NOT EXISTS piatti (
+                id        {pk},
+                nome      TEXT NOT NULL,
+                tipo      TEXT NOT NULL,
+                categoria TEXT NOT NULL DEFAULT '',
+                creato_il TEXT NOT NULL
+            )""",
+            f"""CREATE TABLE IF NOT EXISTS menu_giorno (
+                id        {pk},
+                data      TEXT NOT NULL,
+                tipo      TEXT NOT NULL,
+                posizione INTEGER NOT NULL,
+                piatto    TEXT NOT NULL,
+                categoria TEXT NOT NULL DEFAULT ''
+            )""",
+            f"""CREATE TABLE IF NOT EXISTS menu_settimane (
+                id             {pk},
+                lunedi         TEXT NOT NULL,
+                pubblicato     INTEGER NOT NULL DEFAULT 0,
+                pubblicato_il  TEXT NOT NULL DEFAULT '',
+                pubblicato_da  TEXT NOT NULL DEFAULT '',
+                giorni_chiusi  TEXT NOT NULL DEFAULT ''
+            )""",
             f"""CREATE TABLE IF NOT EXISTS sheets_coda (
                 id        {pk},
                 azione    TEXT NOT NULL,
@@ -1584,6 +1609,81 @@ def get_storico_ordini():
 def get_nomi_in_lista_spesa():
     with get_conn() as conn:
         return [r['prodotto'] for r in _rows(conn.execute("SELECT prodotto FROM lista_spesa"))]
+
+
+# ─── PIANO SETTIMANALE (menu del giorno) ─────────────────────────────────────
+TIPI_PIATTO = ('primo', 'secondo')
+CATEGORIE_PIATTO = ('pesce', 'carne', 'verdure', 'altro')
+POSTI_PER_TIPO = 4
+
+
+def get_piatti():
+    with get_conn() as conn:
+        return _rows(conn.execute("SELECT * FROM piatti ORDER BY LOWER(nome)"))
+
+
+def salva_piatto_archivio(nome, tipo, categoria=''):
+    """Aggiunge il piatto all'archivio (o ne aggiorna la categoria)."""
+    nome = ' '.join((nome or '').split())
+    if not nome or tipo not in TIPI_PIATTO:
+        return
+    categoria = categoria if categoria in CATEGORIE_PIATTO else ''
+    with get_conn() as conn:
+        esiste = _row(conn.execute(
+            "SELECT id, categoria FROM piatti WHERE LOWER(nome) = LOWER(?) AND tipo = ?", (nome, tipo)))
+        if esiste:
+            if categoria and categoria != esiste['categoria']:
+                conn.execute("UPDATE piatti SET categoria = ? WHERE id = ?", (categoria, esiste['id']))
+        else:
+            conn.execute("INSERT INTO piatti (nome, tipo, categoria, creato_il) VALUES (?, ?, ?, ?)",
+                         (nome, tipo, categoria, now_it().isoformat(timespec='seconds')))
+
+
+def get_menu_periodo(dal, al):
+    """Tutti i piatti messi nel menu tra due date (incluse)."""
+    with get_conn() as conn:
+        return _rows(conn.execute(
+            "SELECT data, tipo, posizione, piatto, categoria FROM menu_giorno "
+            "WHERE data >= ? AND data <= ? ORDER BY data, tipo, posizione", (dal, al)))
+
+
+def set_piatto_menu(data, tipo, posizione, piatto, categoria=''):
+    """Mette (o toglie, con piatto vuoto) un piatto in un posto del menu."""
+    piatto = ' '.join((piatto or '').split())
+    with get_conn() as conn:
+        conn.execute("DELETE FROM menu_giorno WHERE data = ? AND tipo = ? AND posizione = ?",
+                     (data, tipo, int(posizione)))
+        if piatto:
+            conn.execute("INSERT INTO menu_giorno (data, tipo, posizione, piatto, categoria) "
+                         "VALUES (?, ?, ?, ?, ?)", (data, tipo, int(posizione), piatto, categoria or ''))
+    if piatto:
+        salva_piatto_archivio(piatto, tipo, categoria)
+
+
+def get_settimana_menu(lunedi):
+    with get_conn() as conn:
+        r = _row(conn.execute("SELECT * FROM menu_settimane WHERE lunedi = ?", (lunedi,)))
+    return r or {'lunedi': lunedi, 'pubblicato': 0, 'pubblicato_il': '', 'pubblicato_da': '', 'giorni_chiusi': ''}
+
+
+def _salva_settimana(lunedi, **campi):
+    with get_conn() as conn:
+        if not _row(conn.execute("SELECT id FROM menu_settimane WHERE lunedi = ?", (lunedi,))):
+            conn.execute("INSERT INTO menu_settimane (lunedi) VALUES (?)", (lunedi,))
+        for k, v in campi.items():
+            conn.execute(f"UPDATE menu_settimane SET {k} = ? WHERE lunedi = ?", (v, lunedi))
+
+
+def pubblica_settimana_menu(lunedi, utente, pubblicato=True):
+    _salva_settimana(lunedi, pubblicato=1 if pubblicato else 0,
+                     pubblicato_il=now_it().isoformat(timespec='seconds') if pubblicato else '',
+                     pubblicato_da=utente if pubblicato else '')
+
+
+def set_giorno_chiuso(lunedi, data, chiuso):
+    giorni = set(filter(None, get_settimana_menu(lunedi)['giorni_chiusi'].split(',')))
+    (giorni.add if chiuso else giorni.discard)(data)
+    _salva_settimana(lunedi, giorni_chiusi=','.join(sorted(giorni)))
 
 
 def get_comprato(comprato_id):

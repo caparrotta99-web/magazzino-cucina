@@ -2168,3 +2168,60 @@ body.comprati-aperto .btn-help { display: none !important; }
 .suggerito-qty { font-size: 13px; font-weight: 600; color: var(--muted); white-space: nowrap; }
 #suggeriti-aggiungi { font-weight: 700; }
 #suggeriti-aggiungi:disabled { opacity: .45; cursor: default; }
+
+/* ─── PIANO SETTIMANALE ─────────────────────────────────────────────────── */
+.hcard-piano .hcard-icon { background: var(--teal); }
+.piano-nav { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+.piano-nav-btn {
+  width: 42px; height: 42px; border-radius: 12px; border: 1px solid var(--border);
+  background: var(--card); color: var(--text); font-size: 24px; line-height: 1; cursor: pointer;
+}
+.piano-nav-centro { text-align: center; }
+.piano-settimana { font-size: 17px; font-weight: 700; }
+.piano-stato { font-size: 12px; margin-top: 2px; color: var(--muted); }
+.piano-stato.ok { color: var(--green, #10b981); }
+.piano-stato.bozza { color: var(--orange, #f59e0b); }
+.piano-azioni { display: flex; gap: 8px; margin-bottom: 14px; }
+.piano-azioni button { flex: 1; height: 42px; justify-content: center; }
+.piano-giorno {
+  background: var(--card); border-radius: 16px; box-shadow: var(--shadow);
+  padding: 12px; margin-bottom: 12px;
+}
+.piano-giorno.oggi { outline: 2px solid var(--action); }
+.piano-giorno-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.piano-giorno-nome { font-size: 15px; font-weight: 700; }
+.piano-giorno-nome span { font-weight: 500; color: var(--muted); margin-left: 4px; }
+.piano-giorno-nome em {
+  font-style: normal; font-size: 11px; font-weight: 700; margin-left: 8px; padding: 2px 8px;
+  border-radius: 100px; background: rgba(var(--action-rgb), .15); color: var(--action);
+}
+.piano-chiuso-btn {
+  font: inherit; font-size: 12px; font-weight: 600; padding: 4px 10px; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 100px; background: none; color: var(--muted);
+}
+.piano-giorno.chiuso { opacity: .6; }
+.piano-chiuso-txt { font-size: 13px; color: var(--muted); padding: 6px 2px; }
+.piano-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.piano-col-tit { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--muted); margin: 0 2px 6px; }
+.piano-posto {
+  width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 3px;
+  min-height: 44px; padding: 7px 9px; margin-bottom: 6px; text-align: left; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 10px; background: none; color: var(--text); font: inherit;
+}
+.piano-posto:disabled { cursor: default; }
+.piano-posto.vuoto { color: var(--muted); border-style: dashed; font-size: 12px; justify-content: center; }
+.piano-piatto { font-size: 13px; font-weight: 600; line-height: 1.25; }
+.piano-cat { font-size: 10px; font-weight: 700; padding: 1px 7px; border-radius: 100px; background: var(--surface-2); color: var(--muted); }
+.piano-cat.cat-pesce { background: rgba(59,130,246,.15); color: #3b82f6; }
+.piano-cat.cat-carne { background: rgba(239,68,68,.15); color: #ef4444; }
+.piano-cat.cat-verdure { background: rgba(16,185,129,.15); color: #10b981; }
+.piatto-alt {
+  width: 100%; display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  padding: 9px 12px; margin-top: 6px; text-align: left; cursor: pointer; font: inherit;
+  border: 1px solid var(--border); border-radius: 12px; background: none; color: var(--text);
+}
+.piatto-alt span { font-size: 14px; font-weight: 600; }
+.piatto-alt small { font-size: 11px; color: var(--muted); }
+/* Dashboard: Oggi a pranzo */
+.pranzo-colonne { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.pranzo-tit { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: rgba(255,255,255,.55); margin-top: 8px; }

@@ -1565,6 +1565,141 @@ def api_spesa_suggeriti():
     return jsonify({'success': True, 'suggeriti': suggeriti})
 
 
+# ─── PIANO SETTIMANALE (menu del giorno a pranzo) ───────────────────────────
+# Tutti vedono il menu pubblicato; solo l'admin lo compila, lo fa proporre
+# all'app e lo pubblica.
+
+def _lunedi_di(valore=None):
+    from datetime import date as _date
+    try:
+        g = _date.fromisoformat(str(valore)[:10]) if valore else today_it()
+    except ValueError:
+        g = today_it()
+    return g - timedelta(days=g.weekday())
+
+
+def _piano_json(lunedi):
+    import database as _db
+    from programma_menu import giorni_settimana
+    domenica = lunedi + timedelta(days=6)
+    sett = _db.get_settimana_menu(lunedi.isoformat())
+    admin = current_user.role == 'admin'
+    visibile = admin or bool(sett['pubblicato'])
+    menu = _db.get_menu_periodo(lunedi.isoformat(), domenica.isoformat()) if visibile else []
+    chiusi = set(filter(None, sett['giorni_chiusi'].split(',')))
+    giorni = []
+    for g in giorni_settimana(lunedi):
+        iso = g.isoformat()
+        del_giorno = [m for m in menu if m['data'] == iso]
+        giorni.append({
+            'data': iso,
+            'chiuso': iso in chiusi,
+            'primi':   {m['posizione']: m for m in del_giorno if m['tipo'] == 'primo'},
+            'secondi': {m['posizione']: m for m in del_giorno if m['tipo'] == 'secondo'},
+        })
+    return {'success': True, 'lunedi': lunedi.isoformat(), 'oggi': today_it().isoformat(),
+            'pubblicato': bool(sett['pubblicato']), 'pubblicato_da': sett['pubblicato_da'],
+            'visibile': visibile, 'puo_modificare': admin, 'giorni': giorni}
+
+
+@app.route('/api/piano')
+@login_required
+def api_piano():
+    return jsonify(_piano_json(_lunedi_di(request.args.get('settimana'))))
+
+
+@app.route('/api/piano/oggi')
+@login_required
+def api_piano_oggi():
+    """Menu di oggi per la home: solo se la settimana è pubblicata."""
+    p = _piano_json(_lunedi_di())
+    oggi = next(g for g in p['giorni'] if g['data'] == p['oggi'])
+    mostra = p['pubblicato'] and not oggi['chiuso']
+    return jsonify({'success': True, 'pubblicato': mostra,
+                    'primi': [oggi['primi'][k]['piatto'] for k in sorted(oggi['primi'])] if mostra else [],
+                    'secondi': [oggi['secondi'][k]['piatto'] for k in sorted(oggi['secondi'])] if mostra else []})
+
+
+@app.route('/api/piano/posto', methods=['POST'])
+@login_required
+@admin_required
+def api_piano_posto():
+    import database as _db
+    d = request.get_json(force=True) or {}
+    tipo = d.get('tipo')
+    try:
+        posizione = int(d.get('posizione'))
+        from datetime import date as _date
+        data = _date.fromisoformat(str(d.get('data'))[:10]).isoformat()
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'error': 'Dati non validi'}), 400
+    if tipo not in _db.TIPI_PIATTO or not 1 <= posizione <= _db.POSTI_PER_TIPO:
+        return jsonify({'success': False, 'error': 'Dati non validi'}), 400
+    categoria = d.get('categoria') if d.get('categoria') in _db.CATEGORIE_PIATTO else ''
+    _db.set_piatto_menu(data, tipo, posizione, d.get('piatto') or '', categoria)
+    return jsonify(_piano_json(_lunedi_di(data)))
+
+
+@app.route('/api/piano/alternative')
+@login_required
+@admin_required
+def api_piano_alternative():
+    import database as _db
+    from datetime import date as _date
+    from programma_menu import alternative
+    try:
+        giorno = _date.fromisoformat(str(request.args.get('data'))[:10])
+    except ValueError:
+        return jsonify({'success': False, 'error': 'Data non valida'}), 400
+    tipo = request.args.get('tipo')
+    menu = _db.get_menu_periodo((giorno - timedelta(days=30)).isoformat(), (giorno + timedelta(days=30)).isoformat())
+    archivio = [{'nome': p['nome'], 'tipo': p['tipo'], 'categoria': p['categoria']} for p in _db.get_piatti()]
+    return jsonify({'success': True,
+                    'alternative': alternative(giorno, tipo, archivio, menu),
+                    'archivio': [p for p in archivio if p['tipo'] == tipo]})
+
+
+@app.route('/api/piano/proponi', methods=['POST'])
+@login_required
+@admin_required
+def api_piano_proponi():
+    """Riempie i posti vuoti della settimana con l'archivio; non tocca quelli già scritti."""
+    import database as _db
+    from programma_menu import proponi_settimana
+    lunedi = _lunedi_di((request.get_json(force=True) or {}).get('settimana'))
+    sett = _db.get_settimana_menu(lunedi.isoformat())
+    menu = _db.get_menu_periodo((lunedi - timedelta(days=21)).isoformat(), (lunedi + timedelta(days=27)).isoformat())
+    archivio = [{'nome': p['nome'], 'tipo': p['tipo'], 'categoria': p['categoria']} for p in _db.get_piatti()]
+    proposte = proponi_settimana(lunedi, archivio, menu, filter(None, sett['giorni_chiusi'].split(',')))
+    for p in proposte:
+        _db.set_piatto_menu(p['data'], p['tipo'], p['posizione'], p['piatto'], p['categoria'])
+    out = _piano_json(lunedi)
+    out['aggiunti'] = len(proposte)
+    return jsonify(out)
+
+
+@app.route('/api/piano/pubblica', methods=['POST'])
+@login_required
+@admin_required
+def api_piano_pubblica():
+    import database as _db
+    d = request.get_json(force=True) or {}
+    lunedi = _lunedi_di(d.get('settimana'))
+    _db.pubblica_settimana_menu(lunedi.isoformat(), current_user.nome, pubblicato=d.get('pubblica', True) is not False)
+    return jsonify(_piano_json(lunedi))
+
+
+@app.route('/api/piano/chiuso', methods=['POST'])
+@login_required
+@admin_required
+def api_piano_chiuso():
+    import database as _db
+    d = request.get_json(force=True) or {}
+    lunedi = _lunedi_di(d.get('data'))
+    _db.set_giorno_chiuso(lunedi.isoformat(), str(d.get('data'))[:10], bool(d.get('chiuso')))
+    return jsonify(_piano_json(lunedi))
+
+
 @app.route('/api/spesa-comprati/<int:comprato_id>/registrato', methods=['POST'])
 @login_required
 def api_spesa_comprato_registrato(comprato_id):

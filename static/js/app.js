@@ -133,6 +133,7 @@ async function init() {
   if (CAN_CHAT) loadChatUnreadBadge();
   loadComprati();
   loadSuggeriti();
+  loadPranzoOggi();
 
   // Al primo login apri automaticamente il tutorial (menu principale) e
   // segna subito come visto, così non si ripresenta ai login successivi.
@@ -303,6 +304,7 @@ function renderHomeDashboard() {
   _renderDashDocks();
   loadComprati();
   loadSuggeriti();
+  loadPranzoOggi();
 
   loadMeteoVigevano();
   loadRifiutiRaccolta();
@@ -673,6 +675,7 @@ function navTo(page) {
   if (page === 'controllo')  loadControlloLogs();
   if (page === 'export')    initExportPage();
   if (page === 'preparazioni') loadPreparazioni();
+  if (page === 'piano')     loadPiano();
   if (page === 'prenotazioni') initPrenotazioniPage();
   if (page === 'setup-sala') initSetupSalaPage();
   if (page === 'help')      closeTutorialSection(); // riparti sempre dal menu principale del tutorial
@@ -2751,6 +2754,169 @@ async function aggiungiSuggeriti() {
   toast(`${scelti.length} ${scelti.length === 1 ? 'prodotto aggiunto' : 'prodotti aggiunti'} alla spesa`, 'success');
   await loadListaSpesa();
   loadSuggeriti();
+}
+
+// ── PIANO SETTIMANALE (menu del giorno a pranzo) ─────────────────────────
+// Ogni giorno 4 primi e 4 secondi. L'admin scrive o fa proporre il menu e lo
+// pubblica; tutti vedono la settimana pubblicata e, in Dashboard, "Oggi a pranzo".
+S.piano = null;
+S.pianoLunedi = null;           // 'YYYY-MM-DD' del lunedì mostrato
+S.pianoPosto = null;            // posto che si sta modificando
+const _GIORNI_IT = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
+const _CATEGORIE_IT = { pesce: 'Pesce', carne: 'Carne', verdure: 'Verdure', altro: 'Altro' };
+
+function _isoPiu(iso, giorni) {
+  const d = new Date(iso + 'T12:00:00');
+  d.setDate(d.getDate() + giorni);
+  return d.toISOString().slice(0, 10);
+}
+function _ggmm(iso) { const [y, m, d] = iso.split('-'); return `${d}/${m}`; }
+
+async function loadPiano() {
+  const q = S.pianoLunedi ? `?settimana=${S.pianoLunedi}` : '';
+  const data = await api('/api/piano' + q);
+  if (!data || !data.success) return;
+  S.piano = data;
+  S.pianoLunedi = data.lunedi;
+  renderPiano();
+}
+
+function cambiaSettimanaPiano(giorni) {
+  S.pianoLunedi = _isoPiu(S.pianoLunedi || S.piano.lunedi, giorni);
+  loadPiano();
+}
+
+function renderPiano() {
+  const p = S.piano;
+  document.getElementById('piano-settimana').textContent =
+    `${_ggmm(p.lunedi)} – ${_ggmm(_isoPiu(p.lunedi, 6))}`;
+  const stato = document.getElementById('piano-stato');
+  stato.textContent = p.pubblicato ? `Pubblicato${p.pubblicato_da ? ' da ' + p.pubblicato_da : ''}` : (p.puo_modificare ? 'Bozza: la vedi solo tu' : '');
+  stato.className = 'piano-stato ' + (p.pubblicato ? 'ok' : 'bozza');
+  document.getElementById('piano-azioni').style.display = p.puo_modificare ? '' : 'none';
+  const pub = document.getElementById('piano-btn-pubblica');
+  if (pub) pub.textContent = p.pubblicato ? 'Ritira' : 'Pubblica';
+
+  const box = document.getElementById('piano-giorni');
+  if (!p.visibile) {
+    box.innerHTML = `<div class="empty-state"><p>Il menu di questa settimana non è ancora stato pubblicato.</p></div>`;
+    return;
+  }
+  box.innerHTML = p.giorni.map((g, i) => {
+    const oggi = g.data === p.oggi;
+    const colonna = (tipo, posti, titolo) => `
+      <div class="piano-col">
+        <div class="piano-col-tit">${titolo}</div>
+        ${[1, 2, 3, 4].map(n => {
+          const m = posti[n] || posti[String(n)];
+          const cat = m && m.categoria ? `<span class="piano-cat cat-${m.categoria}">${_CATEGORIE_IT[m.categoria] || ''}</span>` : '';
+          if (!m && !p.puo_modificare) return `<div class="piano-posto vuoto">—</div>`;
+          return `<button type="button" class="piano-posto ${m ? '' : 'vuoto'}" ${p.puo_modificare ? `onclick="apriPiatto('${g.data}','${tipo}',${n})"` : 'disabled'}>
+              <span class="piano-piatto">${m ? esc(m.piatto) : '+ aggiungi'}</span>${cat}
+            </button>`;
+        }).join('')}
+      </div>`;
+    return `
+      <div class="piano-giorno ${oggi ? 'oggi' : ''} ${g.chiuso ? 'chiuso' : ''}">
+        <div class="piano-giorno-top">
+          <div class="piano-giorno-nome">${_GIORNI_IT[i]} <span>${_ggmm(g.data)}</span>${oggi ? '<em>oggi</em>' : ''}</div>
+          ${p.puo_modificare ? `<button type="button" class="piano-chiuso-btn" onclick="segnaChiuso('${g.data}', ${!g.chiuso})">${g.chiuso ? 'Riapri' : 'Chiuso'}</button>` : ''}
+        </div>
+        ${g.chiuso ? '<div class="piano-chiuso-txt">Chiuso</div>' : `<div class="piano-cols">${colonna('primo', g.primi, 'Primi')}${colonna('secondo', g.secondi, 'Secondi')}</div>`}
+      </div>`;
+  }).join('');
+}
+
+async function proponiPiano() {
+  const data = await api('/api/piano/proponi', { method: 'POST', body: { settimana: S.pianoLunedi } });
+  if (!data || !data.success) { toast((data && data.error) || 'Errore', 'error'); return; }
+  S.piano = data; renderPiano();
+  toast(data.aggiunti ? `Aggiunti ${data.aggiunti} piatti dall'archivio` : 'Nessun piatto da proporre: l\'archivio si riempie man mano che scrivi i menu', data.aggiunti ? 'success' : 'info');
+}
+
+async function pubblicaPiano() {
+  const pubblica = !S.piano.pubblicato;
+  const data = await api('/api/piano/pubblica', { method: 'POST', body: { settimana: S.pianoLunedi, pubblica } });
+  if (!data || !data.success) { toast('Errore', 'error'); return; }
+  S.piano = data; renderPiano();
+  toast(pubblica ? 'Menu pubblicato: ora lo vedono tutti' : 'Menu ritirato: torna una bozza', 'success');
+  loadPranzoOggi();
+}
+
+async function segnaChiuso(data, chiuso) {
+  const r = await api('/api/piano/chiuso', { method: 'POST', body: { data, chiuso } });
+  if (r && r.success) { S.piano = r; renderPiano(); }
+}
+
+async function apriPiatto(data, tipo, posizione) {
+  const g = S.piano.giorni.find(x => x.data === data);
+  const posti = tipo === 'primo' ? g.primi : g.secondi;
+  const m = posti[posizione] || posti[String(posizione)];
+  S.pianoPosto = { data, tipo, posizione, categoria: (m && m.categoria) || '' };
+  const i = S.piano.giorni.indexOf(g);
+  document.getElementById('piatto-titolo').textContent = `${_GIORNI_IT[i]} ${_ggmm(data)} · ${tipo === 'primo' ? 'Primo' : 'Secondo'} ${posizione}`;
+  document.getElementById('piatto-nome').value = m ? m.piatto : '';
+  _sceltaCategoria(S.pianoPosto.categoria);
+  document.getElementById('piatto-alternative').innerHTML = '';
+  document.getElementById('piatto-alt-tit').style.display = 'none';
+  document.getElementById('modal-piatto').classList.add('open');
+
+  const r = await api(`/api/piano/alternative?data=${data}&tipo=${tipo}`);
+  if (!r || !r.success) return;
+  S.pianoArchivio = r.archivio || [];
+  document.getElementById('piatto-archivio').innerHTML = S.pianoArchivio.map(a => `<option value="${esc(a.nome)}">`).join('');
+  const alt = r.alternative || [];
+  document.getElementById('piatto-alt-tit').style.display = alt.length ? '' : 'none';
+  document.getElementById('piatto-alternative').innerHTML = alt.map(a => `
+    <button type="button" class="piatto-alt" onclick='_usaAlternativa(${JSON.stringify(a.nome)}, ${JSON.stringify(a.categoria)})'>
+      <span>${esc(a.nome)}</span>
+      <small>${a.ultima_volta ? 'ultima volta ' + _ggmm(a.ultima_volta) : 'mai fatto'}${a.categoria ? ' · ' + (_CATEGORIE_IT[a.categoria] || '') : ''}</small>
+    </button>`).join('');
+}
+
+function _usaAlternativa(nome, categoria) {
+  document.getElementById('piatto-nome').value = nome;
+  _sceltaCategoria(categoria);
+}
+
+function _piattoDaArchivio() {
+  // se il nome è nell'archivio, riprende il suo tipo
+  const v = document.getElementById('piatto-nome').value.trim().toLowerCase();
+  const a = (S.pianoArchivio || []).find(x => x.nome.toLowerCase() === v);
+  if (a && a.categoria) _sceltaCategoria(a.categoria);
+}
+
+function _sceltaCategoria(cat) {
+  if (S.pianoPosto) S.pianoPosto.categoria = cat || '';
+  document.querySelectorAll('#piatto-categorie .fpill').forEach(b => b.classList.toggle('active', b.dataset.cat === cat));
+}
+
+function chiudiPiatto() {
+  document.getElementById('modal-piatto').classList.remove('open');
+  S.pianoPosto = null;
+}
+
+async function salvaPiatto(togli) {
+  const p = S.pianoPosto;
+  if (!p) return;
+  const piatto = togli ? '' : document.getElementById('piatto-nome').value.trim();
+  const r = await api('/api/piano/posto', { method: 'POST', body: { ...p, piatto, categoria: p.categoria } });
+  if (!r || !r.success) { toast((r && r.error) || 'Errore', 'error'); return; }
+  S.piano = r; renderPiano();
+  chiudiPiatto();
+  if (S.piano.pubblicato) loadPranzoOggi();
+}
+
+async function loadPranzoOggi() {
+  const box = document.getElementById('home-dash-pranzo');
+  if (!box) return;
+  const r = await api('/api/piano/oggi');
+  const ok = r && r.success && r.pubblicato && (r.primi.length || r.secondi.length);
+  box.style.display = ok ? '' : 'none';
+  if (!ok) return;
+  const li = arr => arr.length ? arr.map(x => `<li>${esc(x)}</li>`).join('') : '<li class="home-dash-simple-empty">—</li>';
+  document.getElementById('home-dash-pranzo-primi').innerHTML = li(r.primi);
+  document.getElementById('home-dash-pranzo-secondi').innerHTML = li(r.secondi);
 }
 
 // ── LISTA SPESA — COUNTDOWN ───────────────────────────────────────────────

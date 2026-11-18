@@ -2231,3 +2231,19 @@ body.comprati-aperto .btn-help { display: none !important; }
 .piano-costo-giorno { margin-left: auto; margin-right: 8px; font-size: 11px; font-weight: 700; color: var(--muted); }
 .piano-costo-giorno.sopra { color: #d97706; }
 .piatto-costo-nota { font-size: 11px; color: var(--muted); margin-top: 4px; }
+.piano-suggerisci-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 44px;
+  margin-bottom: 14px; cursor: pointer; font: inherit; font-size: 14px; font-weight: 600;
+  border: 1px dashed rgba(var(--action-rgb), .5); border-radius: 12px;
+  background: rgba(var(--action-rgb), .08); color: var(--text);
+}
+.piano-suggerisci-btn svg { color: var(--action); }
+.piano-sugg { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--border); }
+.piano-sugg-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; }
+.piano-sugg-info { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.piano-sugg-info small { font-size: 11px; color: var(--muted); }
+.piano-sugg-btn {
+  font: inherit; font-size: 12px; font-weight: 700; padding: 6px 12px; cursor: pointer;
+  border: 1px solid var(--border); border-radius: 100px; background: none; color: var(--muted);
+}
+.piano-sugg-btn.usa { border-color: var(--action); color: var(--action); }

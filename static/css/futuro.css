@@ -724,3 +724,11 @@
 :root[data-stile="futuro"] .piano-costo.caro { color: var(--f-am) !important; border-color: color-mix(in srgb, var(--f-am) 50%, transparent); }
 :root[data-stile="futuro"] .piano-costo-giorno { font-family: var(--f-mono); letter-spacing: .06em; color: var(--f-mu) !important; }
 :root[data-stile="futuro"] .piano-costo-giorno.sopra { color: var(--f-am) !important; }
+:root[data-stile="futuro"] .piano-suggerisci-btn {
+  border-radius: 999px !important; background: transparent !important;
+  border: 1px dashed rgba(var(--f-cy-rgb), .6) !important; color: var(--text) !important;
+}
+:root[data-stile="futuro"] .piano-suggerisci-btn svg { color: var(--f-cy) !important; }
+:root[data-stile="futuro"] .piano-sugg { border-top-color: var(--f-ln) !important; }
+:root[data-stile="futuro"] .piano-sugg-btn { border-color: var(--f-ln) !important; color: var(--f-mu) !important; }
+:root[data-stile="futuro"] .piano-sugg-btn.usa { border-color: var(--f-li) !important; color: var(--f-li) !important; }

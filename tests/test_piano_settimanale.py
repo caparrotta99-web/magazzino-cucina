@@ -209,3 +209,63 @@ def test_i_colleghi_vedono_solo_i_giorni_scritti(db):
     assert list(s['giorni'][0]['primi']) == ['1'] and list(s['giorni'][0]['secondi']) == ['3']
     # l'admin continua a vedere tutta la settimana
     assert len(admin.get('/api/piano').get_json()['giorni']) == 4
+
+
+def test_suggerimenti_dei_colleghi_li_vede_solo_lo_chef_che_decide(db):
+    import app as A
+    A.app.config['TESTING'] = True
+    admin = _login(A, db, 'Capo Cucina', 'admin')
+    aiuto = _login(A, db, 'Aiuto Cuoco')
+    altro = _login(A, db, 'Altro Collega')
+    oggi = A.today_it()
+    lunedi = oggi - timedelta(days=oggi.weekday())
+    giovedi = (lunedi + timedelta(days=3)).isoformat()
+
+    r = aiuto.post('/api/piano/suggerisci', json={'data': giovedi, 'tipo': 'primo', 'piatto': 'Gnocchi alla romana',
+                                                  'nota': 'abbiamo semolino'}).get_json()
+    assert r['success'] and [x['piatto'] for x in r['miei_suggerimenti']] == ['Gnocchi alla romana']
+    aiuto.post('/api/piano/suggerisci', json={'data': giovedi, 'tipo': 'secondo', 'piatto': 'Seppie in umido'})
+    # niente lunedì, sabato, domenica; serve primo/secondo e il nome
+    lun = lunedi.isoformat()
+    assert aiuto.post('/api/piano/suggerisci', json={'data': lun, 'tipo': 'primo', 'piatto': 'X'}).status_code == 400
+    assert aiuto.post('/api/piano/suggerisci', json={'data': giovedi, 'tipo': 'dolce', 'piatto': 'X'}).status_code == 400
+
+    # un altro collega non vede i suggerimenti degli altri, e nel menu non c'è niente
+    s = altro.get('/api/piano').get_json()
+    assert s['miei_suggerimenti'] == [] and s['giorni'] == []
+    # lo chef li vede nel giorno giusto
+    a = admin.get('/api/piano').get_json()
+    assert a['suggerimenti_totali'] == 2
+    gio = next(g for g in a['giorni'] if g['data'] == giovedi)
+    ids = {x['piatto']: x['id'] for x in gio['suggerimenti']}
+    # i colleghi non possono decidere
+    assert aiuto.post(f"/api/piano/suggerimento/{ids['Gnocchi alla romana']}/usa").status_code == 403
+
+    # usa: va nel primo posto libero; scarta: sparisce
+    a = admin.post(f"/api/piano/suggerimento/{ids['Gnocchi alla romana']}/usa").get_json()
+    gio = next(g for g in a['giorni'] if g['data'] == giovedi)
+    assert gio['primi']['1']['piatto'] == 'Gnocchi alla romana'
+    a = admin.post(f"/api/piano/suggerimento/{ids['Seppie in umido']}/scarta").get_json()
+    assert a['suggerimenti_totali'] == 0
+    assert admin.post(f"/api/piano/suggerimento/{ids['Seppie in umido']}/usa").status_code == 404
+
+    # dopo la pubblicazione tutti vedono il piatto scelto; il suggeritore non lo vede più "in attesa"
+    admin.post('/api/piano/pubblica', json={'settimana': lunedi.isoformat()})
+    s = aiuto.get('/api/piano').get_json()
+    assert s['miei_suggerimenti'] == []
+    assert s['giorni'][0]['primi']['1']['piatto'] == 'Gnocchi alla romana'
+
+
+def test_usa_suggerimento_con_giorno_pieno(db):
+    import app as A
+    A.app.config['TESTING'] = True
+    admin = _login(A, db, 'Capo Cucina', 'admin')
+    aiuto = _login(A, db, 'Aiuto Cuoco')
+    oggi = A.today_it()
+    martedi = (oggi - timedelta(days=oggi.weekday()) + timedelta(days=1)).isoformat()
+    for n in range(1, 5):
+        admin.post('/api/piano/posto', json={'data': martedi, 'tipo': 'primo', 'posizione': n, 'piatto': f'Primo {n}'})
+    aiuto.post('/api/piano/suggerisci', json={'data': martedi, 'tipo': 'primo', 'piatto': 'Lasagne'})
+    sid = admin.get('/api/piano').get_json()['giorni'][0]['suggerimenti'][0]['id']
+    r = admin.post(f'/api/piano/suggerimento/{sid}/usa')
+    assert r.status_code == 400 and 'pieni' in r.get_json()['error']

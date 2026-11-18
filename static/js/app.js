@@ -2799,6 +2799,11 @@ function renderPiano() {
   const pub = document.getElementById('piano-btn-pubblica');
   if (pub) pub.textContent = p.pubblicato ? 'Ritira' : 'Pubblica';
 
+  document.getElementById('piano-suggerisci-btn').style.display = p.puo_modificare ? 'none' : '';
+  _renderMieiSuggerimenti();
+  if (p.puo_modificare && p.suggerimenti_totali) {
+    stato.textContent += ` · ${p.suggerimenti_totali} ${p.suggerimenti_totali === 1 ? 'suggerimento' : 'suggerimenti'} dai colleghi`;
+  }
   const box = document.getElementById('piano-giorni');
   if (!p.visibile) {
     box.innerHTML = `<div class="empty-state"><p>Il menu di questa settimana non è ancora stato pubblicato.</p></div>`;
@@ -2831,8 +2836,82 @@ function renderPiano() {
           ${p.puo_modificare ? `<button type="button" class="piano-chiuso-btn" onclick="segnaChiuso('${g.data}', ${!g.chiuso})">${g.chiuso ? 'Riapri' : 'Chiuso'}</button>` : ''}
         </div>
         ${g.chiuso ? '<div class="piano-chiuso-txt">Chiuso</div>' : `<div class="piano-cols">${colonna('primo', g.primi, 'Primi')}${colonna('secondo', g.secondi, 'Secondi')}</div>`}
+        ${p.puo_modificare && (g.suggerimenti || []).length ? `
+          <div class="piano-sugg">
+            <div class="piano-col-tit">Suggeriti dai colleghi</div>
+            ${g.suggerimenti.map(x => `
+              <div class="piano-sugg-row">
+                <div class="piano-sugg-info">
+                  <span class="piano-piatto">${esc(x.piatto)}</span>
+                  <small>${x.tipo === 'primo' ? 'Primo' : 'Secondo'}${x.categoria ? ' · ' + (_CATEGORIE_IT[x.categoria] || '') : ''} · da ${esc(x.autore)}${x.nota ? ' · “' + esc(x.nota) + '”' : ''}</small>
+                </div>
+                <button type="button" class="piano-sugg-btn usa" onclick="decidiSuggerimento(${x.id}, 'usa')">Usa</button>
+                <button type="button" class="piano-sugg-btn" onclick="decidiSuggerimento(${x.id}, 'scarta')">Scarta</button>
+              </div>`).join('')}
+          </div>` : ''}
       </div>`;
   }).join('');
+}
+
+// ── Suggerimenti dei colleghi ──
+S.sugg = { data: '', tipo: '', categoria: '' };
+
+function _renderMieiSuggerimenti() {
+  const box = document.getElementById('piano-miei-sugg');
+  const lista = (S.piano && S.piano.miei_suggerimenti) || [];
+  box.innerHTML = lista.length ? `
+    <div class="piano-giorno piano-miei">
+      <div class="piano-col-tit">I tuoi suggerimenti, in attesa dello chef</div>
+      ${lista.map(x => `<div class="piano-sugg-row"><div class="piano-sugg-info">
+        <span class="piano-piatto">${esc(x.piatto)}</span>
+        <small>${_nomeGiorno(x.data)} ${_ggmm(x.data)} · ${x.tipo === 'primo' ? 'Primo' : 'Secondo'}</small>
+      </div></div>`).join('')}
+    </div>` : '';
+}
+
+function apriSuggerisci() {
+  const giorni = S.piano.giorni_menu || [];
+  const oggi = S.piano.oggi;
+  S.sugg = { data: giorni.find(g => g >= oggi) || giorni[0] || '', tipo: '', categoria: '' };
+  document.getElementById('sugg-giorni').innerHTML = giorni.map(g =>
+    `<button type="button" class="fpill" data-data="${g}" onclick="_suggScegli('data','${g}')">${_nomeGiorno(g).slice(0, 3)} ${_ggmm(g)}</button>`).join('');
+  document.getElementById('sugg-piatto').value = '';
+  document.getElementById('sugg-nota').value = '';
+  _suggScegli('data', S.sugg.data);
+  _suggScegli('tipo', '');
+  _suggScegli('categoria', '');
+  document.getElementById('modal-suggerisci').classList.add('open');
+}
+
+function _suggScegli(campo, valore) {
+  S.sugg[campo] = (S.sugg[campo] === valore && campo === 'categoria') ? '' : valore;
+  const sel = { data: '#sugg-giorni .fpill', tipo: '#sugg-tipo .fpill', categoria: '#sugg-categoria .fpill' }[campo];
+  const attr = { data: 'data', tipo: 'tipo', categoria: 'cat' }[campo];
+  document.querySelectorAll(sel).forEach(b => b.classList.toggle('active', b.dataset[attr] === S.sugg[campo]));
+}
+
+function chiudiSuggerisci() {
+  document.getElementById('modal-suggerisci').classList.remove('open');
+}
+
+async function inviaSuggerimento() {
+  const piatto = document.getElementById('sugg-piatto').value.trim();
+  if (!S.sugg.data || !S.sugg.tipo || !piatto) { toast('Scegli il giorno, primo o secondo, e scrivi il piatto', 'error'); return; }
+  const r = await api('/api/piano/suggerisci', { method: 'POST', body: {
+    data: S.sugg.data, tipo: S.sugg.tipo, piatto, categoria: S.sugg.categoria,
+    nota: document.getElementById('sugg-nota').value.trim() } });
+  if (!r || !r.success) { toast((r && r.error) || 'Errore', 'error'); return; }
+  chiudiSuggerisci();
+  if (r.lunedi === S.pianoLunedi) { S.piano = r; renderPiano(); }
+  toast('Suggerimento inviato allo chef', 'success');
+}
+
+async function decidiSuggerimento(id, azione) {
+  const r = await api(`/api/piano/suggerimento/${id}/${azione}`, { method: 'POST' });
+  if (!r || !r.success) { toast((r && r.error) || 'Errore', 'error'); return; }
+  S.piano = r; renderPiano();
+  toast(azione === 'usa' ? 'Piatto messo nel menu' : 'Suggerimento scartato', 'success');
+  if (azione === 'usa' && S.piano.pubblicato) loadPranzoOggi();
 }
 
 async function proponiPiano() {

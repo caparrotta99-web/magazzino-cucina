@@ -550,7 +550,13 @@
       <button type="button" class="btn-spesa-add" id="piano-btn-pubblica" onclick="pubblicaPiano()">Pubblica</button>
     </div>
 
+    <button type="button" class="piano-suggerisci-btn" id="piano-suggerisci-btn" style="display:none" onclick="apriSuggerisci()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+      Suggerisci un piatto
+    </button>
+
     <div id="piano-giorni"></div>
+    <div id="piano-miei-sugg"></div>
   </section>
 
   <!-- COME USARE BRIGADE -->
@@ -1410,6 +1416,49 @@
       <button class="btn-print" onclick="salvaPiatto()">Salva</button>
       <button class="btn-print" onclick="salvaPiatto(true)">Togli</button>
       <button class="btn-close-modal" onclick="chiudiPiatto()">Chiudi</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MODAL SUGGERISCI UN PIATTO (colleghi) ──────────────────────────────── -->
+<div class="modal-backdrop" id="modal-suggerisci" onclick="if (event.target === this) chiudiSuggerisci()">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <div class="modal-title">Suggerisci un piatto</div>
+    <div class="modal-body">
+      <div class="suggeriti-intro">Lo vede solo lo chef: se gli piace lo mette nel menu.</div>
+      <div class="fgroup">
+        <div class="flabel">Giorno</div>
+        <div class="filter-row" id="sugg-giorni"></div>
+      </div>
+      <div class="fgroup">
+        <div class="flabel">Primo o secondo</div>
+        <div class="filter-row" id="sugg-tipo">
+          <button type="button" class="fpill" data-tipo="primo" onclick="_suggScegli('tipo','primo')">Primo</button>
+          <button type="button" class="fpill" data-tipo="secondo" onclick="_suggScegli('tipo','secondo')">Secondo</button>
+        </div>
+      </div>
+      <div class="fgroup">
+        <div class="flabel">Piatto</div>
+        <input class="finput" id="sugg-piatto" autocomplete="off" placeholder="es. Gnocchi alla romana">
+      </div>
+      <div class="fgroup">
+        <div class="flabel">Tipo (facoltativo)</div>
+        <div class="filter-row" id="sugg-categoria">
+          <button type="button" class="fpill" data-cat="pesce" onclick="_suggScegli('categoria','pesce')">Pesce</button>
+          <button type="button" class="fpill" data-cat="carne" onclick="_suggScegli('categoria','carne')">Carne</button>
+          <button type="button" class="fpill" data-cat="verdure" onclick="_suggScegli('categoria','verdure')">Verdure</button>
+          <button type="button" class="fpill" data-cat="altro" onclick="_suggScegli('categoria','altro')">Altro</button>
+        </div>
+      </div>
+      <div class="fgroup">
+        <div class="flabel">Nota (facoltativa)</div>
+        <input class="finput" id="sugg-nota" autocomplete="off" maxlength="200" placeholder="es. abbiamo tante zucchine da finire">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn-print" onclick="inviaSuggerimento()">Invia allo chef</button>
+      <button class="btn-close-modal" onclick="chiudiSuggerisci()">Chiudi</button>
     </div>
   </div>
 </div>

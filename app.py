@@ -1607,6 +1607,13 @@ def _piano_json(lunedi):
             'costo_completo': all(m['costo'] > 0 for m in del_giorno) and len(del_giorno) > 0,
             'sopra_budget': max_primo + max_secondo > _db.COSTO_MAX_GIORNO,
         })
+    # suggerimenti dei colleghi: l'admin li vede tutti, gli altri solo i propri
+    sugg = _db.get_suggerimenti_menu(lunedi.isoformat(), domenica.isoformat())
+    if not admin:
+        sugg = [x for x in sugg if x['autore'] == current_user.nome]
+    for g in giorni:
+        g['suggerimenti'] = [x for x in sugg if x['data'] == g['data']]
+    miei_suggerimenti = [x for x in sugg] if not admin else []
     if not admin:
         # i colleghi vedono solo i giorni già scritti (o segnati chiusi):
         # se oggi scrivi il mercoledì, vedono solo il mercoledì
@@ -1618,6 +1625,9 @@ def _piano_json(lunedi):
             for m in list(g['primi'].values()) + list(g['secondi'].values()):
                 m.pop('costo', None); m.pop('caro', None)
     return {'success': True, 'lunedi': lunedi.isoformat(), 'oggi': today_it().isoformat(),
+            'giorni_menu': [g.isoformat() for g in giorni_settimana(lunedi)],
+            'miei_suggerimenti': miei_suggerimenti,
+            'suggerimenti_totali': len(sugg) if admin else 0,
             'costo_max_giorno': _db.COSTO_MAX_GIORNO, 'costo_max_piatto': _db.COSTO_MAX_PIATTO,
             'pubblicato': bool(sett['pubblicato']), 'pubblicato_da': sett['pubblicato_da'],
             'visibile': visibile, 'puo_modificare': admin, 'giorni': giorni}
@@ -1685,6 +1695,50 @@ def api_piano_alternative():
     return jsonify({'success': True,
                     'alternative': alternative(giorno, tipo, archivio, menu),
                     'archivio': [p for p in archivio if p['tipo'] == tipo]})
+
+
+@app.route('/api/piano/suggerisci', methods=['POST'])
+@login_required
+def api_piano_suggerisci():
+    """Chiunque può suggerire un piatto per un giorno: lo vede solo l'admin,
+    che decide se metterlo nel menu."""
+    import database as _db
+    from datetime import date as _date
+    from programma_menu import giorni_settimana
+    d = request.get_json(force=True) or {}
+    piatto = ' '.join(str(d.get('piatto') or '').split())
+    try:
+        giorno = _date.fromisoformat(str(d.get('data'))[:10])
+    except ValueError:
+        return jsonify({'success': False, 'error': 'Scegli il giorno'}), 400
+    if not piatto or d.get('tipo') not in _db.TIPI_PIATTO:
+        return jsonify({'success': False, 'error': 'Scrivi il piatto e scegli primo o secondo'}), 400
+    if giorno not in giorni_settimana(_lunedi_di(giorno)):
+        return jsonify({'success': False, 'error': 'Il menu del giorno c\'è da martedì a venerdì'}), 400
+    categoria = d.get('categoria') if d.get('categoria') in _db.CATEGORIE_PIATTO else ''
+    _db.aggiungi_suggerimento_menu(giorno.isoformat(), d['tipo'], piatto, categoria, d.get('nota'), current_user.nome)
+    return jsonify(_piano_json(_lunedi_di(giorno)))
+
+
+@app.route('/api/piano/suggerimento/<int:sid>/<azione>', methods=['POST'])
+@login_required
+@admin_required
+def api_piano_suggerimento(sid, azione):
+    """L'admin usa un suggerimento (va nel primo posto libero di quel giorno) o lo scarta."""
+    import database as _db
+    s = _db.get_suggerimento_menu(sid)
+    if not s or s['stato'] != 'attesa' or azione not in ('usa', 'scarta'):
+        return jsonify({'success': False, 'error': 'Suggerimento non trovato'}), 404
+    if azione == 'usa':
+        occupati = {m['posizione'] for m in _db.get_menu_periodo(s['data'], s['data']) if m['tipo'] == s['tipo']}
+        liberi = [p for p in range(1, _db.POSTI_PER_TIPO + 1) if p not in occupati]
+        if not liberi:
+            return jsonify({'success': False, 'error': 'Quel giorno i posti sono pieni: togli prima un piatto'}), 400
+        _db.set_piatto_menu(s['data'], s['tipo'], liberi[0], s['piatto'], s['categoria'])
+        _db.set_stato_suggerimento_menu(sid, 'usato')
+    else:
+        _db.set_stato_suggerimento_menu(sid, 'scartato')
+    return jsonify(_piano_json(_lunedi_di(s['data'])))
 
 
 @app.route('/api/piano/proponi', methods=['POST'])

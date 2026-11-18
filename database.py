@@ -468,6 +468,17 @@ def db_init():
                 piatto    TEXT NOT NULL,
                 categoria TEXT NOT NULL DEFAULT ''
             )""",
+            f"""CREATE TABLE IF NOT EXISTS menu_suggerimenti (
+                id        {pk},
+                data      TEXT NOT NULL,
+                tipo      TEXT NOT NULL,
+                piatto    TEXT NOT NULL,
+                categoria TEXT NOT NULL DEFAULT '',
+                nota      TEXT NOT NULL DEFAULT '',
+                autore    TEXT NOT NULL DEFAULT '',
+                creato_il TEXT NOT NULL,
+                stato     TEXT NOT NULL DEFAULT 'attesa'
+            )""",
             f"""CREATE TABLE IF NOT EXISTS menu_settimane (
                 id             {pk},
                 lunedi         TEXT NOT NULL,
@@ -1666,6 +1677,32 @@ def set_piatto_menu(data, tipo, posizione, piatto, categoria='', costo=None):
                          "VALUES (?, ?, ?, ?, ?)", (data, tipo, int(posizione), piatto, categoria or ''))
     if piatto:
         salva_piatto_archivio(piatto, tipo, categoria, costo)
+
+
+def aggiungi_suggerimento_menu(data, tipo, piatto, categoria, nota, autore):
+    with get_conn() as conn:
+        conn.execute(
+            "INSERT INTO menu_suggerimenti (data, tipo, piatto, categoria, nota, autore, creato_il) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (data, tipo, ' '.join(piatto.split()), categoria or '', (nota or '').strip()[:200],
+             autore, now_it().isoformat(timespec='seconds')))
+
+
+def get_suggerimenti_menu(dal, al, stato='attesa'):
+    with get_conn() as conn:
+        return _rows(conn.execute(
+            "SELECT * FROM menu_suggerimenti WHERE data >= ? AND data <= ? AND stato = ? ORDER BY data, id",
+            (dal, al, stato)))
+
+
+def get_suggerimento_menu(sid):
+    with get_conn() as conn:
+        return _row(conn.execute("SELECT * FROM menu_suggerimenti WHERE id = ?", (sid,)))
+
+
+def set_stato_suggerimento_menu(sid, stato):
+    with get_conn() as conn:
+        conn.execute("UPDATE menu_suggerimenti SET stato = ? WHERE id = ?", (stato, sid))
 
 
 def get_settimana_menu(lunedi):

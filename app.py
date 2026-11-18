@@ -660,8 +660,7 @@ def _sync_sheets_background():
         print(f"[SYNC] Sheets non raggiungibile: {e}", flush=True)
 
 
-# Nei test niente thread: devono restare prevedibili e non parlare con Sheets.
-if os.environ.get('BRIGADE_NO_SCHEDULER') != '1':
+def _avvia_thread_fogli():
     threading.Thread(target=_sync_sheets_background, name='avvio-ricarica-fogli', daemon=True).start()
     threading.Thread(target=_worker_sheets, name='invio-fogli', daemon=True).start()
 
@@ -1046,6 +1045,8 @@ def api_admin_diagnosi_sheets():
                                                        'gspread', 'psycopg2', 'requests', 'urllib3', 'socket', 'ssl', 'threading'))]
         thread.append({'nome': nomi.get(ident, str(ident)), 'pila': [r.strip() for r in utili[-12:]]})
     return jsonify({'success': True, 'lucchetto_occupato': _SHEETS_LOCK.locked(),
+                    'processo': os.getpid(), 'processo_padre': os.getppid(),
+                    'lavori_avviati_qui': _LAVORI_AVVIATI_PID == os.getpid(),
                     'pendenti': conta_pendenti_sheets(), 'stato': dict(_STATO_SHEETS), 'thread': thread})
 
 
@@ -3879,9 +3880,7 @@ def _job_promemoria_scadenze():
         push_per_tipo('scadenze', msg[0], msg[1], url='/?goto=alert', tag='promemoria-scadenze')
 
 
-# Nei test lo scheduler non parte (BRIGADE_NO_SCHEDULER=1), così nessuna
-# notifica vera viene inviata mentre si prova il codice.
-if os.environ.get('BRIGADE_NO_SCHEDULER') != '1':
+def _avvia_scheduler():
     _scheduler = BackgroundScheduler(timezone=TZ_ITALIA)
     _scheduler.add_job(_job_promemoria_rifiuti,
                        CronTrigger(hour=18, minute=0, timezone=TZ_ITALIA), id='promemoria_rifiuti')
@@ -3896,7 +3895,45 @@ if os.environ.get('BRIGADE_NO_SCHEDULER') != '1':
                                    timezone=TZ_ITALIA), id='promemoria_temp_sera')
     _scheduler.start()
     for _job in _scheduler.get_jobs():
-        print(f"[Scheduler] {_job.id}: prossima esecuzione {_job.next_run_time}")
+        print(f"[Scheduler] {_job.id}: prossima esecuzione {_job.next_run_time}", flush=True)
+
+
+# ─── LAVORI IN SOTTOFONDO: SI AVVIANO NEL PROCESSO CHE RISPONDE ──────────────
+# I thread (invio ai fogli, ricarica all'avvio, promemoria) NON partono più
+# quando il modulo viene importato. Gunicorn può importare l'app in un processo
+# e poi duplicarlo (fork) per creare quello che risponde alle richieste: la copia
+# eredita i lucchetti ma non i thread. Era successo proprio questo: lucchetto dei
+# fogli chiuso per sempre, nessun invio, nessun promemoria.
+# Ora partono una volta sola per processo, nel processo giusto:
+#   - gunicorn.conf.py li avvia appena il worker è pronto (post_worker_init);
+#   - come rete di sicurezza, alla prima richiesta se non sono ancora partiti.
+# Nei test non partono mai (BRIGADE_NO_SCHEDULER=1).
+_LAVORI_AVVIATI_PID = None
+_LAVORI_LOCK = threading.Lock()
+
+
+def avvia_lavori_in_sottofondo():
+    global _LAVORI_AVVIATI_PID, _SHEETS_LOCK, _SHEETS_SVEGLIA
+    if os.environ.get('BRIGADE_NO_SCHEDULER') == '1':
+        return False
+    with _LAVORI_LOCK:
+        if _LAVORI_AVVIATI_PID == os.getpid():
+            return False
+        # in un processo nuovo, lucchetto ed evento ripartono puliti
+        if _LAVORI_AVVIATI_PID is not None or _SHEETS_LOCK.locked():
+            _SHEETS_LOCK = threading.Lock()
+            _SHEETS_SVEGLIA = threading.Event()
+        _LAVORI_AVVIATI_PID = os.getpid()
+    print(f"[AVVIO] lavori in sottofondo avviati nel processo {os.getpid()}", flush=True)
+    _avvia_thread_fogli()
+    _avvia_scheduler()
+    return True
+
+
+@app.before_request
+def _assicura_lavori_in_sottofondo():
+    if _LAVORI_AVVIATI_PID != os.getpid():
+        avvia_lavori_in_sottofondo()
 
 
 if __name__ == '__main__':

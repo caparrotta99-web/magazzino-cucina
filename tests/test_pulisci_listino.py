@@ -137,3 +137,26 @@ def test_diagnosi_fogli_solo_admin(db):
     admin = A.app.test_client(); admin.post('/login', data={'nome': 'Capo Cucina', 'password': 'pw123456'})
     r = admin.get('/api/admin/diagnosi-sheets').get_json()
     assert r['success'] and r['lucchetto_occupato'] is False and r['thread']
+
+
+def test_lavori_in_sottofondo_non_partono_nei_test():
+    import app as modulo
+    # BRIGADE_NO_SCHEDULER=1 nei test: niente thread, niente promemoria veri
+    assert modulo.avvia_lavori_in_sottofondo() is False
+    assert modulo._LAVORI_AVVIATI_PID is None
+
+
+def test_lavori_in_sottofondo_una_volta_per_processo(monkeypatch):
+    import app as modulo
+    partiti = []
+    monkeypatch.delenv('BRIGADE_NO_SCHEDULER', raising=False)
+    monkeypatch.setattr(modulo, '_avvia_thread_fogli', lambda: partiti.append('fogli'))
+    monkeypatch.setattr(modulo, '_avvia_scheduler', lambda: partiti.append('promemoria'))
+    monkeypatch.setattr(modulo, '_LAVORI_AVVIATI_PID', None)
+    # lucchetto rimasto chiuso da un processo precedente: deve ripartire pulito
+    chiuso = modulo.threading.Lock(); chiuso.acquire()
+    monkeypatch.setattr(modulo, '_SHEETS_LOCK', chiuso)
+    assert modulo.avvia_lavori_in_sottofondo() is True
+    assert modulo.avvia_lavori_in_sottofondo() is False
+    assert partiti == ['fogli', 'promemoria']
+    assert not modulo._SHEETS_LOCK.locked()

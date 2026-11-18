@@ -1015,6 +1015,28 @@ def admin_conferma_reset():
     return redirect(url_for('admin_page'))
 
 
+@app.route('/api/admin/pulizia-listino', methods=['POST'])
+@login_required
+@admin_required
+def api_admin_pulizia_listino():
+    """Dopo strumenti/pulisci_listino.py --applica (che sistema i fogli Google):
+    rinomina i prodotti uniti anche nelle tabelle dell'app (lista spesa, ordini
+    salvati, abbinamenti delle etichette, ricette) e ricarica listino e registro
+    dai fogli."""
+    import importlib.util
+    import database as _db
+    spec = importlib.util.spec_from_file_location(
+        'pulisci_listino', os.path.join(os.path.dirname(os.path.abspath(__file__)), 'strumenti', 'pulisci_listino.py'))
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    cambiate = _db.rinomina_prodotti(mod.UNIONI)
+    try:
+        esito = _ricarica_da_sheets()
+    except Exception as e:
+        esito = {'ricaricato': False, 'errore': str(e)}
+    return jsonify({'success': True, 'cambiate': cambiate, 'ricarica': esito})
+
+
 @app.route('/api/admin/riordino-magazzino', methods=['POST'])
 @login_required
 @admin_required

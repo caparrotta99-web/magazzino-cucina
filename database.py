@@ -1731,6 +1731,32 @@ def set_giorno_chiuso(lunedi, data, chiuso):
     _salva_settimana(lunedi, giorni_chiusi=','.join(sorted(giorni)))
 
 
+# Tabelle dell'app che usano il nome del prodotto (oltre a listino e registro,
+# che si ricaricano dai fogli Google). I log delle modifiche/eliminazioni del
+# registro non si toccano: sono la traccia storica.
+TABELLE_NOMI_PRODOTTO = ('lista_spesa', 'spesa_comprati', 'log_lista_spesa', 'etichette_alias',
+                         'ricette_ingredienti', 'preparazione_ingredienti')
+
+
+def rinomina_prodotti(unioni):
+    """unioni: {nome vecchio: nome tenuto}. Il nome vecchio si riconosce senza
+    badare a maiuscole e spazi. Restituisce quante righe ha cambiato per tabella."""
+    cambiate = {}
+    with get_conn() as conn:
+        for tabella in TABELLE_NOMI_PRODOTTO:
+            n = 0
+            righe = _rows(conn.execute(f"SELECT id, prodotto FROM {tabella}"))
+            for r in righe:
+                k = ' '.join((r['prodotto'] or '').split()).lower()
+                for vecchio, tenuto in unioni.items():
+                    if k == ' '.join(vecchio.split()).lower() and r['prodotto'] != tenuto:
+                        conn.execute(f"UPDATE {tabella} SET prodotto = ? WHERE id = ?", (tenuto, r['id']))
+                        n += 1
+                        break
+            cambiate[tabella] = n
+    return cambiate
+
+
 def get_comprato(comprato_id):
     with get_conn() as conn:
         return _row(conn.execute("SELECT * FROM spesa_comprati WHERE id = ?", (comprato_id,)))

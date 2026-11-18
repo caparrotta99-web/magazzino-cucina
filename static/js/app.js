@@ -1749,7 +1749,7 @@ function _setHomePage(idx, animate = true) {
   if (!animate) track.offsetHeight; // forza il reflow prima di riabilitare la transizione
   track.style.transition = '';
   document.querySelectorAll('#home-switcher .home-switcher-btn').forEach((b, i) => b.classList.toggle('active', i === idx));
-  document.body.classList.toggle('home-p1', pages.length > 1 && idx === 0);
+  document.body.classList.toggle('home-p1', S.activePage === 'home' && pages.length > 1 && idx === 0);
   if (pages[idx]) pages[idx].scrollTop = 0;
   if (idx === 0 && pages.length > 1) renderHomeDashboard();
 }
@@ -1806,7 +1806,10 @@ function _initHomeSwipe() {
   viewport.addEventListener('touchend', endDrag);
   viewport.addEventListener('touchcancel', endDrag);
 
-  window.addEventListener('resize', () => _setHomePage(S.homePageIdx, false));
+  // Solo se la Home è davvero aperta: altrimenti (tastiera che si apre,
+  // barra del browser che sparisce, telefono girato) rimetteva su body la
+  // classe home-p1 anche nella lista spesa, e la pagina non scorreva più.
+  window.addEventListener('resize', () => { if (S.activePage === 'home') _setHomePage(S.homePageIdx, false); });
 }
 
 // ── TUTORIAL ("?") ───────────────────────────────────────────────────────

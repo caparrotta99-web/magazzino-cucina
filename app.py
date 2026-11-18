@@ -1587,17 +1587,34 @@ def _piano_json(lunedi):
     visibile = admin or bool(sett['pubblicato'])
     menu = _db.get_menu_periodo(lunedi.isoformat(), domenica.isoformat()) if visibile else []
     chiusi = set(filter(None, sett['giorni_chiusi'].split(',')))
+    costi = {(p['nome'].lower(), p['tipo']): float(p.get('costo') or 0) for p in _db.get_piatti()}
     giorni = []
     for g in giorni_settimana(lunedi):
         iso = g.isoformat()
-        del_giorno = [m for m in menu if m['data'] == iso]
+        del_giorno = [dict(m) for m in menu if m['data'] == iso]
+        for m in del_giorno:
+            m['costo'] = costi.get((' '.join(m['piatto'].split()).lower(), m['tipo']), 0)
+            m['caro'] = m['costo'] > _db.COSTO_MAX_PIATTO[m['tipo']]
+        max_primo = max([m['costo'] for m in del_giorno if m['tipo'] == 'primo'] or [0])
+        max_secondo = max([m['costo'] for m in del_giorno if m['tipo'] == 'secondo'] or [0])
         giorni.append({
             'data': iso,
             'chiuso': iso in chiusi,
             'primi':   {m['posizione']: m for m in del_giorno if m['tipo'] == 'primo'},
             'secondi': {m['posizione']: m for m in del_giorno if m['tipo'] == 'secondo'},
+            # primo + secondo più cari: quanto può costare al massimo un pranzo
+            'costo_max': round(max_primo + max_secondo, 2),
+            'costo_completo': all(m['costo'] > 0 for m in del_giorno) and len(del_giorno) > 0,
+            'sopra_budget': max_primo + max_secondo > _db.COSTO_MAX_GIORNO,
         })
+    if not admin:   # i costi li vede solo chi fa il menu
+        for g in giorni:
+            for k in ('costo_max', 'costo_completo', 'sopra_budget'):
+                g.pop(k)
+            for m in list(g['primi'].values()) + list(g['secondi'].values()):
+                m.pop('costo', None); m.pop('caro', None)
     return {'success': True, 'lunedi': lunedi.isoformat(), 'oggi': today_it().isoformat(),
+            'costo_max_giorno': _db.COSTO_MAX_GIORNO, 'costo_max_piatto': _db.COSTO_MAX_PIATTO,
             'pubblicato': bool(sett['pubblicato']), 'pubblicato_da': sett['pubblicato_da'],
             'visibile': visibile, 'puo_modificare': admin, 'giorni': giorni}
 
@@ -1636,7 +1653,13 @@ def api_piano_posto():
     if tipo not in _db.TIPI_PIATTO or not 1 <= posizione <= _db.POSTI_PER_TIPO:
         return jsonify({'success': False, 'error': 'Dati non validi'}), 400
     categoria = d.get('categoria') if d.get('categoria') in _db.CATEGORIE_PIATTO else ''
-    _db.set_piatto_menu(data, tipo, posizione, d.get('piatto') or '', categoria)
+    costo = None
+    if d.get('costo') not in (None, ''):
+        try:
+            costo = max(0.0, round(float(str(d.get('costo')).replace(',', '.')), 2))
+        except ValueError:
+            return jsonify({'success': False, 'error': 'Costo non valido'}), 400
+    _db.set_piatto_menu(data, tipo, posizione, d.get('piatto') or '', categoria, costo)
     return jsonify(_piano_json(_lunedi_di(data)))
 
 
@@ -1653,7 +1676,8 @@ def api_piano_alternative():
         return jsonify({'success': False, 'error': 'Data non valida'}), 400
     tipo = request.args.get('tipo')
     menu = _db.get_menu_periodo((giorno - timedelta(days=30)).isoformat(), (giorno + timedelta(days=30)).isoformat())
-    archivio = [{'nome': p['nome'], 'tipo': p['tipo'], 'categoria': p['categoria']} for p in _db.get_piatti()]
+    archivio = [{'nome': p['nome'], 'tipo': p['tipo'], 'categoria': p['categoria'], 'costo': float(p.get('costo') or 0)}
+                for p in _db.get_piatti()]
     return jsonify({'success': True,
                     'alternative': alternative(giorno, tipo, archivio, menu),
                     'archivio': [p for p in archivio if p['tipo'] == tipo]})
@@ -1669,7 +1693,8 @@ def api_piano_proponi():
     lunedi = _lunedi_di((request.get_json(force=True) or {}).get('settimana'))
     sett = _db.get_settimana_menu(lunedi.isoformat())
     menu = _db.get_menu_periodo((lunedi - timedelta(days=21)).isoformat(), (lunedi + timedelta(days=27)).isoformat())
-    archivio = [{'nome': p['nome'], 'tipo': p['tipo'], 'categoria': p['categoria']} for p in _db.get_piatti()]
+    archivio = [{'nome': p['nome'], 'tipo': p['tipo'], 'categoria': p['categoria'], 'costo': float(p.get('costo') or 0)}
+                for p in _db.get_piatti()]
     proposte = proponi_settimana(lunedi, archivio, menu, filter(None, sett['giorni_chiusi'].split(',')))
     for p in proposte:
         _db.set_piatto_menu(p['data'], p['tipo'], p['posizione'], p['piatto'], p['categoria'])

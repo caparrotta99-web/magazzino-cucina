@@ -2771,6 +2771,7 @@ function _isoPiu(iso, giorni) {
   d.setDate(d.getDate() + giorni);
   return d.toISOString().slice(0, 10);
 }
+function _euro(n) { return (Math.round(n * 100) / 100).toFixed(2).replace('.', ',') + ' €'; }
 function _ggmm(iso) { const [y, m, d] = iso.split('-'); return `${d}/${m}`; }
 
 async function loadPiano() {
@@ -2811,9 +2812,10 @@ function renderPiano() {
         ${[1, 2, 3, 4].map(n => {
           const m = posti[n] || posti[String(n)];
           const cat = m && m.categoria ? `<span class="piano-cat cat-${m.categoria}">${_CATEGORIE_IT[m.categoria] || ''}</span>` : '';
+          const costo = m && m.costo ? `<span class="piano-costo ${m.caro ? 'caro' : ''}">${_euro(m.costo)}</span>` : '';
           if (!m && !p.puo_modificare) return `<div class="piano-posto vuoto">—</div>`;
           return `<button type="button" class="piano-posto ${m ? '' : 'vuoto'}" ${p.puo_modificare ? `onclick="apriPiatto('${g.data}','${tipo}',${n})"` : 'disabled'}>
-              <span class="piano-piatto">${m ? esc(m.piatto) : '+ aggiungi'}</span>${cat}
+              <span class="piano-piatto">${m ? esc(m.piatto) : '+ aggiungi'}</span><span class="piano-tag">${cat}${costo}</span>
             </button>`;
         }).join('')}
       </div>`;
@@ -2821,6 +2823,7 @@ function renderPiano() {
       <div class="piano-giorno ${oggi ? 'oggi' : ''} ${g.chiuso ? 'chiuso' : ''}">
         <div class="piano-giorno-top">
           <div class="piano-giorno-nome">${_nomeGiorno(g.data)} <span>${_ggmm(g.data)}</span>${oggi ? '<em>oggi</em>' : ''}</div>
+          ${p.puo_modificare && !g.chiuso && g.costo_max ? `<span class="piano-costo-giorno ${g.sopra_budget ? 'sopra' : ''}" title="Primo e secondo più cari">${g.sopra_budget ? 'Sopra budget · ' : ''}max ${_euro(g.costo_max)}</span>` : ''}
           ${p.puo_modificare ? `<button type="button" class="piano-chiuso-btn" onclick="segnaChiuso('${g.data}', ${!g.chiuso})">${g.chiuso ? 'Riapri' : 'Chiuso'}</button>` : ''}
         </div>
         ${g.chiuso ? '<div class="piano-chiuso-txt">Chiuso</div>' : `<div class="piano-cols">${colonna('primo', g.primi, 'Primi')}${colonna('secondo', g.secondi, 'Secondi')}</div>`}
@@ -2856,6 +2859,9 @@ async function apriPiatto(data, tipo, posizione) {
   S.pianoPosto = { data, tipo, posizione, categoria: (m && m.categoria) || '' };
   document.getElementById('piatto-titolo').textContent = `${_nomeGiorno(data)} ${_ggmm(data)} · ${tipo === 'primo' ? 'Primo' : 'Secondo'} ${posizione}`;
   document.getElementById('piatto-nome').value = m ? m.piatto : '';
+  document.getElementById('piatto-costo').value = m && m.costo ? String(m.costo).replace('.', ',') : '';
+  document.getElementById('piatto-costo-nota').textContent =
+    `Limite per il menu da 15 €: ${_euro(S.piano.costo_max_piatto[tipo])} per un ${tipo}`;
   _sceltaCategoria(S.pianoPosto.categoria);
   document.getElementById('piatto-alternative').innerHTML = '';
   document.getElementById('piatto-alt-tit').style.display = 'none';
@@ -2868,14 +2874,15 @@ async function apriPiatto(data, tipo, posizione) {
   const alt = r.alternative || [];
   document.getElementById('piatto-alt-tit').style.display = alt.length ? '' : 'none';
   document.getElementById('piatto-alternative').innerHTML = alt.map(a => `
-    <button type="button" class="piatto-alt" onclick='_usaAlternativa(${JSON.stringify(a.nome)}, ${JSON.stringify(a.categoria)})'>
+    <button type="button" class="piatto-alt" onclick='_usaAlternativa(${JSON.stringify(a.nome)}, ${JSON.stringify(a.categoria)}, ${a.costo || 0})'>
       <span>${esc(a.nome)}</span>
-      <small>${a.ultima_volta ? 'ultima volta ' + _ggmm(a.ultima_volta) : 'mai fatto'}${a.categoria ? ' · ' + (_CATEGORIE_IT[a.categoria] || '') : ''}</small>
+      <small>${a.ultima_volta ? 'ultima volta ' + _ggmm(a.ultima_volta) : 'mai fatto'}${a.categoria ? ' · ' + (_CATEGORIE_IT[a.categoria] || '') : ''}${a.costo ? ' · ' + _euro(a.costo) : ''}</small>
     </button>`).join('');
 }
 
-function _usaAlternativa(nome, categoria) {
+function _usaAlternativa(nome, categoria, costo) {
   document.getElementById('piatto-nome').value = nome;
+  document.getElementById('piatto-costo').value = costo ? String(costo).replace('.', ',') : '';
   _sceltaCategoria(categoria);
 }
 
@@ -2884,6 +2891,7 @@ function _piattoDaArchivio() {
   const v = document.getElementById('piatto-nome').value.trim().toLowerCase();
   const a = (S.pianoArchivio || []).find(x => x.nome.toLowerCase() === v);
   if (a && a.categoria) _sceltaCategoria(a.categoria);
+  if (a && a.costo) document.getElementById('piatto-costo').value = String(a.costo).replace('.', ',');
 }
 
 function _sceltaCategoria(cat) {
@@ -2900,7 +2908,8 @@ async function salvaPiatto(togli) {
   const p = S.pianoPosto;
   if (!p) return;
   const piatto = togli ? '' : document.getElementById('piatto-nome').value.trim();
-  const r = await api('/api/piano/posto', { method: 'POST', body: { ...p, piatto, categoria: p.categoria } });
+  const costo = togli ? '' : document.getElementById('piatto-costo').value.trim();
+  const r = await api('/api/piano/posto', { method: 'POST', body: { ...p, piatto, categoria: p.categoria, costo } });
   if (!r || !r.success) { toast((r && r.error) || 'Errore', 'error'); return; }
   S.piano = r; renderPiano();
   chiudiPiatto();

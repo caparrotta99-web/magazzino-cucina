@@ -149,3 +149,42 @@ def test_api_proponi_usa_l_archivio(db):
     r = admin.post('/api/piano/proponi', json={'settimana': lunedi}).get_json()
     assert r['aggiunti'] == 32 and len(r['giorni']) == 4
     assert all(len(g['primi']) == 4 and len(g['secondi']) == 4 for g in r['giorni'])
+
+
+def test_non_propone_piatti_sopra_il_costo_per_porzione():
+    archivio = [{'nome': 'Linguine allo scoglio', 'tipo': 'primo', 'categoria': 'pesce', 'costo': 3.20},
+                {'nome': 'Pasta al pomodoro', 'tipo': 'primo', 'categoria': 'verdure', 'costo': 0.60},
+                {'nome': 'Gamberoni', 'tipo': 'secondo', 'categoria': 'pesce', 'costo': 5.0},
+                {'nome': 'Pollo arrosto', 'tipo': 'secondo', 'categoria': 'carne', 'costo': 1.80},
+                {'nome': 'Frittata', 'tipo': 'secondo', 'categoria': 'verdure', 'costo': 0}]   # costo sconosciuto: va bene
+    nomi = {p['piatto'] for p in proponi_settimana(LUNEDI, archivio, [])}
+    assert 'Linguine allo scoglio' not in nomi and 'Gamberoni' not in nomi
+    assert {'Pasta al pomodoro', 'Pollo arrosto', 'Frittata'} <= nomi
+    alt = [a['nome'] for a in alternative(LUNEDI + timedelta(days=1), 'secondo', archivio, [])]
+    assert 'Gamberoni' not in alt
+
+
+def test_api_costo_salvato_avviso_budget_e_costi_nascosti_allo_staff(db):
+    import app as A
+    A.app.config['TESTING'] = True
+    admin = _login(A, db, 'Capo Cucina', 'admin')
+    staff = _login(A, db, 'Aiuto Cuoco')
+    oggi = A.today_it()
+    martedi = (oggi - timedelta(days=oggi.weekday()) + timedelta(days=1)).isoformat()
+    admin.post('/api/piano/posto', json={'data': martedi, 'tipo': 'primo', 'posizione': 1,
+                                         'piatto': 'Pasta e fagioli', 'categoria': 'verdure', 'costo': '0,90'})
+    r = admin.post('/api/piano/posto', json={'data': martedi, 'tipo': 'secondo', 'posizione': 1,
+                                             'piatto': 'Tagliata', 'categoria': 'carne', 'costo': '3,40'}).get_json()
+    g = next(x for x in r['giorni'] if x['data'] == martedi)
+    assert g['primi']['1']['costo'] == 0.9 and g['secondi']['1']['caro'] is True
+    assert g['costo_max'] == 4.3 and g['sopra_budget'] is True
+    # il costo resta nell'archivio
+    assert next(p for p in db.get_piatti() if p['nome'] == 'Tagliata')['costo'] == 3.4
+    # costo scritto male
+    assert admin.post('/api/piano/posto', json={'data': martedi, 'tipo': 'primo', 'posizione': 2,
+                                                'piatto': 'X', 'costo': 'tanto'}).status_code == 400
+
+    admin.post('/api/piano/pubblica', json={'settimana': martedi})
+    s = staff.get('/api/piano').get_json()
+    g = next(x for x in s['giorni'] if x['data'] == martedi)
+    assert 'costo_max' not in g and 'costo' not in g['secondi']['1']

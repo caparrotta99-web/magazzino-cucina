@@ -720,3 +720,7 @@
   width: auto !important; font-size: 14px !important; font-weight: 700; gap: 6px !important;
   border-radius: 999px !important; padding: 0 18px !important;
 }
+:root[data-stile="futuro"] .piano-costo { font-family: var(--f-mono); background: transparent !important; border: 1px solid var(--f-ln); color: var(--f-mu) !important; }
+:root[data-stile="futuro"] .piano-costo.caro { color: var(--f-am) !important; border-color: color-mix(in srgb, var(--f-am) 50%, transparent); }
+:root[data-stile="futuro"] .piano-costo-giorno { font-family: var(--f-mono); letter-spacing: .06em; color: var(--f-mu) !important; }
+:root[data-stile="futuro"] .piano-costo-giorno.sopra { color: var(--f-am) !important; }

@@ -6,6 +6,8 @@ Regole, in parole semplici:
 - tra i piatti possibili sceglie quello che non fate da più tempo, così
   l'archivio gira tutto e non si ripetono sempre gli stessi;
 - nei secondi prova a mettere ogni giorno almeno un pesce e una carne;
+- non propone piatti che costano più del limite per porzione (menu da 15 €:
+  primo 1,30 €, secondo 2,50 € di materia prima), se il costo è segnato;
 - mai due primi della stessa "famiglia" lo stesso giorno (due risotti,
   due gnocchi...): la famiglia è la prima parola del nome;
 - i posti già compilati a mano non si toccano, e i giorni chiusi restano vuoti;
@@ -18,6 +20,7 @@ from datetime import date, timedelta
 
 GIORNI_SENZA_RIPETERE = 14
 POSTI = 4
+COSTO_MAX_PIATTO = {'primo': 1.30, 'secondo': 2.50}
 GIORNI_MENU = (1, 2, 3, 4)   # menu del giorno da martedì a venerdì (lunedì chiuso,
                              # sabato e domenica niente menu del giorno)
 _PAROLE_VUOTE = {'di', 'del', 'della', 'delle', 'dei', 'al', 'alla', 'alle', 'ai', 'con', 'e', 'in', 'il', 'la', 'lo', 'le', 'gli'}
@@ -66,6 +69,8 @@ def proponi_settimana(lunedi, archivio, menu, giorni_chiusi=()):
                 continue
 
             def usabile(piatto):
+                if float(piatto.get('costo') or 0) > COSTO_MAX_PIATTO[tipo]:
+                    return False
                 k = (_chiave(piatto['nome']), tipo)
                 if any(_chiave(m['piatto']) == k[0] for m in del_giorno.values()):
                     return False
@@ -112,8 +117,9 @@ def alternative(giorno, tipo, archivio, menu, quante=6):
             if g == giorno:
                 del_giorno.add(k)
     ok = [p for p in archivio if p['tipo'] == tipo and _chiave(p['nome']) not in del_giorno
+          and float(p.get('costo') or 0) <= COSTO_MAX_PIATTO.get(tipo, 99)
           and not (ultima.get(_chiave(p['nome'])) and abs((giorno - ultima[_chiave(p['nome'])]).days) < GIORNI_SENZA_RIPETERE)]
     ok.sort(key=lambda p: (ultima.get(_chiave(p['nome']), date.min), _chiave(p['nome'])))
-    return [{'nome': p['nome'], 'categoria': p.get('categoria') or '',
+    return [{'nome': p['nome'], 'categoria': p.get('categoria') or '', 'costo': float(p.get('costo') or 0),
              'ultima_volta': ultima[_chiave(p['nome'])].isoformat() if _chiave(p['nome']) in ultima else ''}
             for p in ok[:quante]]

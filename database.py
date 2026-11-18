@@ -606,6 +606,7 @@ def db_init():
         ('users',        'notif_rifiuti',     "INTEGER NOT NULL DEFAULT 1"),
         ('users',        'notif_chat',        "INTEGER NOT NULL DEFAULT 1"),
         ('users',        'stile',             "TEXT NOT NULL DEFAULT 'classico'"),
+        ('piatti',       'costo',             "REAL NOT NULL DEFAULT 0"),
         ('users',        'puo_chat', "INTEGER NOT NULL DEFAULT 0"),
         ('users',        'chat_last_seen', "TEXT NOT NULL DEFAULT ''"),
         ('chat_messaggi', 'autore_badge', "TEXT NOT NULL DEFAULT ''"),
@@ -1615,6 +1616,10 @@ def get_nomi_in_lista_spesa():
 TIPI_PIATTO = ('primo', 'secondo')
 CATEGORIE_PIATTO = ('pesce', 'carne', 'verdure', 'altro')
 POSTI_PER_TIPO = 4
+# Menu del giorno a 15 € (primo, secondo, acqua o vino, caffè): costo massimo
+# della materia prima per porzione, e per il giorno (primo + secondo più cari).
+COSTO_MAX_PIATTO = {'primo': 1.30, 'secondo': 2.50}
+COSTO_MAX_GIORNO = 3.80
 
 
 def get_piatti():
@@ -1622,8 +1627,9 @@ def get_piatti():
         return _rows(conn.execute("SELECT * FROM piatti ORDER BY LOWER(nome)"))
 
 
-def salva_piatto_archivio(nome, tipo, categoria=''):
-    """Aggiunge il piatto all'archivio (o ne aggiorna la categoria)."""
+def salva_piatto_archivio(nome, tipo, categoria='', costo=None):
+    """Aggiunge il piatto all'archivio (o ne aggiorna categoria e costo).
+    costo None = non toccarlo; 0 = sconosciuto."""
     nome = ' '.join((nome or '').split())
     if not nome or tipo not in TIPI_PIATTO:
         return
@@ -1634,9 +1640,11 @@ def salva_piatto_archivio(nome, tipo, categoria=''):
         if esiste:
             if categoria and categoria != esiste['categoria']:
                 conn.execute("UPDATE piatti SET categoria = ? WHERE id = ?", (categoria, esiste['id']))
+            if costo is not None:
+                conn.execute("UPDATE piatti SET costo = ? WHERE id = ?", (float(costo), esiste['id']))
         else:
-            conn.execute("INSERT INTO piatti (nome, tipo, categoria, creato_il) VALUES (?, ?, ?, ?)",
-                         (nome, tipo, categoria, now_it().isoformat(timespec='seconds')))
+            conn.execute("INSERT INTO piatti (nome, tipo, categoria, costo, creato_il) VALUES (?, ?, ?, ?, ?)",
+                         (nome, tipo, categoria, float(costo or 0), now_it().isoformat(timespec='seconds')))
 
 
 def get_menu_periodo(dal, al):
@@ -1647,7 +1655,7 @@ def get_menu_periodo(dal, al):
             "WHERE data >= ? AND data <= ? ORDER BY data, tipo, posizione", (dal, al)))
 
 
-def set_piatto_menu(data, tipo, posizione, piatto, categoria=''):
+def set_piatto_menu(data, tipo, posizione, piatto, categoria='', costo=None):
     """Mette (o toglie, con piatto vuoto) un piatto in un posto del menu."""
     piatto = ' '.join((piatto or '').split())
     with get_conn() as conn:
@@ -1657,7 +1665,7 @@ def set_piatto_menu(data, tipo, posizione, piatto, categoria=''):
             conn.execute("INSERT INTO menu_giorno (data, tipo, posizione, piatto, categoria) "
                          "VALUES (?, ?, ?, ?, ?)", (data, tipo, int(posizione), piatto, categoria or ''))
     if piatto:
-        salva_piatto_archivio(piatto, tipo, categoria)
+        salva_piatto_archivio(piatto, tipo, categoria, costo)
 
 
 def get_settimana_menu(lunedi):

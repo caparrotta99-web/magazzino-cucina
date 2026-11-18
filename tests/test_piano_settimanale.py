@@ -188,3 +188,24 @@ def test_api_costo_salvato_avviso_budget_e_costi_nascosti_allo_staff(db):
     s = staff.get('/api/piano').get_json()
     g = next(x for x in s['giorni'] if x['data'] == martedi)
     assert 'costo_max' not in g and 'costo' not in g['secondi']['1']
+
+
+def test_i_colleghi_vedono_solo_i_giorni_scritti(db):
+    import app as A
+    A.app.config['TESTING'] = True
+    admin = _login(A, db, 'Capo Cucina', 'admin')
+    staff = _login(A, db, 'Aiuto Cuoco')
+    oggi = A.today_it()
+    lunedi = oggi - timedelta(days=oggi.weekday())
+    mercoledi = (lunedi + timedelta(days=2)).isoformat()
+    venerdi = (lunedi + timedelta(days=4)).isoformat()
+    admin.post('/api/piano/posto', json={'data': mercoledi, 'tipo': 'primo', 'posizione': 1, 'piatto': 'Lasagne'})
+    admin.post('/api/piano/posto', json={'data': mercoledi, 'tipo': 'secondo', 'posizione': 3, 'piatto': 'Polpette'})
+    admin.post('/api/piano/chiuso', json={'data': venerdi, 'chiuso': True})
+    admin.post('/api/piano/pubblica', json={'settimana': lunedi.isoformat()})
+
+    s = staff.get('/api/piano').get_json()
+    assert [g['data'] for g in s['giorni']] == [mercoledi, venerdi]      # martedì e giovedì vuoti: nascosti
+    assert list(s['giorni'][0]['primi']) == ['1'] and list(s['giorni'][0]['secondi']) == ['3']
+    # l'admin continua a vedere tutta la settimana
+    assert len(admin.get('/api/piano').get_json()['giorni']) == 4

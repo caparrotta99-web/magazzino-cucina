@@ -2804,12 +2804,16 @@ function renderPiano() {
     box.innerHTML = `<div class="empty-state"><p>Il menu di questa settimana non è ancora stato pubblicato.</p></div>`;
     return;
   }
+  if (!p.giorni.length) {
+    box.innerHTML = `<div class="empty-state"><p>Il menu di questa settimana non è ancora pronto.</p></div>`;
+    return;
+  }
   box.innerHTML = p.giorni.map((g, i) => {
     const oggi = g.data === p.oggi;
     const colonna = (tipo, posti, titolo) => `
       <div class="piano-col">
         <div class="piano-col-tit">${titolo}</div>
-        ${[1, 2, 3, 4].map(n => {
+        ${[1, 2, 3, 4].filter(n => p.puo_modificare || posti[n] || posti[String(n)]).map(n => {
           const m = posti[n] || posti[String(n)];
           const cat = m && m.categoria ? `<span class="piano-cat cat-${m.categoria}">${_CATEGORIE_IT[m.categoria] || ''}</span>` : '';
           const costo = m && m.costo ? `<span class="piano-costo ${m.caro ? 'caro' : ''}">${_euro(m.costo)}</span>` : '';
@@ -2843,7 +2847,14 @@ async function pubblicaPiano() {
   const data = await api('/api/piano/pubblica', { method: 'POST', body: { settimana: S.pianoLunedi, pubblica } });
   if (!data || !data.success) { toast('Errore', 'error'); return; }
   S.piano = data; renderPiano();
-  toast(pubblica ? 'Menu pubblicato: ora lo vedono tutti' : 'Menu ritirato: torna una bozza', 'success');
+  if (pubblica) {
+    const pronti = data.giorni.filter(g => !g.chiuso && (Object.keys(g.primi).length || Object.keys(g.secondi).length))
+                              .map(g => _nomeGiorno(g.data).toLowerCase());
+    toast(pronti.length ? `Pubblicato: i colleghi vedono ${pronti.join(', ')}. Gli altri giorni compaiono appena li scrivi.`
+                        : 'Pubblicato: i giorni compariranno ai colleghi appena li scrivi', 'success');
+  } else {
+    toast('Menu ritirato: torna una bozza', 'success');
+  }
   loadPranzoOggi();
 }
 

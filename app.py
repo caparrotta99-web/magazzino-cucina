@@ -1607,7 +1607,11 @@ def _piano_json(lunedi):
             'costo_completo': all(m['costo'] > 0 for m in del_giorno) and len(del_giorno) > 0,
             'sopra_budget': max_primo + max_secondo > _db.COSTO_MAX_GIORNO,
         })
-    if not admin:   # i costi li vede solo chi fa il menu
+    if not admin:
+        # i colleghi vedono solo i giorni già scritti (o segnati chiusi):
+        # se oggi scrivi il mercoledì, vedono solo il mercoledì
+        giorni = [g for g in giorni if g['chiuso'] or g['primi'] or g['secondi']]
+        # i costi li vede solo chi fa il menu
         for g in giorni:
             for k in ('costo_max', 'costo_completo', 'sopra_budget'):
                 g.pop(k)

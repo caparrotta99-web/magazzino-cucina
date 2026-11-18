@@ -84,7 +84,12 @@ def test_registro_rinomina_solo_il_prodotto_e_scrive_le_unita_uguali():
 
 def test_segnala_merce_ancora_in_magazzino_col_nome_vecchio():
     valori, _ = registro()
-    assert giacenze_aperte(valori) == {'Gamberi': [(1.0, 'pz')]}
+    # le patatine del lotto L1 sono state scaricate tutte (come col riordino del 17/11),
+    # anche se la vecchia riga di carico ha ancora "Rimanenza" scritta
+    valori[1][10] = '10'
+    valori.append(['17/11/2026', 'DAC', 'Patatine fritte', 'L1', '', '', '10', 'Pz', '', 'a5', '0', 'Simone', 'Cucina', 'SCARICO'])
+    valori.append(['17/11/2026', 'DOCKS', 'fernet menta', '', '', '', '2', 'Pz', '', 'a6', '0', 'Simone', 'Sala', 'SCARICO'])
+    assert giacenze_aperte(valori) == {'Gamberi': [(3.0, 'pz')]}
 
 
 def test_controllo_dopo_la_scrittura():

@@ -610,7 +610,12 @@ def _ricarica_da_sheets():
     dopo aver svuotato tutto quello che era in attesa; se qualcosa resta
     indietro NON si ricarica, altrimenti i movimenti non ancora arrivati su
     Sheets sparirebbero per sempre."""
-    with _SHEETS_LOCK:
+    # Se un altro invio/ricaricamento è in corso da troppo, non aspetto per
+    # sempre: rinuncio e lo dico, invece di bloccare anche questa richiesta.
+    if not _SHEETS_LOCK.acquire(timeout=90):
+        print("[SYNC] ricaricamento rinunciato: un altro invio ai fogli è in corso da oltre 90 secondi", flush=True)
+        return {'ricaricato': False, 'occupato': True, 'inviati': 0, 'pendenti': conta_pendenti_sheets()}
+    try:
         inviati  = _push_pending_to_sheets()
         pendenti = conta_pendenti_sheets()
         if pendenti:
@@ -618,12 +623,17 @@ def _ricarica_da_sheets():
                   f"su Sheets andrebbero persi. Riprovo al prossimo giro.", flush=True)
             return {'ricaricato': False, 'inviati': inviati, 'pendenti': pendenti}
 
+        # una riga di log per passo: se un giorno si blocca, si vede dove
+        print("[SYNC] ricarico: leggo LISTINO", flush=True)
         listino = load_listino()
         replace_listino(listino)
+        print(f"[SYNC] LISTINO: {len(listino)} prodotti. Leggo REGISTRO", flush=True)
         registro = load_registro()
         replace_registro(registro)
+        print(f"[SYNC] REGISTRO: {len(registro)} righe. Leggo TEMPERATURE", flush=True)
         temperature = load_temperatura()
         replace_temperatura(temperature)
+        print(f"[SYNC] TEMPERATURE: {len(temperature)} righe. Ricaricamento finito", flush=True)
         # Appena ricaricato i due archivi devono coincidere: se non coincidono
         # c'e' qualcosa da guardare subito.
         _controlla_allineamento(registro)
@@ -632,6 +642,8 @@ def _ricarica_da_sheets():
             'listino': len(listino), 'registro': len(registro),
             'temperature': len(temperature),
         }
+    finally:
+        _SHEETS_LOCK.release()
 
 
 def _sync_sheets_background():
@@ -1021,8 +1033,8 @@ def admin_conferma_reset():
 def api_admin_pulizia_listino():
     """Dopo strumenti/pulisci_listino.py --applica (che sistema i fogli Google):
     rinomina i prodotti uniti anche nelle tabelle dell'app (lista spesa, ordini
-    salvati, abbinamenti delle etichette, ricette) e ricarica listino e registro
-    dai fogli."""
+    salvati, abbinamenti delle etichette, ricette). Listino e registro si
+    ricaricano dai fogli a parte (riavvio o Sincronizza)."""
     import importlib.util
     import database as _db
     spec = importlib.util.spec_from_file_location(
@@ -1030,11 +1042,10 @@ def api_admin_pulizia_listino():
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
     cambiate = _db.rinomina_prodotti(mod.UNIONI)
-    try:
-        esito = _ricarica_da_sheets()
-    except Exception as e:
-        esito = {'ricaricato': False, 'errore': str(e)}
-    return jsonify({'success': True, 'cambiate': cambiate, 'ricarica': esito})
+    print(f"[PULIZIA] prodotti rinominati nelle tabelle dell'app: {cambiate}", flush=True)
+    # Il ricaricamento dai fogli NON si fa qui: si fa al riavvio o con
+    # "Sincronizza", così questa operazione non resta appesa a Google.
+    return jsonify({'success': True, 'cambiate': cambiate})
 
 
 @app.route('/api/admin/riordino-magazzino', methods=['POST'])
@@ -2343,6 +2354,9 @@ def api_stato_sheets():
 def api_sync():
     try:
         esito = _ricarica_da_sheets()
+        if esito.get('occupato'):
+            return jsonify({'success': False, 'ricaricato': False,
+                            'error': "Un altro invio ai fogli Google è ancora in corso: riprova tra qualche minuto."}), 503
         if not esito['ricaricato']:
             return jsonify({
                 'success': True,

@@ -199,6 +199,14 @@ def get_conn():
     return _DBConn()
 
 
+def _attesa_massima(conn, secondi=30):
+    """Per le operazioni lunghe (ricaricamento dai fogli, rinomine): se una
+    tabella è bloccata da un'altra operazione, dopo `secondi` dà errore invece
+    di aspettare per sempre. Vale solo per questa transazione."""
+    if _USE_PG:
+        conn.execute(f"SET LOCAL lock_timeout = '{int(secondi)}s'")
+
+
 def _rows(cur):
     """Convert cursor results to a list of plain dicts (works for both backends)."""
     return [dict(r) for r in cur.fetchall()]
@@ -720,6 +728,7 @@ def db_init():
 
 def replace_listino(rows):
     with get_conn() as conn:
+        _attesa_massima(conn)
         conn.execute("DELETE FROM listino")
         if rows:
             conn.executemany(
@@ -1340,6 +1349,7 @@ def get_scadenze_promemoria(oggi=None):
 
 def replace_registro(rows):
     with get_conn() as conn:
+        _attesa_massima(conn)
         conn.execute("DELETE FROM registro")
         if rows:
             conn.executemany(
@@ -1743,6 +1753,7 @@ def rinomina_prodotti(unioni):
     badare a maiuscole e spazi. Restituisce quante righe ha cambiato per tabella."""
     cambiate = {}
     with get_conn() as conn:
+        _attesa_massima(conn)
         for tabella in TABELLE_NOMI_PRODOTTO:
             n = 0
             righe = _rows(conn.execute(f"SELECT id, prodotto FROM {tabella}"))
@@ -2430,6 +2441,7 @@ def get_temperature_storico(giorni=30, apparecchio=None):
 def replace_temperatura(rows):
     """Ricarica lo storico temperature dal foglio Google (usato da /api/sync)."""
     with get_conn() as conn:
+        _attesa_massima(conn)
         conn.execute("DELETE FROM temperature")
         if rows:
             conn.executemany(

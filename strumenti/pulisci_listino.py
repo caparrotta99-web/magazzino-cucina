@@ -23,7 +23,8 @@ Uso (dalla cartella del progetto, con credentials.json presente):
 
 Dopo --applica serve un passo nell'app (lo fa Claude dal browser, da admin):
 POST /api/admin/pulizia-listino rinomina i prodotti uniti anche in lista spesa,
-ordini salvati, abbinamenti delle etichette e ricette, e ricarica i fogli.
+ordini salvati, abbinamenti delle etichette e ricette; poi "Sincronizza" (o un
+riavvio) ricarica listino e registro dai fogli.
 Per tornare indietro: nel foglio, File > Cronologia versioni.
 """
 import os
@@ -154,20 +155,30 @@ def pianifica_registro(valori, formule):
 
 
 def giacenze_aperte(valori):
-    """Prodotti col nome vecchio che hanno ancora merce in magazzino (rimanenza > 0):
-    unire nomi con unità diverse sommerebbe quantità che non si sommano."""
+    """Prodotti col nome vecchio che hanno ancora merce in magazzino:
+    per ogni lotto, carichi meno scarichi (la colonna "Rimanenza" delle vecchie
+    righe di carico non si aggiorna quando il lotto viene scaricato, quindi da
+    sola darebbe falsi allarmi)."""
     h = [x.strip() for x in valori[0]]
-    c_nome, c_rim, c_unita = _col(h, 'prodotto'), _col(h, 'rimanenza'), _col(h, 'unità', 'unita')
+    c_nome, c_lotto, c_unita = _col(h, 'prodotto'), _col(h, 'lotto'), _col(h, 'unità', 'unita')
+    c_car, c_sca = _col(h, 'carico'), _col(h, 'scarico')
     unioni = {_k(a) for a in UNIONI}
-    aperte = {}
+
+    def num(x):
+        try:
+            return float(str(x).replace(',', '.') or 0)
+        except ValueError:
+            return 0.0
+
+    saldi = {}
     for r in valori[1:]:
         if _k(_cella(r, c_nome)) in unioni:
-            try:
-                rim = float(str(_cella(r, c_rim)).replace(',', '.') or 0)
-            except ValueError:
-                rim = 0
-            if rim > 0:
-                aperte.setdefault(_cella(r, c_nome).strip(), []).append((rim, _cella(r, c_unita)))
+            chiave = (_cella(r, c_nome).strip(), _cella(r, c_lotto).strip(), _unita(_cella(r, c_unita)))
+            saldi[chiave] = saldi.get(chiave, 0) + num(_cella(r, c_car)) - num(_cella(r, c_sca))
+    aperte = {}
+    for (nome, _lotto, unita), saldo in saldi.items():
+        if saldo > 1e-9:
+            aperte.setdefault(nome, []).append((round(saldo, 3), unita))
     return aperte
 
 

@@ -163,7 +163,15 @@ def _get_client():
         creds = Credentials.from_service_account_info(info, scopes=SCOPES)
     else:
         creds = Credentials.from_service_account_file(CREDENTIALS_FILE, scopes=SCOPES)
-    return gspread.authorize(creds)
+    gc = gspread.authorize(creds)
+    # Senza un tempo massimo una chiamata a cui Google non risponde resta
+    # appesa per sempre e blocca ogni altro invio e ricaricamento: dopo 60
+    # secondi diventa un errore, e il giro dopo si riprova.
+    try:
+        gc.set_timeout(60)
+    except Exception:
+        pass
+    return gc
 
 
 def _detect(headers, key):

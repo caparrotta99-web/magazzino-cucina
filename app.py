@@ -616,6 +616,7 @@ def _ricarica_da_sheets():
         print("[SYNC] ricaricamento rinunciato: un altro invio ai fogli è in corso da oltre 90 secondi", flush=True)
         return {'ricaricato': False, 'occupato': True, 'inviati': 0, 'pendenti': conta_pendenti_sheets()}
     try:
+        print("[SYNC] lucchetto preso: invio prima quello che aspetta", flush=True)
         inviati  = _push_pending_to_sheets()
         pendenti = conta_pendenti_sheets()
         if pendenti:
@@ -647,21 +648,22 @@ def _ricarica_da_sheets():
 
 
 def _sync_sheets_background():
+    print("[SYNC] avvio: ricarico dai fogli Google", flush=True)
     try:
         esito = _ricarica_da_sheets()
         if not esito['ricaricato']:
             return
         extra = f" | {esito['inviati']} in sospeso sincronizzati" if esito['inviati'] else ""
         print(f"[SYNC] Listino: {esito['listino']} prodotti | Registro: {esito['registro']} movimenti | "
-              f"Temperature: {esito['temperature']} rilevazioni{extra}")
+              f"Temperature: {esito['temperature']} rilevazioni{extra}", flush=True)
     except Exception as e:
-        print(f"[SYNC] Sheets non raggiungibile: {e}")
+        print(f"[SYNC] Sheets non raggiungibile: {e}", flush=True)
 
 
 # Nei test niente thread: devono restare prevedibili e non parlare con Sheets.
 if os.environ.get('BRIGADE_NO_SCHEDULER') != '1':
-    threading.Thread(target=_sync_sheets_background, daemon=True).start()
-    threading.Thread(target=_worker_sheets, daemon=True).start()
+    threading.Thread(target=_sync_sheets_background, name='avvio-ricarica-fogli', daemon=True).start()
+    threading.Thread(target=_worker_sheets, name='invio-fogli', daemon=True).start()
 
 
 # ─── AUTH ─────────────────────────────────────────────────────────────────────
@@ -1025,6 +1027,26 @@ def admin_conferma_reset():
     confirm_reset_token(token_id)
     print(f"[Reset] codice id={token_id} confermato dall'admin {current_user.id}")
     return redirect(url_for('admin_page'))
+
+
+@app.route('/api/admin/diagnosi-sheets')
+@login_required
+@admin_required
+def api_admin_diagnosi_sheets():
+    """Per capire un blocco: dice se il lucchetto degli invii ai fogli è
+    occupato e in che punto del codice si trova ogni thread in questo momento."""
+    import sys as _sys
+    import traceback as _tb
+    nomi = {t.ident: t.name for t in threading.enumerate()}
+    thread = []
+    for ident, frame in _sys._current_frames().items():
+        pila = _tb.format_stack(frame)
+        # solo le righe del nostro codice e delle librerie che parlano con l'esterno
+        utili = [r for r in pila if any(x in r for x in ('/app.py', '/database.py', '/sheets.py',
+                                                       'gspread', 'psycopg2', 'requests', 'urllib3', 'socket', 'ssl', 'threading'))]
+        thread.append({'nome': nomi.get(ident, str(ident)), 'pila': [r.strip() for r in utili[-12:]]})
+    return jsonify({'success': True, 'lucchetto_occupato': _SHEETS_LOCK.locked(),
+                    'pendenti': conta_pendenti_sheets(), 'stato': dict(_STATO_SHEETS), 'thread': thread})
 
 
 @app.route('/api/admin/pulizia-listino', methods=['POST'])

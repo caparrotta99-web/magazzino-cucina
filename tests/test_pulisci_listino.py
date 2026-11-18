@@ -127,3 +127,13 @@ def test_endpoint_solo_admin(db):
     admin = A.app.test_client(); admin.post('/login', data={'nome': 'Capo Cucina', 'password': 'pw123456'})
     r = admin.post('/api/admin/pulizia-listino').get_json()
     assert r['success'] and r['cambiate']['lista_spesa'] == 1
+
+
+def test_diagnosi_fogli_solo_admin(db):
+    import app as A
+    from werkzeug.security import generate_password_hash
+    A.app.config['TESTING'] = True
+    db.create_user('Capo Cucina', 'capo', generate_password_hash('pw123456', method='pbkdf2'), 'cucina', role='admin')
+    admin = A.app.test_client(); admin.post('/login', data={'nome': 'Capo Cucina', 'password': 'pw123456'})
+    r = admin.get('/api/admin/diagnosi-sheets').get_json()
+    assert r['success'] and r['lucchetto_occupato'] is False and r['thread']

@@ -2429,8 +2429,15 @@ async function submitModificaLotto() {
 function _updateSpesaBadge() {
   const n = S.listaSpesa.filter(i => !i.completato).length;
   const el = document.getElementById('home-spesa-num');
-  if (el) el.textContent = n;
+  if (!el) return;
+  el.textContent = n;
+  // Brigade 3000: l'anello si riempie man mano che la lista cresce,
+  // pieno a SPESA_ANELLO_PIENO prodotti; oltre resta pieno e diventa ambra.
+  const pct = Math.min(100, Math.round(n / SPESA_ANELLO_PIENO * 100));
+  el.style.setProperty('--spesa-pct', pct + '%');
+  el.classList.toggle('piena', n >= SPESA_ANELLO_PIENO);
 }
+const SPESA_ANELLO_PIENO = 30;
 
 function _enrichItem(item) {
   // Lookup live stock data at render time

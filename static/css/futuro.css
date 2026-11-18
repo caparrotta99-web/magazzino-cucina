@@ -445,14 +445,17 @@
   background:
     radial-gradient(circle, var(--f-bg) 0 62%, transparent 63%),
     radial-gradient(circle, transparent 0 66%, rgba(var(--f-cy-rgb), .25) 66.5%, transparent 67.5%),
-    conic-gradient(var(--f-cy) 0 72%, rgba(var(--f-cy-rgb), .12) 72% 100%) !important;
+    conic-gradient(var(--anello) 0 var(--spesa-pct), rgba(var(--f-cy-rgb), .12) var(--spesa-pct) 100%) !important;
   box-shadow: 0 0 40px rgba(var(--f-cy-rgb), .28) !important;
   padding-bottom: 18px; box-sizing: border-box;
+  --anello: var(--f-cy);
+  transition: --spesa-pct .7s cubic-bezier(.2,.8,.2,1);
 }
+:root[data-stile="futuro"] .hcard-spesa-num.piena { --anello: var(--f-am); box-shadow: 0 0 40px color-mix(in srgb, var(--f-am) 35%, transparent) !important; }
 :root[data-stile="futuro"][data-theme="light"] .hcard-spesa-num {
   background:
     radial-gradient(circle, var(--f-bg) 0 62%, transparent 63%),
-    conic-gradient(var(--f-cy) 0 72%, rgba(var(--f-cy-rgb), .14) 72% 100%) !important;
+    conic-gradient(var(--anello) 0 var(--spesa-pct), rgba(var(--f-cy-rgb), .14) var(--spesa-pct) 100%) !important;
 }
 :root[data-stile="futuro"] .hcard-spesa-lbl {
   position: absolute; left: 0; right: 0; top: 122px; text-align: center; margin: 0;

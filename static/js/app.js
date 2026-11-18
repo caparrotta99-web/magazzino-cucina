@@ -2763,6 +2763,7 @@ S.piano = null;
 S.pianoLunedi = null;           // 'YYYY-MM-DD' del lunedì mostrato
 S.pianoPosto = null;            // posto che si sta modificando
 const _GIORNI_IT = ['Lunedì', 'Martedì', 'Mercoledì', 'Giovedì', 'Venerdì', 'Sabato', 'Domenica'];
+const _nomeGiorno = iso => _GIORNI_IT[(new Date(iso + 'T12:00:00').getDay() + 6) % 7];
 const _CATEGORIE_IT = { pesce: 'Pesce', carne: 'Carne', verdure: 'Verdure', altro: 'Altro' };
 
 function _isoPiu(iso, giorni) {
@@ -2789,7 +2790,7 @@ function cambiaSettimanaPiano(giorni) {
 function renderPiano() {
   const p = S.piano;
   document.getElementById('piano-settimana').textContent =
-    `${_ggmm(p.lunedi)} – ${_ggmm(_isoPiu(p.lunedi, 6))}`;
+    `Mar ${_ggmm(_isoPiu(p.lunedi, 1))} – Ven ${_ggmm(_isoPiu(p.lunedi, 4))}`;
   const stato = document.getElementById('piano-stato');
   stato.textContent = p.pubblicato ? `Pubblicato${p.pubblicato_da ? ' da ' + p.pubblicato_da : ''}` : (p.puo_modificare ? 'Bozza: la vedi solo tu' : '');
   stato.className = 'piano-stato ' + (p.pubblicato ? 'ok' : 'bozza');
@@ -2819,7 +2820,7 @@ function renderPiano() {
     return `
       <div class="piano-giorno ${oggi ? 'oggi' : ''} ${g.chiuso ? 'chiuso' : ''}">
         <div class="piano-giorno-top">
-          <div class="piano-giorno-nome">${_GIORNI_IT[i]} <span>${_ggmm(g.data)}</span>${oggi ? '<em>oggi</em>' : ''}</div>
+          <div class="piano-giorno-nome">${_nomeGiorno(g.data)} <span>${_ggmm(g.data)}</span>${oggi ? '<em>oggi</em>' : ''}</div>
           ${p.puo_modificare ? `<button type="button" class="piano-chiuso-btn" onclick="segnaChiuso('${g.data}', ${!g.chiuso})">${g.chiuso ? 'Riapri' : 'Chiuso'}</button>` : ''}
         </div>
         ${g.chiuso ? '<div class="piano-chiuso-txt">Chiuso</div>' : `<div class="piano-cols">${colonna('primo', g.primi, 'Primi')}${colonna('secondo', g.secondi, 'Secondi')}</div>`}
@@ -2853,8 +2854,7 @@ async function apriPiatto(data, tipo, posizione) {
   const posti = tipo === 'primo' ? g.primi : g.secondi;
   const m = posti[posizione] || posti[String(posizione)];
   S.pianoPosto = { data, tipo, posizione, categoria: (m && m.categoria) || '' };
-  const i = S.piano.giorni.indexOf(g);
-  document.getElementById('piatto-titolo').textContent = `${_GIORNI_IT[i]} ${_ggmm(data)} · ${tipo === 'primo' ? 'Primo' : 'Secondo'} ${posizione}`;
+  document.getElementById('piatto-titolo').textContent = `${_nomeGiorno(data)} ${_ggmm(data)} · ${tipo === 'primo' ? 'Primo' : 'Secondo'} ${posizione}`;
   document.getElementById('piatto-nome').value = m ? m.piatto : '';
   _sceltaCategoria(S.pianoPosto.categoria);
   document.getElementById('piatto-alternative').innerHTML = '';

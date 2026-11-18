@@ -1613,8 +1613,8 @@ def api_piano():
 def api_piano_oggi():
     """Menu di oggi per la home: solo se la settimana è pubblicata."""
     p = _piano_json(_lunedi_di())
-    oggi = next(g for g in p['giorni'] if g['data'] == p['oggi'])
-    mostra = p['pubblicato'] and not oggi['chiuso']
+    oggi = next((g for g in p['giorni'] if g['data'] == p['oggi']), None)
+    mostra = bool(oggi) and p['pubblicato'] and not oggi['chiuso']
     return jsonify({'success': True, 'pubblicato': mostra,
                     'primi': [oggi['primi'][k]['piatto'] for k in sorted(oggi['primi'])] if mostra else [],
                     'secondi': [oggi['secondi'][k]['piatto'] for k in sorted(oggi['secondi'])] if mostra else []})

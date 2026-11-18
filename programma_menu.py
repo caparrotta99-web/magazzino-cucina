@@ -8,7 +8,8 @@ Regole, in parole semplici:
 - nei secondi prova a mettere ogni giorno almeno un pesce e una carne;
 - mai due primi della stessa "famiglia" lo stesso giorno (due risotti,
   due gnocchi...): la famiglia è la prima parola del nome;
-- i posti già compilati a mano non si toccano, e i giorni chiusi restano vuoti.
+- i posti già compilati a mano non si toccano, e i giorni chiusi restano vuoti;
+- il menu del giorno c'è da martedì a venerdì.
 
 Questo file non tocca il database: riceve archivio e menu già letti e
 restituisce i piatti da aggiungere.
@@ -17,6 +18,8 @@ from datetime import date, timedelta
 
 GIORNI_SENZA_RIPETERE = 14
 POSTI = 4
+GIORNI_MENU = (1, 2, 3, 4)   # menu del giorno da martedì a venerdì (lunedì chiuso,
+                             # sabato e domenica niente menu del giorno)
 _PAROLE_VUOTE = {'di', 'del', 'della', 'delle', 'dei', 'al', 'alla', 'alle', 'ai', 'con', 'e', 'in', 'il', 'la', 'lo', 'le', 'gli'}
 
 
@@ -33,7 +36,8 @@ def famiglia(nome):
 
 
 def giorni_settimana(lunedi):
-    return [lunedi + timedelta(days=i) for i in range(7)]
+    """I giorni con il menu del giorno: da martedì a venerdì."""
+    return [lunedi + timedelta(days=i) for i in GIORNI_MENU]
 
 
 def proponi_settimana(lunedi, archivio, menu, giorni_chiusi=()):

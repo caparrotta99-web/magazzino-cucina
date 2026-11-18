@@ -26,10 +26,12 @@ def archivio_grande():
     return [piatto(n) for n in primi] + [piatto(n, 'secondo', c) for n, c in secondi]
 
 
-def test_riempie_tutta_la_settimana_4_primi_e_4_secondi():
+def test_riempie_da_martedi_a_venerdi_4_primi_e_4_secondi():
     proposte = proponi_settimana(LUNEDI, archivio_grande(), [])
-    assert len(proposte) == 7 * 8
-    for g in range(7):
+    assert len(proposte) == 4 * 8
+    giorni = {p['data'] for p in proposte}
+    assert giorni == {(LUNEDI + timedelta(days=g)).isoformat() for g in (1, 2, 3, 4)}
+    for g in (1, 2, 3, 4):
         giorno = (LUNEDI + timedelta(days=g)).isoformat()
         assert sorted(p['posizione'] for p in proposte if p['data'] == giorno and p['tipo'] == 'primo') == [1, 2, 3, 4]
         assert sorted(p['posizione'] for p in proposte if p['data'] == giorno and p['tipo'] == 'secondo') == [1, 2, 3, 4]
@@ -43,7 +45,7 @@ def test_nessun_piatto_ripetuto_in_14_giorni():
 
 def test_ogni_giorno_almeno_un_pesce_e_una_carne_nei_secondi():
     proposte = proponi_settimana(LUNEDI, archivio_grande(), [])
-    for g in range(7):
+    for g in (1, 2, 3, 4):
         giorno = (LUNEDI + timedelta(days=g)).isoformat()
         cat = {p['categoria'] for p in proposte if p['data'] == giorno and p['tipo'] == 'secondo'}
         assert {'pesce', 'carne'} <= cat
@@ -52,19 +54,25 @@ def test_ogni_giorno_almeno_un_pesce_e_una_carne_nei_secondi():
 def test_mai_due_primi_della_stessa_famiglia_nello_stesso_giorno():
     assert famiglia('Risotto ai funghi') == 'risotto' and famiglia('Gnocchi al pesto') == 'gnocchi'
     proposte = proponi_settimana(LUNEDI, archivio_grande(), [])
-    for g in range(7):
+    for g in (1, 2, 3, 4):
         giorno = (LUNEDI + timedelta(days=g)).isoformat()
         fam = [famiglia(p['piatto']) for p in proposte if p['data'] == giorno and p['tipo'] == 'primo']
         assert len(fam) == len(set(fam))
 
 
 def test_non_tocca_i_posti_gia_scritti_e_i_giorni_chiusi():
-    gia = [{'data': LUNEDI.isoformat(), 'tipo': 'primo', 'posizione': 2, 'piatto': 'Lasagne', 'categoria': ''}]
     martedi = (LUNEDI + timedelta(days=1)).isoformat()
-    proposte = proponi_settimana(LUNEDI, archivio_grande(), gia, giorni_chiusi=[martedi])
-    assert not any(p['data'] == LUNEDI.isoformat() and p['tipo'] == 'primo' and p['posizione'] == 2 for p in proposte)
-    assert not any(p['data'] == martedi for p in proposte)
-    assert 'Lasagne' not in [p['piatto'] for p in proposte]     # già in menu lunedì: non si ripete
+    mercoledi = (LUNEDI + timedelta(days=2)).isoformat()
+    gia = [{'data': martedi, 'tipo': 'primo', 'posizione': 2, 'piatto': 'Lasagne', 'categoria': ''}]
+    proposte = proponi_settimana(LUNEDI, archivio_grande(), gia, giorni_chiusi=[mercoledi])
+    assert not any(p['data'] == martedi and p['tipo'] == 'primo' and p['posizione'] == 2 for p in proposte)
+    assert not any(p['data'] == mercoledi for p in proposte)
+    assert 'Lasagne' not in [p['piatto'] for p in proposte]     # già in menu martedì: non si ripete
+
+
+def test_niente_menu_lunedi_sabato_e_domenica():
+    proposte = proponi_settimana(LUNEDI, archivio_grande(), [])
+    assert not any(date.fromisoformat(p['data']).weekday() in (0, 5, 6) for p in proposte)
 
 
 def test_piatto_fatto_di_recente_non_viene_riproposto_e_si_preferisce_il_meno_recente():
@@ -72,10 +80,9 @@ def test_piatto_fatto_di_recente_non_viene_riproposto_e_si_preferisce_il_meno_re
     settimana_scorsa = [{'data': (LUNEDI - timedelta(days=5)).isoformat(), 'tipo': 'primo', 'posizione': 1,
                          'piatto': 'Lasagne', 'categoria': ''}]
     proposte = proponi_settimana(LUNEDI, archivio, settimana_scorsa)
-    # lunedì: la lasagna è di 5 giorni fa → no; c'è solo la carbonara
-    lun = [p['piatto'] for p in proposte if p['data'] == LUNEDI.isoformat()]
-    assert lun == ['Carbonara']
-    # la lasagna torna dopo 14 giorni dall'ultima volta (cioè dal lunedì della settimana dopo... non in questa)
+    # martedì: la lasagna è di 6 giorni fa → no; c'è solo la carbonara
+    mar = [p['piatto'] for p in proposte if p['data'] == (LUNEDI + timedelta(days=1)).isoformat()]
+    assert mar == ['Carbonara']
     assert 'Lasagne' not in [p['piatto'] for p in proposte]
 
 
@@ -106,12 +113,14 @@ def test_api_bozza_solo_admin_poi_pubblicata_per_tutti(db):
     staff = _login(A, db, 'Aiuto Cuoco')
     oggi = A.today_it()
     lunedi = (oggi - timedelta(days=oggi.weekday())).isoformat()
+    con_menu = oggi.weekday() in (1, 2, 3, 4)
+    giorno_menu = oggi if con_menu else date.fromisoformat(lunedi) + timedelta(days=1)
 
-    r = admin.post('/api/piano/posto', json={'data': oggi.isoformat(), 'tipo': 'primo', 'posizione': 1,
+    r = admin.post('/api/piano/posto', json={'data': giorno_menu.isoformat(), 'tipo': 'primo', 'posizione': 1,
                                              'piatto': 'Risotto ai funghi', 'categoria': 'verdure'}).get_json()
     assert r['success'] and r['puo_modificare']
     # lo staff non può modificare e non vede la bozza
-    assert staff.post('/api/piano/posto', json={'data': oggi.isoformat(), 'tipo': 'primo', 'posizione': 2,
+    assert staff.post('/api/piano/posto', json={'data': giorno_menu.isoformat(), 'tipo': 'primo', 'posizione': 2,
                                                 'piatto': 'X'}).status_code == 403
     s = staff.get('/api/piano').get_json()
     assert not s['visibile'] and not s['pubblicato']
@@ -124,9 +133,9 @@ def test_api_bozza_solo_admin_poi_pubblicata_per_tutti(db):
     admin.post('/api/piano/pubblica', json={'settimana': lunedi})
     s = staff.get('/api/piano').get_json()
     assert s['visibile'] and s['pubblicato']
-    giorno = next(g for g in s['giorni'] if g['data'] == oggi.isoformat())
+    giorno = next(g for g in s['giorni'] if g['data'] == giorno_menu.isoformat())
     assert giorno['primi']['1']['piatto'] == 'Risotto ai funghi'
-    assert staff.get('/api/piano/oggi').get_json()['primi'] == ['Risotto ai funghi']
+    assert staff.get('/api/piano/oggi').get_json()['primi'] == (['Risotto ai funghi'] if con_menu else [])
 
 
 def test_api_proponi_usa_l_archivio(db):
@@ -138,5 +147,5 @@ def test_api_proponi_usa_l_archivio(db):
     oggi = A.today_it()
     lunedi = (oggi - timedelta(days=oggi.weekday())).isoformat()
     r = admin.post('/api/piano/proponi', json={'settimana': lunedi}).get_json()
-    assert r['aggiunti'] == 56
+    assert r['aggiunti'] == 32 and len(r['giorni']) == 4
     assert all(len(g['primi']) == 4 and len(g['secondi']) == 4 for g in r['giorni'])

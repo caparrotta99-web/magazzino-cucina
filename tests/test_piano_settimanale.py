@@ -106,9 +106,11 @@ def _login(A, db, nome, ruolo='staff'):
     return c
 
 
-def test_api_bozza_solo_admin_poi_pubblicata_per_tutti(db):
+def test_api_bozza_solo_admin_poi_pubblicata_per_tutti(db, monkeypatch):
     import app as A
     A.app.config['TESTING'] = True
+    # la Dashboard dalle 16 passa a domani: qui guardo sempre il pranzo di oggi
+    monkeypatch.setattr(A, '_giorno_pranzo_da_mostrare', lambda adesso=None: (A.today_it(), 'oggi'))
     admin = _login(A, db, 'Capo Cucina', 'admin')
     staff = _login(A, db, 'Aiuto Cuoco')
     oggi = A.today_it()
@@ -269,3 +271,56 @@ def test_usa_suggerimento_con_giorno_pieno(db):
     sid = admin.get('/api/piano').get_json()['giorni'][0]['suggerimenti'][0]['id']
     r = admin.post(f'/api/piano/suggerimento/{sid}/usa')
     assert r.status_code == 400 and 'pieni' in r.get_json()['error']
+
+
+def test_dashboard_mostra_domani_dalle_16():
+    import app as A
+    from datetime import datetime
+    mer = datetime(2026, 11, 18, 15, 59, tzinfo=A.TZ_ITALIA)
+    assert A._giorno_pranzo_da_mostrare(mer) == (date(2026, 11, 18), 'oggi')
+    assert A._giorno_pranzo_da_mostrare(mer.replace(hour=16, minute=0)) == (date(2026, 11, 19), 'domani')
+    # venerdì sera: domani è sabato, niente menu del giorno ma nessun errore
+    ven = datetime(2026, 11, 20, 18, 0, tzinfo=A.TZ_ITALIA)
+    assert A._giorno_pranzo_da_mostrare(ven) == (date(2026, 11, 21), 'domani')
+
+
+def test_api_domani_anche_nella_settimana_dopo(db, monkeypatch):
+    import app as A
+    A.app.config['TESTING'] = True
+    admin = _login(A, db, 'Capo Cucina', 'admin')
+    # lunedì sera: domani è martedì della stessa settimana; domenica sera → lunedì (chiuso, nessun menu)
+    oggi = A.today_it()
+    martedi = oggi - timedelta(days=oggi.weekday()) + timedelta(days=8)
+    admin.post('/api/piano/posto', json={'data': martedi.isoformat(), 'tipo': 'primo', 'posizione': 1,
+                                         'piatto': 'Pasta e fagioli', 'categoria': 'verdure'})
+    admin.post('/api/piano/pubblica', json={'settimana': (martedi - timedelta(days=1)).isoformat()})
+    monkeypatch.setattr(A, '_giorno_pranzo_da_mostrare', lambda adesso=None: (martedi, 'domani'))
+    r = admin.get('/api/piano/oggi').get_json()
+    assert r['pubblicato'] and r['quando'] == 'domani' and r['primi'] == ['Pasta e fagioli']
+
+
+def test_simone_decide_chi_vede_il_menu_del_giorno(db, monkeypatch):
+    import app as A
+    A.app.config['TESTING'] = True
+    admin = _login(A, db, 'Capo Cucina', 'admin')
+    staff = _login(A, db, 'Aiuto Cuoco')
+    oggi = A.today_it()
+    martedi = oggi - timedelta(days=oggi.weekday()) + timedelta(days=1)
+    admin.post('/api/piano/posto', json={'data': martedi.isoformat(), 'tipo': 'primo', 'posizione': 1,
+                                         'piatto': 'Gnocchi al pesto', 'categoria': 'verdure'})
+    admin.post('/api/piano/pubblica', json={'settimana': (martedi - timedelta(days=1)).isoformat()})
+    monkeypatch.setattr(A, '_giorno_pranzo_da_mostrare', lambda adesso=None: (martedi, 'oggi'))
+    # di base lo vede anche lo staff
+    assert staff.get('/api/piano/oggi').get_json()['primi'] == ['Gnocchi al pesto']
+    uid = db.get_user_by_nome('Aiuto Cuoco')['id']
+    # lo staff non può cambiarsi il permesso da solo
+    assert staff.post('/admin/menu-giorno-permesso', data={'user_id': uid, 'permesso': '0'}).status_code in (302, 403)
+    assert staff.get('/api/piano/oggi').get_json()['primi'] == ['Gnocchi al pesto']
+    # Simone lo nasconde: niente menu nella Dashboard di quel collega
+    admin.post('/admin/menu-giorno-permesso', data={'user_id': uid, 'permesso': '0'})
+    r = staff.get('/api/piano/oggi').get_json()
+    assert r['pubblicato'] is False and r['primi'] == []
+    # l'admin lo vede sempre
+    assert admin.get('/api/piano/oggi').get_json()['primi'] == ['Gnocchi al pesto']
+    admin.post('/admin/menu-giorno-permesso', data={'user_id': uid, 'permesso': '1'})
+    assert staff.get('/api/piano/oggi').get_json()['primi'] == ['Gnocchi al pesto']

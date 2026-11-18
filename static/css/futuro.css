@@ -732,3 +732,13 @@
 :root[data-stile="futuro"] .piano-sugg { border-top-color: var(--f-ln) !important; }
 :root[data-stile="futuro"] .piano-sugg-btn { border-color: var(--f-ln) !important; color: var(--f-mu) !important; }
 :root[data-stile="futuro"] .piano-sugg-btn.usa { border-color: var(--f-li) !important; color: var(--f-li) !important; }
+
+/* Dashboard: capsula "Oggi a pranzo" */
+:root[data-stile="futuro"] .home-dash-pranzo {
+  border-radius: 999px !important; padding: 12px 18px !important;
+  border: 1px solid color-mix(in srgb, var(--f-li) 45%, transparent) !important;
+}
+:root[data-stile="futuro"] .home-dash-pranzo.aperto { border-radius: 24px 24px 24px 6px !important; padding: 16px !important; }
+:root[data-stile="futuro"] .home-dash-pranzo .home-dash-card-title::before { background: var(--f-li); box-shadow: 0 0 10px var(--f-li); }
+:root[data-stile="futuro"] .pranzo-conta { font-family: var(--f-mono); font-size: 11px; letter-spacing: .06em; color: var(--f-mu) !important; opacity: 1; }
+:root[data-stile="futuro"] .pranzo-piano-btn { border-radius: 999px !important; border-color: var(--f-ln) !important; color: var(--f-tx, inherit) !important; }

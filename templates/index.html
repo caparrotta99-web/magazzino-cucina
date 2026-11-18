@@ -291,13 +291,20 @@
               </div>
             </div>
 
-            <div class="home-dash-card home-dash-pranzo" id="home-dash-pranzo" style="display:none" onclick="navTo('piano')">
+            <!-- Menu del giorno: capsula piccola, si apre col tocco -->
+            <div class="home-dash-card home-dash-pranzo" id="home-dash-pranzo" style="display:none" onclick="togglePranzo(event)">
               <div class="home-dash-card-top">
-                <div class="home-dash-card-title">Oggi a pranzo</div>
+                <div class="home-dash-card-title" id="home-dash-pranzo-tit">Oggi a pranzo</div>
+                <div class="pranzo-conta"><span id="home-dash-pranzo-conta"></span>
+                  <svg class="pranzo-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
               </div>
-              <div class="pranzo-colonne">
-                <div><div class="pranzo-tit">Primi</div><ul class="home-dash-simple-list" id="home-dash-pranzo-primi"></ul></div>
-                <div><div class="pranzo-tit">Secondi</div><ul class="home-dash-simple-list" id="home-dash-pranzo-secondi"></ul></div>
+              <div class="pranzo-dettaglio">
+                <div class="pranzo-colonne">
+                  <div><div class="pranzo-tit">Primi</div><ul class="home-dash-simple-list" id="home-dash-pranzo-primi"></ul></div>
+                  <div><div class="pranzo-tit">Secondi</div><ul class="home-dash-simple-list" id="home-dash-pranzo-secondi"></ul></div>
+                </div>
+                <button type="button" class="pranzo-piano-btn" onclick="event.stopPropagation(); navTo('piano')">Piano settimanale</button>
               </div>
             </div>
 

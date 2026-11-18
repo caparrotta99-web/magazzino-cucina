@@ -604,6 +604,7 @@ def db_init():
         ('users',    'stato',     "TEXT NOT NULL DEFAULT 'attivo'"),
         ('users',    'puo_vedere_controllo', "INTEGER NOT NULL DEFAULT 0"),
         ('users',    'puo_eliminare_carichi', "INTEGER NOT NULL DEFAULT 0"),
+        ('users',    'vede_menu_giorno', "INTEGER NOT NULL DEFAULT 1"),
         ('apparecchi', 'reparto', "TEXT NOT NULL DEFAULT 'Cucina'"),
         ('apparecchi', 'marca',   "TEXT NOT NULL DEFAULT ''"),
         ('apparecchi', 'modello', "TEXT NOT NULL DEFAULT ''"),
@@ -1437,7 +1438,7 @@ def get_all_users():
     with get_conn() as conn:
         cur = conn.execute(
             "SELECT id, nome, email, telefono, reparto, role, gestisce_apparecchi, "
-            "stato, puo_vedere_controllo, puo_eliminare_carichi FROM users ORDER BY "
+            "stato, puo_vedere_controllo, puo_eliminare_carichi, vede_menu_giorno FROM users ORDER BY "
             "CASE WHEN stato = 'in_attesa' THEN 0 ELSE 1 END, nome"
         )
         return _rows(cur)
@@ -1451,6 +1452,13 @@ def update_user_role(user_id, role):
 def update_user_controllo_permesso(user_id, permesso):
     with get_conn() as conn:
         conn.execute("UPDATE users SET puo_vedere_controllo = ? WHERE id = ?",
+                     (1 if permesso else 0, user_id))
+
+
+def update_user_menu_giorno_permesso(user_id, permesso):
+    """Se lo staff vede il menu del giorno nella Dashboard (di base sì)."""
+    with get_conn() as conn:
+        conn.execute("UPDATE users SET vede_menu_giorno = ? WHERE id = ?",
                      (1 if permesso else 0, user_id))
 
 

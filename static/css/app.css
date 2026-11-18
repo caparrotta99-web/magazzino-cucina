@@ -2222,7 +2222,23 @@ body.comprati-aperto .btn-help { display: none !important; }
 }
 .piatto-alt span { font-size: 14px; font-weight: 600; }
 .piatto-alt small { font-size: 11px; color: var(--muted); }
-/* Dashboard: Oggi a pranzo */
+/* Dashboard: Oggi a pranzo — capsula chiusa, si apre col tocco */
+.home-dash-pranzo { border-radius: 100px; padding: 12px 18px; border-color: rgba(163,230,53,.45); transition: border-radius .2s; }
+.home-dash-pranzo .home-dash-card-title::before {
+  content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 10px; vertical-align: middle;
+  border-radius: 50%; background: #a3e635;
+}
+.home-dash-pranzo .pranzo-dettaglio { display: none; }
+.home-dash-pranzo.aperto { border-radius: 20px; padding: 16px; }
+.home-dash-pranzo.aperto .pranzo-dettaglio { display: block; margin-top: 4px; }
+.pranzo-conta { display: flex; align-items: center; gap: 6px; font-size: 12px; font-weight: 600; opacity: .75; }
+.pranzo-chevron { transition: transform .2s; }
+.home-dash-pranzo.aperto .pranzo-chevron { transform: rotate(180deg); }
+.pranzo-piano-btn {
+  display: block; width: 100%; margin-top: 12px; padding: 10px; border-radius: 100px; cursor: pointer;
+  font: inherit; font-size: 13px; font-weight: 600; background: transparent; color: inherit;
+  border: 1px solid rgba(255,255,255,.3);
+}
 .pranzo-colonne { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
 .pranzo-tit { font-size: 10.5px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: rgba(255,255,255,.55); margin-top: 8px; }
 .piano-tag { display: flex; flex-wrap: wrap; gap: 4px; }

@@ -341,6 +341,7 @@
             {% if u.role == 'staff' and u.gestisce_apparecchi %}<span class="badge badge-reparto">Gestisce apparecchi</span>{% endif %}
             {% if u.role == 'staff' and u.puo_vedere_controllo %}<span class="badge badge-controllo">Accesso Controllo</span>{% endif %}
             {% if u.role == 'staff' and u.puo_eliminare_carichi %}<span class="badge badge-controllo">Elimina carichi</span>{% endif %}
+            {% if u.role == 'staff' and not u.vede_menu_giorno %}<span class="badge badge-reparto">Niente menu del giorno</span>{% endif %}
           </div>
         </div>
       </div>
@@ -402,6 +403,17 @@
             <input type="hidden" name="permesso" value="{{ '0' if u.puo_eliminare_carichi else '1' }}">
             <button type="submit" class="btn-action">
               {% if u.puo_eliminare_carichi %}✕ Revoca permesso{% else %}+ Abilita permesso{% endif %}
+            </button>
+          </form>
+        </div>
+
+        <div class="settings-row">
+          <span class="settings-label">Menu del giorno in Dashboard</span>
+          <form method="post" action="/admin/menu-giorno-permesso">
+            <input type="hidden" name="user_id" value="{{ u.id }}">
+            <input type="hidden" name="permesso" value="{{ '0' if u.vede_menu_giorno else '1' }}">
+            <button type="submit" class="btn-action">
+              {% if u.vede_menu_giorno %}✕ Nascondi{% else %}+ Mostra{% endif %}
             </button>
           </form>
         </div>

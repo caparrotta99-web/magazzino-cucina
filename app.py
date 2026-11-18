@@ -74,7 +74,7 @@ from database import (
     log_lista_spesa_azione, get_log_lista_spesa,
     update_registro_lotto, log_modifica_registro, get_log_modifiche_registro,
     get_registro_by_mese, get_temperature_by_mese, get_report_mensile_anno,
-    update_user_eliminazione_carichi_permesso,
+    update_user_eliminazione_carichi_permesso, update_user_menu_giorno_permesso,
     delete_registro_row, log_eliminazione_carico, get_log_eliminazioni_registro,
     insert_preparazione, insert_preparazione_ingrediente,
     get_preparazioni, get_preparazione_by_id, get_preparazione_ingredienti,
@@ -185,6 +185,8 @@ class User(UserMixin):
         self.tutorial_visto = bool(data.get('tutorial_visto'))
         self.puo_vedere_controllo = bool(data.get('puo_vedere_controllo'))
         self.puo_eliminare_carichi_raw = bool(data.get('puo_eliminare_carichi'))
+        # di base tutti vedono il menu del giorno; Simone può toglierlo a chi vuole
+        self.vede_menu_giorno_raw = bool(data.get('vede_menu_giorno', 1))
 
     @property
     def puo_gestire_apparecchi(self):
@@ -193,6 +195,10 @@ class User(UserMixin):
     @property
     def puo_accedere_controllo(self):
         return self.role == 'admin' or self.puo_vedere_controllo
+
+    @property
+    def vede_menu_giorno(self):
+        return self.role == 'admin' or self.vede_menu_giorno_raw
 
     @property
     def puo_eliminare_carichi(self):
@@ -970,6 +976,18 @@ def admin_set_apparecchi_permesso():
     return redirect(url_for('admin_page'))
 
 
+@app.route('/admin/menu-giorno-permesso', methods=['POST'])
+@login_required
+@admin_required
+def admin_set_menu_giorno_permesso():
+    user_id  = request.form.get('user_id', type=int)
+    permesso = request.form.get('permesso') == '1'
+    if not user_id:
+        abort(400)
+    update_user_menu_giorno_permesso(user_id, permesso)
+    return redirect(url_for('admin_page'))
+
+
 @app.route('/admin/controllo-permesso', methods=['POST'])
 @login_required
 @admin_required
@@ -1695,16 +1713,32 @@ def api_piano():
     return jsonify(_piano_json(_lunedi_di(request.args.get('settimana'))))
 
 
+ORA_MENU_DOMANI = 16  # dalle 16 la Dashboard mostra il menu di domani
+
+
+def _giorno_pranzo_da_mostrare(adesso=None):
+    """Prima delle 16 il pranzo di oggi, dalle 16 quello di domani."""
+    adesso = adesso or now_it()
+    if adesso.hour >= ORA_MENU_DOMANI:
+        return adesso.date() + timedelta(days=1), 'domani'
+    return adesso.date(), 'oggi'
+
+
 @app.route('/api/piano/oggi')
 @login_required
 def api_piano_oggi():
-    """Menu di oggi per la home: solo se la settimana è pubblicata."""
-    p = _piano_json(_lunedi_di())
-    oggi = next((g for g in p['giorni'] if g['data'] == p['oggi']), None)
-    mostra = bool(oggi) and p['pubblicato'] and not oggi['chiuso']
-    return jsonify({'success': True, 'pubblicato': mostra,
-                    'primi': [oggi['primi'][k]['piatto'] for k in sorted(oggi['primi'])] if mostra else [],
-                    'secondi': [oggi['secondi'][k]['piatto'] for k in sorted(oggi['secondi'])] if mostra else []})
+    """Menu del giorno per la Dashboard: oggi, oppure domani dalle 16.
+    Solo se la settimana è pubblicata e quel giorno non è chiuso."""
+    giorno, quando = _giorno_pranzo_da_mostrare()
+    if not current_user.vede_menu_giorno:
+        return jsonify({'success': True, 'pubblicato': False, 'quando': quando, 'data': giorno.isoformat(),
+                        'primi': [], 'secondi': []})
+    p = _piano_json(_lunedi_di(giorno.isoformat()))
+    g = next((x for x in p['giorni'] if x['data'] == giorno.isoformat()), None)
+    mostra = bool(g) and p['pubblicato'] and not g['chiuso']
+    return jsonify({'success': True, 'pubblicato': mostra, 'quando': quando, 'data': giorno.isoformat(),
+                    'primi': [g['primi'][k]['piatto'] for k in sorted(g['primi'])] if mostra else [],
+                    'secondi': [g['secondi'][k]['piatto'] for k in sorted(g['secondi'])] if mostra else []})
 
 
 @app.route('/api/piano/posto', methods=['POST'])

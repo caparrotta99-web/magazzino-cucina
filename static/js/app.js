@@ -3019,6 +3019,13 @@ async function loadPranzoOggi() {
   const li = arr => arr.length ? arr.map(x => `<li>${esc(x)}</li>`).join('') : '<li class="home-dash-simple-empty">—</li>';
   document.getElementById('home-dash-pranzo-primi').innerHTML = li(r.primi);
   document.getElementById('home-dash-pranzo-secondi').innerHTML = li(r.secondi);
+  document.getElementById('home-dash-pranzo-tit').textContent = r.quando === 'domani' ? 'Domani a pranzo' : 'Oggi a pranzo';
+  document.getElementById('home-dash-pranzo-conta').textContent = `${r.primi.length} primi · ${r.secondi.length} secondi`;
+}
+
+function togglePranzo(e) {
+  const box = document.getElementById('home-dash-pranzo');
+  if (box) box.classList.toggle('aperto');
 }
 
 // ── LISTA SPESA — COUNTDOWN ───────────────────────────────────────────────
